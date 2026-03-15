@@ -1,4 +1,4 @@
-use crate::{ApprovalMode, ClaudeRequest, Message, Provider};
+use crate::{ApprovalMode, Message, Provider};
 use anyhow::Result;
 use netsage_pybridge::PythonBridge;
 use netsage_session::SessionStore;
