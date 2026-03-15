@@ -13,7 +13,7 @@ NetSage is a next-generation AI network intelligence tool that lives in your ter
 ## Installation
 
 ```bash
-curl -sSL https://netsage.dev/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/thrive-spectrexq/netsage/master/install.sh | bash
 ```
 
 ## Quick Start
