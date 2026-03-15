@@ -2,6 +2,9 @@ use anyhow::Result;
 use netsage_tui::run_tui;
 
 fn main() -> Result<()> {
+    // Load .env file
+    let _ = dotenvy::dotenv();
+    
     tracing_subscriber::fmt::init();
 
     let config_path = std::path::Path::new("config.toml");
@@ -31,6 +34,8 @@ fn main() -> Result<()> {
         netsage_agent::Provider::Gemini => "GEMINI_API_KEY",
         netsage_agent::Provider::Anthropic => "ANTHROPIC_API_KEY",
     };
+
+    let api_key = std::env::var(api_key_env).unwrap_or_default();
 
     let mode = match config.core.approval_mode.as_str() {
         "read-only" => netsage_agent::ApprovalMode::ReadOnly,

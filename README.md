@@ -16,15 +16,22 @@ NetSage is a next-generation AI network intelligence tool that lives in your ter
 curl -sSL https://raw.githubusercontent.com/thrive-spectrexq/netsage/master/install.sh | bash
 ```
 
-## Quick Start
-
-1. Set your API key: 
-   - `export ANTHROPIC_API_KEY=...`
-   - or `export OPENAI_API_KEY=...`
-   - or `export GEMINI_API_KEY=...`
+1. Set your API key in your environment:
+   - **Windows (PowerShell)**: `$env:GEMINI_API_KEY = "your_key_here"`
+   - **Linux/macOS**: `export GEMINI_API_KEY=your_key_here`
 2. Create a `NETWORK.md` file in your project root for context.
-3. Select your provider in `config.toml`.
-4. Run `netsage`.
+3. Select your provider in `config.toml`:
+   ```toml
+   [core]
+   provider = "gemini"
+   model = "gemini-1.5-pro"
+   ```
+4. Run `cargo build` and then the binary.
+
+### Windows Build Requirements
+To build NetSage on Windows, you must have the **Npcap SDK** installed so that the packet engine can link against `wpcap.lib`.
+1. Download the **Npcap SDK** from [nmap.org/npcap/](https://nmap.org/npcap/).
+2. Extract it and set the `LIB` environment variable to point to the `Lib\x64` folder.
 
 ## Key Commands
 - `q`: Quit.
