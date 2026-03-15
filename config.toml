@@ -1,0 +1,6 @@
+[core]
+provider = "anthropic" # Options: anthropic | openai | gemini
+model = "claude-3-5-sonnet-20240620"
+# model = "gpt-4o"
+# model = "gemini-1.5-pro"
+approval_mode = "supervised"

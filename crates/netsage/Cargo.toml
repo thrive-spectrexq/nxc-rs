@@ -1,0 +1,19 @@
+[package]
+name = "netsage"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+netsage-agent = { path = "../netsage-agent" }
+netsage-tui = { path = "../netsage-tui" }
+netsage-tools = { path = "../netsage-tools" }
+netsage-pybridge = { path = "../netsage-pybridge" }
+netsage-capture = { path = "../netsage-capture" }
+netsage-session = { path = "../netsage-session" }
+netsage-config = { path = "../netsage-config" }
+netsage-auth = { path = "../netsage-auth" }
+tokio = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

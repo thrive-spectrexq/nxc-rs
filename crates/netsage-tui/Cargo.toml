@@ -1,0 +1,13 @@
+[package]
+name = "netsage-tui"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+tokio = { workspace = true }
+tui-textarea = { workspace = true }
+syntect = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }

@@ -1,0 +1,9 @@
+[package]
+name = "netsage-config"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+toml = { workspace = true }
+serde = { workspace = true }
+anyhow = { workspace = true }

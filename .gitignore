@@ -1,0 +1,29 @@
+# Rust
+target/
+**/*.rs.bk
+debug/
+release/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+*.log
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project specific
+session.db
+.gemini/
+.agents/
+docs/_site/
+dist/
+build/

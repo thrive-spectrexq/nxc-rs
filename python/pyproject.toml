@@ -1,0 +1,23 @@
+[project]
+name = "netsage-tools"
+version = "0.1.0"
+description = "NetSage Python Tool Engine"
+dependencies = [
+    "scapy",
+    "python-nmap",
+    "paramiko",
+    "netmiko",
+    "napalm",
+    "ncclient",
+    "dnspython",
+    "httpx",
+    "cryptography",
+    "python-whois",
+    "geoip2",
+    "psutil",
+    "jsonschema"
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

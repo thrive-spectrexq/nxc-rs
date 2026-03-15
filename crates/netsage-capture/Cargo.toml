@@ -1,0 +1,9 @@
+[package]
+name = "netsage-capture"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+pcap = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
