@@ -25,9 +25,21 @@ impl PythonBridge {
         Ok(Self { child })
     }
 
-    pub async fn call_tool(&mut self, tool: &str, args: serde_json::Value) -> Result<serde_json::Value> {
-        let stdin = self.child.stdin.as_mut().ok_or_else(|| anyhow::anyhow!("No stdin"))?;
-        let stdout = self.child.stdout.as_mut().ok_or_else(|| anyhow::anyhow!("No stdout"))?;
+    pub async fn call_tool(
+        &mut self,
+        tool: &str,
+        args: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        let stdin = self
+            .child
+            .stdin
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("No stdin"))?;
+        let stdout = self
+            .child
+            .stdout
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("No stdout"))?;
         let mut reader = BufReader::new(stdout);
 
         let request = JsonRpcRequest {
@@ -52,6 +64,8 @@ impl PythonBridge {
             anyhow::bail!("Python error {}: {}", err.code, err.message);
         }
 
-        response.result.ok_or_else(|| anyhow::anyhow!("No result in response"))
+        response
+            .result
+            .ok_or_else(|| anyhow::anyhow!("No result in response"))
     }
 }

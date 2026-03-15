@@ -1,16 +1,16 @@
 use anyhow::Result;
-use ratatui::{
-    backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
-    widgets::{Block, Borders, Paragraph, List, ListItem},
-    Terminal,
-};
-use std::io;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use ratatui::{
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout},
+    widgets::{Block, Borders, List, ListItem, Paragraph},
+    Terminal,
+};
+use std::io;
 
 #[derive(Debug, PartialEq)]
 pub enum View {
@@ -67,7 +67,10 @@ pub fn run_tui() -> Result<()> {
     Ok(())
 }
 
-fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
+fn run_app<B: ratatui::backend::Backend>(
+    terminal: &mut Terminal<B>,
+    mut app: App,
+) -> io::Result<()> {
     loop {
         terminal.draw(|f| {
             let chunks = Layout::default()
@@ -75,40 +78,56 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                 .margin(1)
                 .constraints(
                     [
-                        Constraint::Length(3), // Header/Mode
-                        Constraint::Min(10),   // Chat/Main
+                        Constraint::Length(3),  // Header/Mode
+                        Constraint::Min(10),    // Chat/Main
                         Constraint::Length(10), // Packet Inspector
-                        Constraint::Length(3), // Input
+                        Constraint::Length(3),  // Input
                     ]
                     .as_ref(),
                 )
                 .split(f.area());
 
             // Header
-            let header = Paragraph::new(app.mode_info.clone())
-                .block(Block::default().borders(Borders::ALL).title(" NetSage status "));
+            let header = Paragraph::new(app.mode_info.clone()).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" NetSage status "),
+            );
             f.render_widget(header, chunks[0]);
 
             // Main Content Area (View Switch)
             match app.current_view {
                 View::Dashboard => {
-                    let chat_items: Vec<ListItem> = app.messages.iter()
+                    let chat_items: Vec<ListItem> = app
+                        .messages
+                        .iter()
                         .map(|m| ListItem::new(m.as_str()))
                         .collect();
-                    let chat = List::new(chat_items)
-                        .block(Block::default().borders(Borders::ALL).title(" Investigation Trace "));
+                    let chat = List::new(chat_items).block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(" Investigation Trace "),
+                    );
                     f.render_widget(chat, chunks[1]);
 
-                    let packet_items: Vec<ListItem> = app.packets.iter()
+                    let packet_items: Vec<ListItem> = app
+                        .packets
+                        .iter()
                         .map(|p| ListItem::new(p.as_str()))
                         .collect();
-                    let packet_list = List::new(packet_items)
-                        .block(Block::default().borders(Borders::ALL).title(" Live Packets (L1/L2) "));
+                    let packet_list = List::new(packet_items).block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(" Live Packets (L1/L2) "),
+                    );
                     f.render_widget(packet_list, chunks[2]);
                 }
                 View::Topology => {
-                    let topology = Paragraph::new(app.topology_map.clone())
-                        .block(Block::default().borders(Borders::ALL).title(" Network Topology (Ctrl+T) "));
+                    let topology = Paragraph::new(app.topology_map.clone()).block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(" Network Topology (Ctrl+T) "),
+                    );
                     f.render_widget(topology, chunks[1]);
                     // Hide packets or show a smaller version? For now hide.
                 }
@@ -118,14 +137,17 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
             let input = Paragraph::new(app.input.clone())
                 .block(Block::default().borders(Borders::ALL).title(" Prompt "));
             f.render_widget(input, chunks[3]);
-
         })?;
 
         if let Event::Key(key) = event::read()? {
             match key.code {
                 KeyCode::Char('q') => return Ok(()),
                 KeyCode::Char('t') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
-                    app.current_view = if app.current_view == View::Dashboard { View::Topology } else { View::Dashboard };
+                    app.current_view = if app.current_view == View::Dashboard {
+                        View::Topology
+                    } else {
+                        View::Dashboard
+                    };
                 }
                 KeyCode::Enter => {
                     let input = app.input.trim();
@@ -133,13 +155,16 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                         app.messages.clear();
                         app.messages.push("History cleared.".to_string());
                     } else if input == "/export" {
-                        app.messages.push("Exporting session to report.md...".to_string());
+                        app.messages
+                            .push("Exporting session to report.md...".to_string());
                         // In a real app, this would trigger the actual SessionStore export
                     }
                     app.input.clear();
                 }
                 KeyCode::Char(c) => app.input.push(c),
-                KeyCode::Backspace => { app.input.pop(); }
+                KeyCode::Backspace => {
+                    app.input.pop();
+                }
                 _ => {}
             }
         }

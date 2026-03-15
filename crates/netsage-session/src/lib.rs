@@ -1,8 +1,8 @@
 use anyhow::Result;
+use chrono::Utc;
 use rusqlite::{params, Connection};
 use serde_json::Value;
 use std::path::Path;
-use chrono::Utc;
 
 pub struct SessionStore {
     conn: Connection,
@@ -11,7 +11,7 @@ pub struct SessionStore {
 impl SessionStore {
     pub fn open(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)?;
-        
+
         // Initialize tables
         conn.execute(
             "CREATE TABLE IF NOT EXISTS tool_calls (
@@ -32,13 +32,7 @@ impl SessionStore {
         self.conn.execute(
             "INSERT INTO tool_calls (id, timestamp, tool, args, status)
              VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                id,
-                Utc::now().to_rfc3339(),
-                tool,
-                args.to_string(),
-                status
-            ],
+            params![id, Utc::now().to_rfc3339(), tool, args.to_string(), status],
         )?;
         Ok(())
     }

@@ -3,7 +3,7 @@ use netsage_tui::run_tui;
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
-    
+
     let config_path = std::path::Path::new("config.toml");
     let config = if config_path.exists() {
         netsage_config::load_config(config_path)?
@@ -55,6 +55,6 @@ fn main() -> Result<()> {
 
     println!("Starting NetSage Phase 2...");
     run_tui()?;
-    
+
     Ok(())
 }

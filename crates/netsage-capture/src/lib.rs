@@ -19,7 +19,7 @@ impl PacketEngine {
         };
 
         info!("Starting capture on device: {}", device.name);
-        
+
         let capture = Capture::from_device(device)?
             .promisc(true)
             .snaplen(65535)
