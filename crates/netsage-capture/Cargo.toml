@@ -7,6 +7,8 @@ edition.workspace = true
 pcap = { version = "2.4.0", optional = true }
 etherparse = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+netsage-auth = { path = "../netsage-auth" }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true, features = ["full"] }

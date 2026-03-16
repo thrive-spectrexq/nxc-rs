@@ -154,7 +154,7 @@ impl ToolRegistry {
     }
 
     async fn port_scan(&self, args: Value) -> anyhow::Result<Value> {
-        let host = args["host"].as_str().ok_or_else(|| anyhow::anyhow!("Missing host"))?;
+        let host = args["host"].as_str().ok_or_else(|| anyhow::anyhow!("Missing host"))?.to_string();
         let ports_str = args["ports"].as_str().unwrap_or("1-1024");
 
         let mut ports = Vec::new();
@@ -176,29 +176,58 @@ impl ToolRegistry {
         }
 
         let mut open_ports = Vec::new();
+        let mut handles = Vec::new();
+
         for port in ports {
-            let addr = format!("{}:{}", host, port);
-            if let Ok(Ok(_)) = tokio::time::timeout(Duration::from_millis(100), tokio::net::TcpStream::connect(&addr)).await {
+            let host_clone = host.clone();
+            handles.push(tokio::spawn(async move {
+                let addr = format!("{}:{}", host_clone, port);
+                match tokio::time::timeout(Duration::from_millis(200), tokio::net::TcpStream::connect(&addr)).await {
+                    Ok(Ok(_)) => Some(port),
+                    _ => None,
+                }
+            }));
+        }
+
+        for handle in handles {
+            if let Ok(Some(port)) = handle.await {
                 open_ports.push(port);
             }
         }
+
+        open_ports.sort_unstable();
 
         Ok(json!({
             "status": "success",
             "host": host,
             "open_ports": open_ports,
+            "scan_count": open_ports.len()
         }))
     }
 
     async fn geoip_lookup(&self, args: Value) -> anyhow::Result<Value> {
         let ip_str = args["ip"].as_str().ok_or_else(|| anyhow::anyhow!("Missing ip"))?;
         
+        // Refined mock response
+        let is_private = ip_str.starts_with("10.") || ip_str.starts_with("192.168.") || ip_str.starts_with("172.");
+        
+        if is_private {
+            return Ok(json!({
+                "status": "success",
+                "ip": ip_str,
+                "location": "Internal Network",
+                "isp": "Local Authority",
+                "note": "Private IP address detected"
+            }));
+        }
+
         Ok(json!({
             "status": "success",
             "ip": ip_str,
             "city": "San Francisco",
+            "region": "California",
             "country": "United States",
-            "isp": "Mock ISP",
+            "isp": "Cloudflare / Google Mock",
             "note": "GeoIP database path not configured, returning mock data"
         }))
     }

@@ -1,4 +1,5 @@
 pub mod topology;
+pub mod ingestion;
 use anyhow::Result;
 use tracing::{info, error};
 use tokio::sync::mpsc;
@@ -161,16 +162,23 @@ impl PacketEngine {
 
         // Async streaming loop
         tokio::spawn(async move {
+            let token = netsage_auth::get_local_token();
             loop {
                 info!("Connecting to central NetSage server at {}...", server_addr);
                 match TcpStream::connect(&server_addr).await {
                     Ok(mut stream) => {
                         info!("Connected to server. Starting remote stream.");
                         while let Some(desc) = rx.recv().await {
-                            let data = format!("{}\n", desc);
-                            if let Err(e) = stream.write_all(data.as_bytes()).await {
-                                error!("Failed to send packet data to server: {}", e);
-                                break;
+                            let pkt = ingestion::IngestionPacket {
+                                auth: token.clone(),
+                                payload: desc,
+                            };
+                            if let Ok(data) = serde_json::to_string(&pkt) {
+                                let data = format!("{}\n", data);
+                                if let Err(e) = stream.write_all(data.as_bytes()).await {
+                                    error!("Failed to send packet data to server: {}", e);
+                                    break;
+                                }
                             }
                         }
                     }

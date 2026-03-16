@@ -5,6 +5,7 @@ use netsage_agent::{Agent, AgentEvent, Message, Provider, ApprovalMode, Persona}
 use tracing::info;
 use netsage_capture::PacketEngine;
 use netsage_capture::topology::{SharedTopology, TopologyGraph};
+use netsage_capture::ingestion::IngestionServer;
 use netsage_mcp::McpServer;
 use tokio::sync::mpsc;
 use std::sync::{Arc, Mutex as StdMutex};
@@ -123,39 +124,19 @@ async fn main() -> Result<()> {
         if let Some(topo) = shared_topology.clone() {
             let ui_tx_srv = ui_tx.clone();
             tokio::spawn(async move {
-                let listener = tokio::net::TcpListener::bind("0.0.0.0:9090").await.unwrap();
-                info!("NetSage Ingestion Server listening on 0.0.0.0:9090");
-                loop {
-                    if let Ok((socket, addr)) = listener.accept().await {
-                        let topo_inner = topo.clone();
-                        let ui_tx_inner = ui_tx_srv.clone();
-                        info!("New capture node connected: {}", addr);
-                        tokio::spawn(async move {
-                            use tokio::io::AsyncBufReadExt;
-                            let reader = tokio::io::BufReader::new(socket);
-                            let mut lines = reader.lines();
-                            while let Ok(Some(line)) = lines.next_line().await {
-                                // Basic parsing of "src -> dst"
-                                if line.contains(" -> ") {
-                                    let parts: Vec<&str> = line.split(" -> ").collect();
-                                    if parts.len() >= 2 {
-                                        let src = parts[0].trim().to_string();
-                                        let dst_full = parts[1].trim();
-                                        let dst = dst_full.split(' ').next().unwrap_or(dst_full).to_string();
-                                        
-                                        if let Ok(graph) = topo_inner.lock() {
-                                            let mut graph: std::sync::MutexGuard<'_, TopologyGraph> = graph;
-                                            graph.add_node(src.clone(), src.clone(), "remote_host".to_string());
-                                            graph.add_node(dst.clone(), dst.clone(), "remote_host".to_string());
-                                            graph.add_edge(src, dst);
-                                        }
-                                    }
-                                }
-                                let _ = ui_tx_inner.send(TuiEvent::PacketUpdate(format!("[REMOTE] {}", line))).await;
-                            }
-                            info!("Capture node disconnected: {}", addr);
-                        });
+                let server = IngestionServer::new(topo, "0.0.0.0:9090".to_string());
+                let (pkt_tx, mut pkt_rx) = mpsc::channel::<String>(100);
+                
+                // Spawn a task to bridge raw ingestion strings to TuiEvents
+                let ui_tx_bridge = ui_tx_srv.clone();
+                tokio::spawn(async move {
+                    while let Some(pkt) = pkt_rx.recv().await {
+                        let _ = ui_tx_bridge.send(TuiEvent::PacketUpdate(pkt)).await;
                     }
+                });
+
+                if let Err(e) = server.run(pkt_tx).await {
+                    error!("Ingestion Server error: {}", e);
                 }
             });
         }
