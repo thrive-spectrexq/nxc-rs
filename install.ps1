@@ -12,11 +12,6 @@ if (!(Get-Command cargo -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-if (!(Get-Command python -ErrorAction SilentlyContinue)) {
-    Write-Host "❌ Error: Python is not installed. Please install it from https://www.python.org/" -ForegroundColor Red
-    exit 1
-}
-
 # 2. Setup Directory
 $NETSAGE_DIR = "$HOME\.netsage"
 if (Test-Path $NETSAGE_DIR) {
@@ -29,18 +24,7 @@ if (Test-Path $NETSAGE_DIR) {
     Set-Location $NETSAGE_DIR
 }
 
-# 3. Setup Python Tool Engine
-Write-Host "🐍 Setting up Python Tool Engine..."
-python -m venv "$NETSAGE_DIR\venv"
-& "$NETSAGE_DIR\venv\Scripts\Activate.ps1"
-python -m pip install --upgrade pip
-if (Test-Path "python\requirements.txt") {
-    pip install -r python\requirements.txt
-} else {
-    pip install "python\."
-}
-
-# 4. Check for Npcap
+# 3. Check for Npcap
 if (!(Test-Path "C:\Windows\System32\wpcap.dll")) {
     Write-Host "⚠️ Warning: Npcap not found. Network capture may require Npcap installed in 'WinPcap API-compatible mode'." -ForegroundColor Yellow
 }

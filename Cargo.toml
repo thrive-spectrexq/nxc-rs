@@ -4,7 +4,6 @@ members = [
     "crates/netsage-agent",
     "crates/netsage-tui",
     "crates/netsage-tools",
-    "crates/netsage-pybridge",
     "crates/netsage-mcp",
     "crates/netsage-capture",
     "crates/netsage-session",
@@ -42,3 +41,7 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 dotenvy = "0.15"
 rand = "0.8"
 etherparse = "0.14"
+surge-ping = "0.8"
+trust-dns-resolver = "0.23"
+ssh2 = "0.9"
+maxminddb = "0.24"

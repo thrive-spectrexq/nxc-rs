@@ -5,7 +5,6 @@ edition.workspace = true
 
 [dependencies]
 netsage-tools = { path = "../netsage-tools" }
-netsage-pybridge = { path = "../netsage-pybridge" }
 netsage-session = { path = "../netsage-session" }
 tokio = { workspace = true }
 reqwest = { workspace = true }

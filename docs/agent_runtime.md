@@ -1,37 +1,27 @@
-# Agent Runtime & Python Engine
+# Agent Runtime
 
 ## The Agent Loop
 
 The agent loop manages the conversation flow:
 1. User prompt is submitted.
-2. Agent calls Claude `/v1/messages` with tool definitions.
-3. Claude streams text and `tool_use` blocks.
-4. Agent intercepts `tool_use` and requests user approval.
-5. If approved, the **Python Bridge** executes the tool.
-6. Result is streamed back to Claude to continue the turn.
+2. Agent calls the configured LLM API (Anthropic, Gemini, or OpenAI) with tool definitions.
+3. The LLM streams text and tool use requests.
+4. Agent intercepts tool use and requests user approval (if in Supervised mode).
+5. If approved, the agent calls the native Rust tools via `ToolRegistry`.
+6. Results are fed back to the LLM to continue the reasoning loop.
 
-## Python Tool Engine (Sidecar)
+## Native Tool Registry
 
-The Python engine is a standalone process spawned by the Rust binary. 
+NetSage uses a native Rust implementation for all its networking tools, located in the `netsage-tools` crate.
 
-### Why Python?
-Unmatched ecosystem for networking:
-- **Scapy**: Packet crafting/capture.
-- **Nmap**: Port scanning and service discovery.
-- **NAPALM / Netmiko**: Multi-vendor automation.
-- **Paramiko**: SSH communication.
+### Why Pure Rust?
+- **Speed**: No IPC overhead or process spawning delays.
+- **Safety**: Memory safety guarantees and single binary deployment.
+- **Simplicity**: No external Python runtime or dependency management required.
 
-### Communication Protocol
-JSON-RPC 2.0 over a Unix domain socket (or named pipe on Windows).
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "call-001",
-  "method": "execute_tool",
-  "params": {
-    "tool": "ping_host",
-    "args": { "host": "8.8.8.8", "count": 4 }
-  }
-}
-```
+### Integrated Tools
+- **Ping**: Ported using raw sockets (via `surge-ping`).
+- **DNS**: Native asynchronous resolution (via `trust-dns-resolver`).
+- **Port Scanning**: High-performance TCP connect scans.
+- **SSH**: Secure remote execution (via `ssh2`).
+- **GeoIP**: Local IP intelligence.

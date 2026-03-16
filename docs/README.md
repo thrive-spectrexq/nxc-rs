@@ -4,14 +4,14 @@ NetSage is a next-generation AI-powered network intelligence tool that lives ent
 
 ## High-Level Architecture
 
-NetSage uses a hybrid **Rust + Python** system:
-- **Rust Core**: Handles the Terminal UI (TUI), agent event loop, real-time packet capture, and streaming I/O.
-- **Python Tool Engine**: Provides the rich ecosystem of networking libraries (Scapy, Nmap, Paramiko, etc.) and acts as a tool executor.
+NetSage is a pure Rust system:
+- **Rust Core**: Handles the Terminal UI (TUI), agent event loop, real-time packet capture, and native networking tools.
+- **Native Tools**: All investigations (Ping, DNS, SSH, etc.) are implemented natively within the `netsage-tools` crate.
 
 ## Design Philosophy
 - **Agent-First**: Conversational experience similar to Claude Code.
-- **Single Binary**: Rust binary as the user-facing entry point.
-- **Zero Install**: Sidecar Python engine installs transparently.
+- **Single Binary**: Portability and performance with no external runtime dependencies.
+- **Zero Config**: Works out of the box with native tools.
 
 ## Approval Modes
 1. **READ-ONLY**: Observation and analysis only.

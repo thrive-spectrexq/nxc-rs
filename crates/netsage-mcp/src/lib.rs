@@ -1,20 +1,15 @@
 use anyhow::Result;
-use netsage_pybridge::PythonBridge;
 use netsage_tools::ToolRegistry;
 use serde_json::{json, Value};
 use std::io::{self, BufRead};
-use tokio::sync::Mutex;
-use std::sync::Arc;
 
 pub struct McpServer {
-    bridge: Arc<Mutex<PythonBridge>>,
     registry: ToolRegistry,
 }
 
 impl McpServer {
-    pub fn new(bridge: Arc<Mutex<PythonBridge>>) -> Self {
+    pub fn new() -> Self {
         Self {
-            bridge,
             registry: ToolRegistry::new(),
         }
     }
@@ -46,8 +41,10 @@ impl McpServer {
                     let name = request["params"]["name"].as_str().unwrap_or_default();
                     let args = request["params"]["arguments"].clone();
                     
-                    let mut bridge = self.bridge.lock().await;
-                    match bridge.call_tool(name, args).await {
+                    let registry = &self.registry;
+                    // We need a way to run async in a sync loop or make run async
+                    // Actually run is already async!
+                    match registry.call_tool(name, args).await {
                         Ok(res) => {
                             let response = json!({
                                 "jsonrpc": "2.0",

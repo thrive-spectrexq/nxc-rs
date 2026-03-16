@@ -12,11 +12,6 @@ if ! command -v cargo &> /dev/null; then
     exit 1
 fi
 
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Error: Python 3 is not installed."
-    exit 1
-fi
-
 # 2. Clone Repository
 NETSAGE_DIR="$HOME/.netsage"
 if [ -d "$NETSAGE_DIR" ]; then
@@ -29,18 +24,7 @@ else
     cd "$NETSAGE_DIR"
 fi
 
-# 3. Setup Python Tool Engine
-echo "🐍 Setting up Python Tool Engine..."
-python3 -m venv "$NETSAGE_DIR/venv"
-source "$NETSAGE_DIR/venv/bin/activate"
-pip install --upgrade pip
-if [ -f "python/requirements.txt" ]; then
-    pip install -r python/requirements.txt
-else
-    pip install "python/."
-fi
-
-# 4. Check for libpcap
+# 3. Check for libpcap
 if [ "$(uname)" == "Darwin" ]; then
     # macOS
     echo "🍎 Detected macOS. Ensuring libpcap is available..."

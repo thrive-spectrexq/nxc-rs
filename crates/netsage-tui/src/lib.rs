@@ -6,10 +6,9 @@ use crossterm::{
 };
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap, Gauge, Sparkline},
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Style},
+    widgets::{Block, List, ListItem},
     Terminal,
 };
 use std::io;
@@ -60,12 +59,7 @@ pub struct App<'a> {
 impl<'a> App<'a> {
     pub fn new(topology: Option<SharedTopology>) -> App<'a> {
         let mut textarea = TextArea::default();
-        textarea.set_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" Investigation Prompt ")
-                .border_style(Style::default().fg(Color::Cyan)),
-        );
+        textarea.set_block(Block::default());
         textarea.set_cursor_line_style(Style::default());
         textarea.set_placeholder_text("Ask NetSage anything... (e.g. 'Why is latency high?')");
 
@@ -138,18 +132,34 @@ pub async fn run_tui(mut rx: mpsc::Receiver<TuiEvent>, tx: mpsc::Sender<TuiEvent
     let mut terminal = Terminal::new(backend)?;
 
     let app = App::new(topology);
-    let res = run_app(&mut terminal, app, &mut rx, tx).await;
+    
+    // Create a dedicated event task to avoid blocking the UI
+    let (event_tx, mut event_rx) = mpsc::channel(100);
+    tokio::spawn(async move {
+        loop {
+            if event::poll(Duration::from_millis(50)).unwrap_or(false) {
+                if let Ok(event) = event::read() {
+                    if let Err(_) = event_tx.send(event).await {
+                        break;
+                    }
+                }
+            }
+        }
+    });
 
-    disable_raw_mode()?;
-    execute!(
+    let res = run_app(&mut terminal, app, &mut rx, tx, &mut event_rx).await;
+
+    // Guaranteed cleanup
+    let _ = disable_raw_mode();
+    let _ = execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
         DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+    );
+    let _ = terminal.show_cursor();
 
     if let Err(err) = res {
-        println!("{:?}", err)
+        eprintln!("TUI Error: {:?}", err);
     }
 
     Ok(())
@@ -160,107 +170,71 @@ async fn run_app<B: ratatui::backend::Backend>(
     mut app: App<'_>,
     rx: &mut mpsc::Receiver<TuiEvent>,
     tx: mpsc::Sender<TuiEvent>,
+    event_rx: &mut mpsc::Receiver<Event>,
 ) -> io::Result<()> {
     loop {
         terminal.draw(|f| {
             let root = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(3), 
-                    Constraint::Min(10),   
-                    Constraint::Length(5), 
+                    Constraint::Min(0),   
+                    Constraint::Length(1), 
                 ])
                 .split(f.area());
 
-            let bg_color = match app.mode.as_str() {
-                "AUTONOMOUS" => Color::Red,
-                "SUPERVISED" => Color::Yellow,
-                _ => Color::Green,
-            };
-            let fg_color = if bg_color == Color::Yellow { Color::Black } else { Color::White };
-
-            let header = Paragraph::new(Line::from(vec![
-                Span::styled(" NETSAGE ", Style::default().bg(Color::Cyan).fg(Color::Black).add_modifier(Modifier::BOLD)),
-                Span::raw(" | "),
-                Span::styled(format!(" MODE: {} ", app.mode), Style::default().bg(bg_color).fg(fg_color).add_modifier(Modifier::BOLD)),
-                Span::raw(" | "),
-                Span::styled(format!(" IFACE: {} ", app.interface), Style::default().fg(Color::Cyan)),
-                Span::raw(" | "),
-                Span::styled(format!(" VIEW: {:?} ", app.current_view), Style::default().fg(Color::White)),
-                if app.is_thinking {
-                    Span::styled(" [THINKING...]", Style::default().fg(Color::Magenta).add_modifier(Modifier::ITALIC))
-                } else {
-                    Span::raw("")
-                }
-            ]))
-            .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Cyan)));
-            f.render_widget(header, root[0]);
-
-            match app.current_view {
-                View::Dashboard => render_dashboard(f, root[1], &app),
-                View::Packets => render_packets(f, root[1], &app),
-                View::Topology => render_topology(f, root[1], &app),
-                View::Logs => render_logs(f, root[1], &app),
-                View::Scanner => render_scanner(f, root[1], &app),
-                View::History => render_history(f, root[1], &app),
-            }
-
-            f.render_widget(&app.textarea, root[2]);
+            let items: Vec<ListItem> = app.messages.iter().map(|m| {
+                let style = if m.starts_with("NetSage Agent:") { Style::default().fg(Color::Magenta) } 
+                            else if m.starts_with("System:") { Style::default().fg(Color::Cyan) }
+                            else { Style::default().fg(Color::White) };
+                ListItem::new(m.as_str()).style(style)
+            }).collect();
+            
+            let chat = List::new(items).block(Block::default());
+            f.render_widget(chat, root[0]);
+            f.render_widget(&app.textarea, root[1]);
         })?;
 
-        let event_ready = event::poll(Duration::from_millis(10))?;
-
         tokio::select! {
-            res = async {
-                if event_ready {
-                    if let Event::Key(key) = event::read()? {
-                        match key.code {
-                            KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => return Ok::<bool, io::Error>(true),
-                            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => app.current_view = View::Dashboard,
-                            KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => app.current_view = View::Packets,
-                            KeyCode::Char('t') if key.modifiers.contains(KeyModifiers::CONTROL) => app.current_view = View::Topology,
-                            KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => app.current_view = View::Logs,
-                            KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => app.current_view = View::History,
-                            KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => app.current_view = View::Scanner,
-                            
-                            KeyCode::Enter if !key.modifiers.contains(KeyModifiers::SHIFT) => {
-                                let lines: Vec<String> = app.textarea.lines().iter().cloned().collect();
-                                let cmd = lines.join(" ").trim().to_string();
-                                if !cmd.is_empty() {
-                                    if cmd.starts_with('/') {
-                                        app.handle_command(cmd.clone());
-                                        if cmd == "/export" {
-                                            let _ = tx.send(TuiEvent::ExportRequested).await;
-                                        } else if cmd == "/persona general" {
-                                            let _ = tx.send(TuiEvent::PersonaUpdate(Persona::General)).await;
-                                        } else if cmd == "/persona netops" {
-                                            let _ = tx.send(TuiEvent::PersonaUpdate(Persona::NetOps)).await;
-                                        } else if cmd == "/persona secops" {
-                                            let _ = tx.send(TuiEvent::PersonaUpdate(Persona::SecOps)).await;
-                                        } else if cmd == "/persona sre" {
-                                            let _ = tx.send(TuiEvent::PersonaUpdate(Persona::SRE)).await;
-                                        } else if cmd == "/mermaid" {
-                                            let _ = tx.send(TuiEvent::MermaidRequested).await;
-                                        }
-                                    } else {
-                                        app.messages.push(format!("You: {}", cmd));
-                                        let _ = tx.send(TuiEvent::Input(cmd)).await;
+            Some(event) = event_rx.recv() => {
+                if let Event::Key(key) = event {
+                    match key.code {
+                        KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => return Ok(()),
+                        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => return Ok(()),
+                        
+                        KeyCode::Enter if !key.modifiers.contains(KeyModifiers::SHIFT) => {
+                            let lines: Vec<String> = app.textarea.lines().iter().cloned().collect();
+                            let cmd = lines.join(" ").trim().to_string();
+                            if !cmd.is_empty() {
+                                if cmd.starts_with('/') {
+                                    app.handle_command(cmd.clone());
+                                    if cmd == "/export" {
+                                        let _ = tx.send(TuiEvent::ExportRequested).await;
+                                    } else if cmd == "/persona general" {
+                                        let _ = tx.send(TuiEvent::PersonaUpdate(Persona::General)).await;
+                                    } else if cmd == "/persona netops" {
+                                        let _ = tx.send(TuiEvent::PersonaUpdate(Persona::NetOps)).await;
+                                    } else if cmd == "/persona secops" {
+                                        let _ = tx.send(TuiEvent::PersonaUpdate(Persona::SecOps)).await;
+                                    } else if cmd == "/persona sre" {
+                                        let _ = tx.send(TuiEvent::PersonaUpdate(Persona::SRE)).await;
+                                    } else if cmd == "/mermaid" {
+                                        let _ = tx.send(TuiEvent::MermaidRequested).await;
                                     }
-                                    let mut next_textarea = TextArea::default();
-                                    next_textarea.set_block(Block::default().borders(Borders::ALL).title(" Investigation Prompt ").border_style(Style::default().fg(Color::Cyan)));
-                                    next_textarea.set_placeholder_text("Ask NetSage anything...");
-                                    app.textarea = next_textarea;
+                                } else {
+                                    app.messages.push(format!("You: {}", cmd));
+                                    let _ = tx.send(TuiEvent::Input(cmd)).await;
                                 }
+                                let mut next_textarea = TextArea::default();
+                                next_textarea.set_block(Block::default());
+                                next_textarea.set_placeholder_text("Ask NetSage anything...");
+                                app.textarea = next_textarea;
                             }
-                            _ => {
-                                app.textarea.input(key);
-                            }
+                        }
+                        _ => {
+                            app.textarea.input(key);
                         }
                     }
                 }
-                Ok(false)
-            } => {
-                if res? { return Ok(()); }
             }
 
             Some(msg) = rx.recv() => {
@@ -279,15 +253,6 @@ async fn run_app<B: ratatui::backend::Backend>(
                             app.messages.push(format!("NetSage Agent: {}", delta));
                         }
                     }
-                    TuiEvent::PacketUpdate(p) => {
-                        app.packets.push(p);
-                        if app.packets.len() > 100 { app.packets.remove(0); }
-                    }
-                    TuiEvent::ThroughputUpdate(val) => {
-                        app.throughput = val;
-                        app.throughput_history.push(val as u64);
-                        if app.throughput_history.len() > 50 { app.throughput_history.remove(0); }
-                    }
                     TuiEvent::AgentThinking(val) => {
                         app.is_thinking = val;
                     }
@@ -298,95 +263,3 @@ async fn run_app<B: ratatui::backend::Backend>(
     }
 }
 
-fn render_dashboard(f: &mut ratatui::Frame, area: Rect, app: &App) {
-    let layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
-        .split(area);
-
-    let items: Vec<ListItem> = app.messages.iter().map(|m| {
-        let style = if m.starts_with("NetSage Agent:") { Style::default().fg(Color::Magenta) } 
-                    else if m.starts_with("System:") { Style::default().fg(Color::Cyan) }
-                    else { Style::default().fg(Color::White) };
-        ListItem::new(m.as_str()).style(style)
-    }).collect();
-    
-    let chat = List::new(items).block(Block::default().borders(Borders::ALL).title(" Investigation Trace ").border_style(Style::default().fg(Color::Blue)));
-    f.render_widget(chat, layout[0]);
-
-    let sidebar = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3), 
-            Constraint::Length(3), 
-            Constraint::Length(4),
-            Constraint::Min(5)
-        ])
-        .split(layout[1]);
-
-    let throughput_gauge = Gauge::default()
-        .block(Block::default().title(" Throughput (Mbps) ").borders(Borders::ALL).border_style(Style::default().fg(Color::Yellow)))
-        .gauge_style(Style::default().fg(Color::Yellow).bg(Color::Black).add_modifier(Modifier::BOLD))
-        .percent((app.throughput as u16).min(100));
-    f.render_widget(throughput_gauge, sidebar[0]);
-
-    let drop_rate = Gauge::default()
-        .block(Block::default().title(" Packet Drop Rate ").borders(Borders::ALL).border_style(Style::default().fg(Color::Red)))
-        .gauge_style(Style::default().fg(Color::Red))
-        .percent(2); 
-    f.render_widget(drop_rate, sidebar[1]);
-
-    let sparkline = Sparkline::default()
-        .block(Block::default().title(" Traffic Load ").borders(Borders::ALL).border_style(Style::default().fg(Color::Magenta)))
-        .data(&app.throughput_history)
-        .style(Style::default().fg(Color::Magenta));
-    f.render_widget(sparkline, sidebar[2]);
-
-    let packet_items: Vec<ListItem> = app.packets.iter().take(10).map(|p| ListItem::new(p.as_str()).style(Style::default().fg(Color::Green))).collect();
-    let packet_list = List::new(packet_items).block(Block::default().borders(Borders::ALL).title(" Live Snoop ").border_style(Style::default().fg(Color::Green)));
-    f.render_widget(packet_list, sidebar[3]);
-}
-
-fn render_packets(f: &mut ratatui::Frame, area: Rect, app: &App) {
-    let block = Block::default().borders(Borders::ALL).title(" Packet Inspector (Ctrl+P) ").border_style(Style::default().fg(Color::Green));
-    let items: Vec<ListItem> = app.packets.iter().map(|p| ListItem::new(p.as_str())).collect();
-    let list = List::new(items).block(block);
-    f.render_widget(list, area);
-}
-
-fn render_topology(f: &mut ratatui::Frame, area: Rect, app: &App) {
-    let block = Block::default().borders(Borders::ALL).title(" Network Topology Map (Ctrl+T) ").border_style(Style::default().fg(Color::LightRed));
-    
-    let content = if let Some(shared_topo) = &app.topology {
-        if let Ok(graph) = shared_topo.lock() {
-            graph.to_ascii()
-        } else {
-            "Error locking topology graph.".to_string()
-        }
-    } else {
-        "        ┌───────┐\n        │ Cloud │\n        └───┬───┘\n            ▼\n    ┌───────┴───────┐\n    │ Gateway (R1)  │\n    └───────┬───────┘\n            ▼\n    ┌───────┴───────┐\n    │  Local Host   │\n    └───────────────┘\n\n(Mock Visualization)".to_string()
-    };
-
-    let p = Paragraph::new(content).block(block).wrap(Wrap { trim: false });
-    f.render_widget(p, area);
-}
-
-fn render_logs(f: &mut ratatui::Frame, area: Rect, app: &App) {
-    let block = Block::default().borders(Borders::ALL).title(" Structured Log Stream (Ctrl+L) ").border_style(Style::default().fg(Color::White));
-    let items: Vec<ListItem> = app.logs.iter().map(|l| ListItem::new(l.as_str())).collect();
-    let list = List::new(items).block(block);
-    f.render_widget(list, area);
-}
-
-fn render_scanner(f: &mut ratatui::Frame, area: Rect, app: &App) {
-    let block = Block::default().borders(Borders::ALL).title(" Port Scan Results (Ctrl+S) ").border_style(Style::default().fg(Color::Yellow));
-    let items: Vec<ListItem> = app.scan_results.iter().map(|r| ListItem::new(r.as_str())).collect();
-    let list = List::new(items).block(block);
-    f.render_widget(list, area);
-}
-
-fn render_history(f: &mut ratatui::Frame, area: Rect, _app: &App) {
-    let block = Block::default().borders(Borders::ALL).title(" Session History (Ctrl+H) ").border_style(Style::default().fg(Color::Magenta));
-    let p = Paragraph::new("No previous sessions found in SQLite store.").block(block);
-    f.render_widget(p, area);
-}

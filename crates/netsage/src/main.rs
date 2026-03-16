@@ -2,7 +2,6 @@ use anyhow::Result;
 use chrono::Utc;
 use netsage_tui::{run_tui, TuiEvent};
 use netsage_agent::{Agent, AgentEvent, Message, Provider, ApprovalMode, Persona};
-use netsage_pybridge::PythonBridge;
 use tracing::info;
 use netsage_capture::PacketEngine;
 use netsage_capture::topology::{SharedTopology, TopologyGraph};
@@ -37,10 +36,7 @@ async fn main() -> Result<()> {
     
     if args.mcp {
         // Run in MCP mode - no TUI
-        let python_path = "python";
-        let script_path = "python/netsage_tools/server.py";
-        let bridge = Arc::new(TokioMutex::new(PythonBridge::spawn(python_path, script_path).await?));
-        let server = McpServer::new(bridge);
+        let server = McpServer::new();
         server.run().await?;
         return Ok(());
     }
@@ -195,14 +191,8 @@ async fn main() -> Result<()> {
         session_store.clone(),
     ));
 
-    // Spawn Python Bridge
-    let python_path = "python";
-    let script_path = "python/netsage_tools/server.py";
-    let bridge = Arc::new(TokioMutex::new(PythonBridge::spawn(python_path, script_path).await?));
-
     let ui_tx_agent = ui_tx.clone();
     let agent_clone = agent.clone();
-    let bridge_clone = bridge.clone();
 
     let session_store_for_agent = session_store.clone();
     let shared_topology_for_events = shared_topology.clone();
@@ -231,13 +221,11 @@ async fn main() -> Result<()> {
                     let (agent_event_tx, mut agent_event_rx) = mpsc::channel::<AgentEvent>(100);
                     
                     let agent_run = agent_clone.clone();
-                    let bridge_run = bridge_clone.clone();
                     let mut messages_run = messages.clone();
-                    let ui_tx_inner = ui_tx_agent.clone();
-
+                    let ui_tx_inner = ui_tx.clone();
+                    
                     tokio::spawn(async move {
-                        let mut bridge_lock = bridge_run.lock().await;
-                        if let Err(e) = agent_run.run_loop(&mut messages_run, &mut *bridge_lock, agent_event_tx).await {
+                        if let Err(e) = agent_run.run_loop(&mut messages_run, agent_event_tx).await {
                             let _ = ui_tx_inner.send(TuiEvent::AgentResponse(format!("Error: {}", e))).await;
                         }
                     });
@@ -349,7 +337,6 @@ async fn main() -> Result<()> {
         });
     }
 
-    println!("Starting NetSage Core (Phase 5) TUI...");
     run_tui(ui_rx, tui_tx, shared_topology).await?;
 
     Ok(())

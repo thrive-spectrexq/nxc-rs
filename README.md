@@ -40,6 +40,5 @@ To build NetSage on Windows, you must have the **Npcap SDK** installed so that t
 - `/export`: Generate a Markdown report from the current session.
 
 ## Architecture
-- **Rust Core**: Ratatui TUI, Agent Loop, Packet Engine.
-- **Python Sidecar**: Scapy, Nmap, Paramiko, NAPALM.
-- **Brain**: Powered by Claude 4.6 Sonnet.
+- **Pure Rust Core**: Integrated TUI, Agent Loop, Packet Engine, and Networking Tools.
+- **Brain**: Powered by advanced LLM models (Claude, Gemini, GPT).

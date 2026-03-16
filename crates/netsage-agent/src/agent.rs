@@ -5,7 +5,6 @@ use reqwest::Client;
 use serde_json::{json, Value, to_value};
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
-use netsage_pybridge::PythonBridge;
 use netsage_session::SessionStore;
 use netsage_tools::ToolRegistry;
 use tracing::info;
@@ -55,7 +54,6 @@ impl Agent {
     pub async fn run_loop(
         &self,
         messages: &mut Vec<Message>,
-        bridge: &mut PythonBridge,
         event_tx: mpsc::Sender<AgentEvent>,
     ) -> Result<()> {
         let _ = event_tx.send(AgentEvent::Thinking(true)).await;
@@ -147,7 +145,7 @@ impl Agent {
 
                 self.session_store.log_tool_call(&id, &name, &args, "pending")?;
 
-                let result = bridge.call_tool(&name, args.clone()).await?;
+                let result = self.tool_registry.call_tool(&name, args.clone()).await?;
                 self.session_store.update_tool_result(&id, &result)?;
 
                 let _ = event_tx.send(AgentEvent::ToolResult { id: id.clone(), result: result.clone() }).await;

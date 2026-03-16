@@ -7,7 +7,6 @@ edition.workspace = true
 netsage-agent = { path = "../netsage-agent" }
 netsage-tui = { path = "../netsage-tui" }
 netsage-tools = { path = "../netsage-tools" }
-netsage-pybridge = { path = "../netsage-pybridge" }
 netsage-capture = { path = "../netsage-capture", default-features = false }
 netsage-session = { path = "../netsage-session" }
 netsage-config = { path = "../netsage-config" }
