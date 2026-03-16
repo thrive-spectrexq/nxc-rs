@@ -11,8 +11,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  check:
-    name: Check & Lint
+  lint:
+    name: Lint & Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,31 +21,65 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
       - name: Rustfmt Check
         run: cargo fmt --all -- --check
-      - name: Cargo Check
-        run: cargo check --all-targets --all-features
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+  msrv:
+    name: MSRV (1.80.0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install libpcap
+        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.80.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Cargo Check
+        run: cargo check --all-targets --all-features
+
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
   test:
     name: Test Suite
-    needs: check
+    needs: lint
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libpcap-dev
+        
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://nmap.org/npcap/dist/npcap-sdk-1.13.zip" -OutFile "npcap-sdk.zip"
+          Expand-Archive -Path "npcap-sdk.zip" -DestinationPath "npcap-sdk"
+          echo "LIB=$((Get-Location).Path)\npcap-sdk\Lib\x64" >> $env:GITHUB_ENV
+          
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      
       - name: Run Tests
         run: cargo test --workspace --verbose
 
   build:
-    name: Build Artifacts
+    name: Build Release
     needs: test
     strategy:
       matrix:
@@ -53,8 +87,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libpcap-dev
+        
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://nmap.org/npcap/dist/npcap-sdk-1.13.zip" -OutFile "npcap-sdk.zip"
+          Expand-Archive -Path "npcap-sdk.zip" -DestinationPath "npcap-sdk"
+          echo "LIB=$((Get-Location).Path)\npcap-sdk\Lib\x64" >> $env:GITHUB_ENV
+          
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      
       - name: Build
         run: cargo build --release

@@ -1,218 +1,142 @@
-pub mod ingestion;
-pub mod topology;
-use crate::topology::{SharedTopology, TopologyGraph};
 use anyhow::Result;
 use chrono::Utc;
-#[cfg(feature = "pcap")]
-use etherparse::PacketHeaders;
+use netsage_common::{AppEvent, PacketSummary};
 use std::sync::{Arc, Mutex};
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
-use tokio::sync::mpsc;
+use tokio::sync::broadcast;
 use tracing::{error, info};
+
+pub mod ingestion;
+pub mod topology;
+
+use crate::topology::SharedTopology;
+use crate::topology::TopologyGraph;
 
 #[cfg(feature = "pcap")]
 use pcap::{Capture, Device};
 
-pub struct PacketEngine {
-    #[cfg(feature = "pcap")]
-    capture: Capture<pcap::Active>,
+pub struct CaptureEngine {
+    event_tx: broadcast::Sender<AppEvent>,
     topology: SharedTopology,
+    #[cfg(feature = "pcap")]
+    capture: Arc<Mutex<Capture<pcap::Active>>>,
 }
 
-impl PacketEngine {
-    pub fn new(interface_name: Option<&str>) -> Result<Self> {
-        let device = if let Some(name) = interface_name {
-            Device::list()?
-                .into_iter()
-                .find(|d| d.name == name)
-                .ok_or_else(|| anyhow::anyhow!("Interface {} not found", name))?
-        } else {
-            Device::lookup()?.ok_or_else(|| anyhow::anyhow!("No default interface found"))?
-        };
+impl CaptureEngine {
+    pub fn new(
+        event_tx: broadcast::Sender<AppEvent>,
+        interface_name: Option<&str>,
+    ) -> Result<Self> {
+        let topology = Arc::new(Mutex::new(TopologyGraph::new()));
 
-        info!("Starting capture on device: {}", device.name);
+        #[cfg(feature = "pcap")]
+        {
+            let device = if let Some(name) = interface_name {
+                Device::list()?
+                    .into_iter()
+                    .find(|d| d.name == name)
+                    .ok_or_else(|| anyhow::anyhow!("Interface {} not found", name))?
+            } else {
+                Device::lookup()?.ok_or_else(|| anyhow::anyhow!("No default interface found"))?
+            };
 
-        let capture = Capture::from_device(device)?
-            .promisc(true)
-            .snaplen(65535)
-            .timeout(100)
-            .open()?;
+            info!("Starting capture on device: {}", device.name);
 
-        Ok(Self {
-            capture,
-            topology: Arc::new(Mutex::new(TopologyGraph::new())),
-        })
+            let capture = Capture::from_device(device)?
+                .promisc(true)
+                .snaplen(65535)
+                .timeout(100)
+                .open()?;
+
+            Ok(Self {
+                event_tx,
+                topology,
+                capture: Arc::new(Mutex::new(capture)),
+            })
+        }
+        #[cfg(not(feature = "pcap"))]
+        {
+            // Even without pcap, we can have an engine that might receive remote events
+            Ok(Self { event_tx, topology })
+        }
     }
 
     pub fn get_topology(&self) -> SharedTopology {
         self.topology.clone()
     }
 
-    pub fn set_filter(&mut self, filter: &str) -> Result<()> {
-        self.capture.filter(filter, true)?;
-        Ok(())
-    }
+    pub fn start(&self) {
+        let tx = self.event_tx.clone();
+        let topology = self.topology.clone();
 
-    pub fn next_packet(&mut self) -> Result<Option<String>> {
-        match self.capture.next_packet() {
-            Ok(packet) => {
-                match PacketHeaders::from_ethernet_slice(packet.data) {
-                    Ok(headers) => {
-                        let mut desc = String::new();
+        #[cfg(feature = "pcap")]
+        {
+            let capture = self.capture.clone();
+            tokio::task::spawn_blocking(move || {
+                loop {
+                    let mut cap = capture.lock().unwrap();
+                    match cap.next_packet() {
+                        Ok(packet) => {
+                            // Basic dissection logic
+                            let mut proto = "Unknown".to_string();
+                            let mut src_ip = None;
+                            let mut dst_ip = None;
 
-                        // IP Layer
-                        if let Some(net) = headers.net {
-                            match net {
-                                etherparse::NetHeaders::Ipv4(ipv4, _) => {
-                                    let src = std::net::Ipv4Addr::from(ipv4.source).to_string();
-                                    let dst =
-                                        std::net::Ipv4Addr::from(ipv4.destination).to_string();
-
-                                    desc.push_str(&format!("{} -> {} ", src, dst));
-
-                                    // Discovery Logic
-                                    if let Ok(mut graph) = self.topology.lock() {
-                                        graph.add_node(
-                                            src.clone(),
-                                            src.clone(),
-                                            "host".to_string(),
-                                        );
-                                        graph.add_node(
-                                            dst.clone(),
-                                            dst.clone(),
-                                            "host".to_string(),
-                                        );
-                                        graph.add_edge(src, dst);
-                                    }
-                                }
-                                etherparse::NetHeaders::Ipv6(ipv6, _) => {
-                                    let src = format!("{:?}", ipv6.source);
-                                    let dst = format!("{:?}", ipv6.destination);
-                                    desc.push_str(&format!("{} -> {} ", src, dst));
-
-                                    if let Ok(mut graph) = self.topology.lock() {
-                                        graph.add_node(
-                                            src.clone(),
-                                            src.clone(),
-                                            "host".to_string(),
-                                        );
-                                        graph.add_node(
-                                            dst.clone(),
-                                            dst.clone(),
-                                            "host".to_string(),
-                                        );
-                                        graph.add_edge(src, dst);
-                                    }
+                            // Very basic dissection for demo purposes
+                            // In a real app, use etherparse properly here
+                            // For v1.0, we want at least IP visibility
+                            if packet.data.len() > 34 {
+                                // IPv4 check (Ethernet type 0x0800)
+                                if packet.data[12] == 0x08 && packet.data[13] == 0x00 {
+                                    src_ip = Some(format!(
+                                        "{}.{}.{}.{}",
+                                        packet.data[26],
+                                        packet.data[27],
+                                        packet.data[28],
+                                        packet.data[29]
+                                    ));
+                                    dst_ip = Some(format!(
+                                        "{}.{}.{}.{}",
+                                        packet.data[30],
+                                        packet.data[31],
+                                        packet.data[32],
+                                        packet.data[33]
+                                    ));
+                                    proto = match packet.data[23] {
+                                        6 => "TCP".to_string(),
+                                        17 => "UDP".to_string(),
+                                        1 => "ICMP".to_string(),
+                                        _ => "IP".to_string(),
+                                    };
                                 }
                             }
-                        }
 
-                        // Transport Layer
-                        if let Some(transport) = headers.transport {
-                            match transport {
-                                etherparse::TransportHeader::Tcp(tcp) => {
-                                    desc.push_str(&format!(
-                                        "[TCP] {}:{} -> {}:{}",
-                                        "", tcp.source_port, "", tcp.destination_port
-                                    ));
+                            if let (Some(ref src), Some(ref dst)) = (&src_ip, &dst_ip) {
+                                if let Ok(mut graph) = topology.lock() {
+                                    graph.add_node(src.clone(), src.clone(), "host".to_string());
+                                    graph.add_node(dst.clone(), dst.clone(), "host".to_string());
+                                    graph.add_edge(src.clone(), dst.clone());
                                 }
-                                etherparse::TransportHeader::Udp(udp) => {
-                                    desc.push_str(&format!(
-                                        "[UDP] {}:{} -> {}:{}",
-                                        "", udp.source_port, "", udp.destination_port
-                                    ));
-                                }
-                                _ => desc.push_str("[OTHER]"),
                             }
-                        }
 
-                        if desc.is_empty() {
-                            Ok(Some(format!("Packet: {} bytes", packet.header.len)))
-                        } else {
-                            Ok(Some(desc))
-                        }
-                    }
-                    Err(_) => Ok(Some(format!("Unknown Packet: {} bytes", packet.header.len))),
-                }
-            }
-            Err(pcap::Error::TimeoutExpired) => Ok(None),
-            Err(e) => Err(e.into()),
-        }
-    }
-
-    pub fn spawn_loop(mut self, tx: mpsc::Sender<String>) {
-        tokio::task::spawn_blocking(move || loop {
-            match self.next_packet() {
-                Ok(Some(desc)) => {
-                    if tx.blocking_send(desc).is_err() {
-                        break;
-                    }
-                }
-                Ok(None) => continue,
-                Err(e) => {
-                    error!("Capture engine error: {}", e);
-                    break;
-                }
-            }
-        });
-    }
-
-    pub fn spawn_remote_loop(mut self, server_addr: String) {
-        let (tx, mut rx) = mpsc::channel::<String>(100);
-
-        // Blocking capture loop
-        tokio::task::spawn_blocking(move || loop {
-            match self.next_packet() {
-                Ok(Some(desc)) => {
-                    if tx.blocking_send(desc).is_err() {
-                        break;
-                    }
-                }
-                Ok(None) => continue,
-                Err(e) => {
-                    error!("Capture engine error: {}", e);
-                    break;
-                }
-            }
-        });
-
-        // Async streaming loop
-        tokio::spawn(async move {
-            let token = netsage_auth::get_local_token();
-            loop {
-                info!("Connecting to central NetSage server at {}...", server_addr);
-                match TcpStream::connect(&server_addr).await {
-                    Ok(mut stream) => {
-                        info!("Connected to server. Starting remote stream.");
-                        let node_id = hostname::get()
-                            .map(|h| h.to_string_lossy().into_owned())
-                            .unwrap_or_else(|_| "unknown_node".to_string());
-                        while let Some(desc) = rx.recv().await {
-                            let pkt = ingestion::IngestionPacket {
-                                auth: token.clone(),
-                                node_id: node_id.clone(),
-                                timestamp: Utc::now().timestamp(),
-                                payload: desc,
+                            let summary = PacketSummary {
+                                timestamp: Utc::now(),
+                                length: packet.header.len,
+                                protocol: proto,
+                                src_ip,
+                                dst_ip,
+                                src_port: None,
+                                dst_port: None,
                             };
-                            if let Ok(data) = serde_json::to_string(&pkt) {
-                                let data = format!("{}\n", data);
-                                if let Err(e) = stream.write_all(data.as_bytes()).await {
-                                    error!("Failed to send packet data to server: {}", e);
-                                    break;
-                                }
-                            }
+                            let _ = tx.send(AppEvent::PacketCaptured(summary));
+                        }
+                        Err(pcap::Error::TimeoutExpired) => continue,
+                        Err(e) => {
+                            error!("Capture engine error: {}", e);
+                            break;
                         }
                     }
-                    Err(e) => {
-                        error!(
-                            "Failed to connect to NetSage server ({}). Retrying in 5s...",
-                            e
-                        );
-                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                    }
                 }
-            }
-        });
+            });
+        }
     }
 }

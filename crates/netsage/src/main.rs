@@ -1,361 +1,81 @@
 use anyhow::Result;
-use chrono::Utc;
 use clap::Parser;
-use netsage_agent::{Agent, AgentEvent, ApprovalMode, Message, Persona, Provider};
-use netsage_capture::ingestion::IngestionServer;
-use netsage_capture::topology::{SharedTopology, TopologyGraph};
-use netsage_capture::PacketEngine;
-use netsage_mcp::McpServer;
-use netsage_tui::{run_tui, TuiEvent};
-use std::sync::{Arc, Mutex as StdMutex};
-use tokio::sync::mpsc;
-use tracing::{error, info};
+use netsage_agent::Agent;
+use netsage_capture::CaptureEngine;
+use netsage_common::AppEvent;
+use netsage_session::SessionManager;
+use netsage_tui::run_tui;
+use tokio::sync::{broadcast, mpsc};
+use tracing::info;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
     #[arg(short, long)]
-    mcp: bool,
-
-    #[arg(short, long)]
     interface: Option<String>,
-
-    #[arg(short, long)]
-    server: bool,
-
-    #[arg(short, long)]
-    node: Option<String>,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-
-    // Load .env file
     let _ = dotenvy::dotenv();
-
-    if args.mcp {
-        // Run in MCP mode - no TUI
-        let server = McpServer::new();
-        server.run().await?;
-        return Ok(());
-    }
-
-    if let Some(server_addr) = args.node {
-        // Run in Node mode - streaming to central server
-        tracing_subscriber::fmt::init();
-        info!("Launching NetSage in NODE mode...");
-
-        let engine = if let Ok(engine) = PacketEngine::new(args.interface.as_deref()) {
-            engine
-        } else {
-            anyhow::bail!("Failed to initialize packet engine for node.");
-        };
-
-        engine.spawn_remote_loop(server_addr);
-
-        // Keep alive
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
-        }
-    }
-
     tracing_subscriber::fmt::init();
+
+    info!("Launching NetSage v1.0.0...");
 
     let config_path = std::path::Path::new("config.toml");
     let config = if config_path.exists() {
         netsage_config::load_config(config_path)?
     } else {
-        anyhow::bail!("Config file not found at config.toml");
+        anyhow::bail!("Config file not found at config.toml. Please create it.");
     };
 
-    // Initialize Session Store
-    let session_path = std::path::Path::new("session.db");
-    let session_store = netsage_session::SessionStore::open(session_path)?;
+    // Initialize broadcast bus
+    let (event_tx, _) = broadcast::channel::<AppEvent>(1024);
 
-    // Initialize Channels
-    let (tui_tx, mut agent_rx) = mpsc::channel::<TuiEvent>(100);
-    let (ui_tx, ui_rx) = mpsc::channel::<TuiEvent>(100);
+    // Initialize Session Manager
+    let db_path = std::path::Path::new("session.db");
+    let session_manager = SessionManager::new(db_path)?;
+    let session_id = uuid::Uuid::new_v4();
 
-    // Initialize Packet Engine
-    let ui_tx_pcap = ui_tx.clone();
-    let (pcap_tx, mut pcap_rx) = mpsc::channel::<String>(100);
+    // Initialize Capture Engine
+    let capture_engine = CaptureEngine::new(event_tx.clone(), args.interface.as_deref())?;
+    let topology = capture_engine.get_topology();
+    capture_engine.start();
 
-    let shared_topology = if let Ok(engine) = PacketEngine::new(args.interface.as_deref()) {
-        let topo = engine.get_topology();
-        engine.spawn_loop(pcap_tx);
-        tokio::spawn(async move {
-            let mut byte_count = 0;
-            let mut timer = tokio::time::interval(std::time::Duration::from_secs(1));
-            while let Some(packet_desc) = pcap_rx.recv().await {
-                let _ = ui_tx_pcap
-                    .send(TuiEvent::PacketUpdate(packet_desc.clone()))
-                    .await;
-                byte_count += 500;
-
-                tokio::select! {
-                    _ = timer.tick() => {
-                        let throughput_mbps = (byte_count as f64 * 8.0) / 1_000_000.0;
-                        let _ = ui_tx_pcap.send(TuiEvent::ThroughputUpdate(throughput_mbps)).await;
-                        byte_count = 0;
-                    }
-                    else => {}
-                }
-            }
-        });
-        Some(topo)
-    } else {
-        // Fallback to mock
-        let ui_tx_clone = ui_tx.clone();
-        let topo: SharedTopology = Arc::new(StdMutex::new(TopologyGraph::new()));
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
-            loop {
-                interval.tick().await;
-                let pkt = "[MOCK] TCP 192.168.1.1:443 -> 192.168.1.52:54212 [ACK]".to_string();
-                let _ = ui_tx_clone.send(TuiEvent::PacketUpdate(pkt)).await;
-                let _ = ui_tx_clone
-                    .send(TuiEvent::ThroughputUpdate(
-                        45.0 + (rand::random::<f64>() * 10.0),
-                    ))
-                    .await;
-            }
-        });
-        Some(topo)
-    };
-
-    // If in Server mode, spawn ingestion listener
-    if args.server {
-        if let Some(topo) = shared_topology.clone() {
-            let ui_tx_srv = ui_tx.clone();
-            tokio::spawn(async move {
-                let server = IngestionServer::new(topo, "0.0.0.0:9090".to_string());
-                let (pkt_tx, mut pkt_rx) = mpsc::channel::<String>(100);
-
-                // Spawn a task to bridge raw ingestion strings to TuiEvents
-                let ui_tx_bridge = ui_tx_srv.clone();
-                tokio::spawn(async move {
-                    while let Some(pkt) = pkt_rx.recv().await {
-                        let _ = ui_tx_bridge.send(TuiEvent::PacketUpdate(pkt)).await;
-                    }
-                });
-
-                if let Err(e) = server.run(pkt_tx).await {
-                    error!("Ingestion Server error: {}", e);
-                }
-            });
-        }
-    }
-
-    // Initialize Agent
-    let provider = match config.core.provider.as_str() {
-        "openai" => Provider::OpenAI,
-        "gemini" => Provider::Gemini,
-        _ => Provider::Anthropic,
-    };
-
-    let api_key_env = match provider {
-        Provider::OpenAI => "OPENAI_API_KEY",
-        Provider::Gemini => "GEMINI_API_KEY",
-        Provider::Anthropic => "ANTHROPIC_API_KEY",
-    };
-
-    let api_key = std::env::var(api_key_env).unwrap_or_default();
-    let model = config.core.model.clone();
-    let mode = match config.core.approval_mode.as_str() {
-        "read-only" => ApprovalMode::ReadOnly,
-        "autonomous" => ApprovalMode::Autonomous,
-        _ => ApprovalMode::Supervised,
-    };
-
-    let agent = Arc::new(Agent::new(
-        api_key,
-        model,
-        provider,
-        mode,
-        Persona::General,
-        session_store.clone(),
-    ));
-
-    let ui_tx_agent = ui_tx.clone();
-    let agent_clone = agent.clone();
-
-    let session_store_for_agent = session_store.clone();
-    let shared_topology_for_events = shared_topology.clone();
-
-    let _agent_task = tokio::spawn(async move {
-        let mut messages: Vec<Message> = Vec::new();
-
-        let network_md = std::path::Path::new("NETWORK.md");
-        if network_md.exists() {
-            if let Ok(context) = netsage_config::load_network_context(network_md) {
-                messages.push(Message {
-                    role: "user".to_string(),
-                    content: format!("NETWORK CONTEXT:\n\n{}", context),
-                });
-            }
-        }
-
-        while let Some(event) = agent_rx.recv().await {
-            match event {
-                TuiEvent::Input(cmd) => {
-                    messages.push(Message {
-                        role: "user".to_string(),
-                        content: cmd,
-                    });
-
-                    let (agent_event_tx, mut agent_event_rx) = mpsc::channel::<AgentEvent>(100);
-
-                    let agent_run = agent_clone.clone();
-                    let mut messages_run = messages.clone();
-                    let ui_tx_inner = ui_tx.clone();
-
-                    tokio::spawn(async move {
-                        if let Err(e) = agent_run.run_loop(&mut messages_run, agent_event_tx).await
-                        {
-                            let _ = ui_tx_inner
-                                .send(TuiEvent::AgentResponse(format!("Error: {}", e)))
-                                .await;
-                        }
-                    });
-
-                    while let Some(agent_event) = agent_event_rx.recv().await {
-                        match agent_event {
-                            AgentEvent::TextDelta(delta) => {
-                                let _ = ui_tx_agent.send(TuiEvent::TextDelta(delta)).await;
-                            }
-                            AgentEvent::ToolCall { name, .. } => {
-                                let _ = ui_tx_agent
-                                    .send(TuiEvent::AgentResponse(format!(
-                                        "[Executing Tool: {}]",
-                                        name
-                                    )))
-                                    .await;
-                            }
-                            AgentEvent::Thinking(val) => {
-                                let _ = ui_tx_agent.send(TuiEvent::AgentThinking(val)).await;
-                            }
-                            AgentEvent::Error(err) => {
-                                let _ = ui_tx_agent
-                                    .send(TuiEvent::AgentResponse(format!("Error: {}", err)))
-                                    .await;
-                            }
-                            AgentEvent::Finished => {}
-                            _ => {}
-                        }
-                    }
-                }
-                TuiEvent::PersonaUpdate(persona) => {
-                    let agent_run = agent_clone.clone();
-                    tokio::spawn(async move {
-                        agent_run.set_persona(persona).await;
-                    });
-                }
-                TuiEvent::ExportRequested => {
-                    let session_store_clone = session_store_for_agent.clone();
-                    let ui_tx_inner = ui_tx_agent.clone();
-                    tokio::spawn(async move {
-                        match session_store_clone.export_as_markdown() {
-                            Ok(md) => {
-                                let timestamp = Utc::now().format("%Y%m%d_%H%M%S").to_string();
-                                let filename = format!("reports/session_{}.md", timestamp);
-                                let _ = std::fs::create_dir_all("reports");
-                                if let Err(e) = std::fs::write(&filename, md) {
-                                    let _ = ui_tx_inner
-                                        .send(TuiEvent::AgentResponse(format!(
-                                            "Export failed: {}",
-                                            e
-                                        )))
-                                        .await;
-                                } else {
-                                    let _ = ui_tx_inner
-                                        .send(TuiEvent::AgentResponse(format!(
-                                            "Session exported to {}",
-                                            filename
-                                        )))
-                                        .await;
-                                }
-                            }
-                            Err(e) => {
-                                let _ = ui_tx_inner
-                                    .send(TuiEvent::AgentResponse(format!("Export failed: {}", e)))
-                                    .await;
-                            }
-                        }
-                    });
-                }
-                TuiEvent::MermaidRequested => {
-                    if let Some(topo) = shared_topology_for_events.clone() {
-                        let ui_tx_inner = ui_tx_agent.clone();
-                        tokio::spawn(async move {
-                            let (mermaid, filename) = {
-                                if let Ok(graph) = topo.lock() {
-                                    let graph: std::sync::MutexGuard<'_, TopologyGraph> = graph;
-                                    let mermaid = graph.to_mermaid();
-                                    let timestamp = Utc::now().format("%Y%m%d_%H%M%S").to_string();
-                                    let filename = format!("reports/topology_{}.mmd", timestamp);
-                                    (Some(mermaid), Some(filename))
-                                } else {
-                                    (None, None)
-                                }
-                            };
-
-                            if let (Some(mermaid), Some(filename)) = (mermaid, filename) {
-                                let _ = std::fs::create_dir_all("reports");
-                                if let Err(e) = std::fs::write(&filename, mermaid) {
-                                    let _ = ui_tx_inner
-                                        .send(TuiEvent::AgentResponse(format!(
-                                            "Mermaid export failed: {}",
-                                            e
-                                        )))
-                                        .await;
-                                } else {
-                                    let _ = ui_tx_inner
-                                        .send(TuiEvent::AgentResponse(format!(
-                                            "Topology exported to {}",
-                                            filename
-                                        )))
-                                        .await;
-                                }
-                            }
-                        });
-                    }
-                }
-                _ => {}
+    // Background Logging Task
+    let mut log_rx = event_tx.subscribe();
+    let logger_sm = session_manager.clone();
+    tokio::spawn(async move {
+        while let Ok(event) = log_rx.recv().await {
+            if let AppEvent::PacketCaptured(pkt) = event {
+                let _ = logger_sm.log_packet(session_id, &pkt).await;
             }
         }
     });
 
-    // Periodic Topology Snapshots
-    if let Some(topo) = shared_topology.clone() {
-        let session_store_topo = session_store.clone();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
-            loop {
-                interval.tick().await;
-                let topo_json = {
-                    if let Ok(graph) = topo.lock() {
-                        let graph: std::sync::MutexGuard<'_, TopologyGraph> = graph;
-                        // Convert nodes/edges to a JSON value for storage
-                        let nodes: Vec<_> = graph.nodes.values().cloned().collect();
-                        let edges: Vec<_> = graph.edges.clone();
-                        Some(serde_json::json!({
-                            "nodes": serde_json::to_value(nodes).unwrap_or_default(),
-                            "edges": serde_json::to_value(edges).unwrap_or_default(),
-                        }))
-                    } else {
-                        None
-                    }
-                };
+    // Initialize Agent
+    let (user_tx, user_rx) = mpsc::channel::<String>(100);
+    let agent = Agent::new(
+        config.clone(),
+        session_manager.clone(),
+        session_id,
+        event_tx.clone(),
+        user_rx,
+    );
 
-                if let Some(json) = topo_json {
-                    let _ = session_store_topo.log_snapshot(&json);
-                }
-            }
-        });
-    }
+    let agent_handle = tokio::spawn(async move {
+        if let Err(e) = agent.run(Vec::new()).await {
+            tracing::error!("Agent error: {}", e);
+        }
+    });
 
-    run_tui(ui_rx, tui_tx, shared_topology).await?;
+    // Run TUI
+    run_tui(event_tx.clone(), user_tx, topology).await?;
+
+    // Cleanup
+    let _ = event_tx.send(AppEvent::Quit);
+    let _ = agent_handle.await;
 
     Ok(())
 }

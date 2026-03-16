@@ -1,30 +1,11 @@
 pub mod agent;
+pub mod client;
 pub mod stream;
+
 pub use agent::{Agent, AgentEvent};
+pub use netsage_common::{AppEvent, ApprovalMode, Provider};
 
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
-pub enum Provider {
-    Anthropic,
-    OpenAI,
-    Gemini,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
-pub enum ApprovalMode {
-    ReadOnly,
-    Supervised,
-    Autonomous,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
-pub enum Persona {
-    General,
-    NetOps,
-    SecOps,
-    SRE,
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Message {
@@ -32,27 +13,37 @@ pub struct Message {
     pub content: String,
 }
 
+impl Message {
+    pub fn user(content: String) -> Self {
+        Self {
+            role: "user".to_string(),
+            content,
+        }
+    }
+    pub fn assistant(content: String) -> Self {
+        Self {
+            role: "assistant".to_string(),
+            content,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ToolUse {
+pub struct ToolCall {
     pub id: String,
     pub name: String,
     pub input: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "type")]
-pub enum ContentBlock {
-    #[serde(rename = "text")]
-    Text { text: String },
-    #[serde(rename = "tool_use")]
-    ToolUse(ToolUse),
+pub struct CompletionResponse {
+    pub content: String,
+    pub tool_calls: Vec<ToolCall>,
+    pub stop_reason: StopReason,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ClaudeRequest {
-    pub model: String,
-    pub messages: Vec<Message>,
-    pub max_tokens: u32,
-    pub stream: bool,
-    pub tools: Option<Vec<serde_json::Value>>,
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum StopReason {
+    EndTurn,
+    ToolUse,
 }

@@ -4,10 +4,11 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+netsage-common = { path = "../netsage-common" }
+netsage-agent = { path = "../netsage-agent" }
+netsage-capture = { path = "../netsage-capture" }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
 tokio = { workspace = true }
 tui-textarea = { workspace = true }
 anyhow = { workspace = true }
-netsage-capture = { path = "../netsage-capture", default-features = false }
-netsage-agent = { path = "../netsage-agent" }

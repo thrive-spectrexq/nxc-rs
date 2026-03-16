@@ -4,8 +4,12 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+netsage-common = { path = "../netsage-common" }
+r2d2 = { workspace = true }
+r2d2_sqlite = { workspace = true }
 rusqlite = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
+uuid = { workspace = true }

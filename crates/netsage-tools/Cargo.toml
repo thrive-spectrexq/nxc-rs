@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+netsage-common = { path = "../netsage-common" }
+async-trait = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -13,3 +15,5 @@ surge-ping = { workspace = true }
 trust-dns-resolver = { workspace = true }
 ssh2 = { workspace = true }
 maxminddb = { workspace = true }
+futures = "0.3"
+reqwest = { workspace = true }

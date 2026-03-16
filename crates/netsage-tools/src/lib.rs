@@ -1,13 +1,42 @@
+use anyhow::Result;
+use async_trait::async_trait;
 use serde_json::{json, Value};
-use std::net::IpAddr;
+use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::io::AsyncReadExt;
-use trust_dns_resolver::config::*;
-use trust_dns_resolver::TokioAsyncResolver;
+
+pub mod tools;
+
+#[async_trait]
+pub trait NetworkTool: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn description(&self) -> &'static str;
+    fn input_schema(&self) -> Value;
+    fn is_read_only(&self) -> bool {
+        true
+    }
+    async fn execute(&self, input: Value) -> Result<ToolResult>;
+}
+
+pub struct ToolResult {
+    pub success: bool,
+    pub output: String,
+    pub data: Value,
+    pub duration_ms: u64,
+}
+
+impl ToolResult {
+    pub fn to_json(&self) -> Value {
+        json!({
+            "success": self.success,
+            "output": self.output,
+            "data": self.data,
+            "duration_ms": self.duration_ms,
+        })
+    }
+}
 
 pub struct ToolRegistry {
-    tools: Vec<Value>,
+    tools: HashMap<String, Arc<dyn NetworkTool>>,
 }
 
 impl Default for ToolRegistry {
@@ -18,372 +47,81 @@ impl Default for ToolRegistry {
 
 impl ToolRegistry {
     pub fn new() -> Self {
-        let tools = vec![
-            json!({
-                "name": "ping_host",
-                "description": "Send ICMP echo requests to a host to check connectivity.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "host": {"type": "string", "description": "The target hostname or IP address"},
-                        "count": {"type": "integer", "description": "Number of packets to send", "default": 4}
-                    },
-                    "required": ["host"]
-                }
-            }),
-            json!({
-                "name": "dns_lookup",
-                "description": "Resolve a hostname to IP addresses or vice versa.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "The hostname or IP to resolve"}
-                    },
-                    "required": ["query"]
-                }
-            }),
-            json!({
-                "name": "port_scan",
-                "description": "Scan a target host for open TCP ports.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "host": {"type": "string", "description": "Target hostname or IP"},
-                        "ports": {"type": "string", "description": "Port range (e.g., '1-1024' or '80,443')", "default": "1-1024"}
-                    },
-                    "required": ["host"]
-                }
-            }),
-            json!({
-                "name": "geoip_lookup",
-                "description": "Get geographical and ISP information for a public IP address.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "ip": {"type": "string", "description": "The public IP address to lookup"}
-                    },
-                    "required": ["ip"]
-                }
-            }),
-            json!({
-                "name": "ssh_command",
-                "description": "Execute a CLI command on a remote host via standard SSH.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "host": {"type": "string", "description": "Remote host IP or hostname"},
-                        "command": {"type": "string", "description": "CLI command to execute"},
-                        "username": {"type": "string", "description": "SSH username"},
-                        "password": {"type": "string", "description": "SSH password (optional if key is provided)"},
-                    },
-                    "required": ["host", "command", "username"]
-                }
-            }),
-            json!({
-                "name": "whois_lookup",
-                "description": "Retrieve WHOIS registry information for a domain or IP.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "domain": {"type": "string", "description": "Domain name or IP address"}
-                    },
-                    "required": ["domain"]
-                }
-            }),
-        ];
+        let mut tools: HashMap<String, Arc<dyn NetworkTool>> = HashMap::new();
+
+        tools.insert(
+            "ping".to_string(),
+            Arc::new(tools::ping::PingTool) as Arc<dyn NetworkTool>,
+        );
+        tools.insert(
+            "dns_lookup".to_string(),
+            Arc::new(tools::dns::DnsTool) as Arc<dyn NetworkTool>,
+        );
+        tools.insert(
+            "port_scan".to_string(),
+            Arc::new(tools::port_scan::PortScanTool) as Arc<dyn NetworkTool>,
+        );
+        tools.insert(
+            "geoip_lookup".to_string(),
+            Arc::new(tools::geoip::GeoIpTool) as Arc<dyn NetworkTool>,
+        );
+        tools.insert(
+            "whois_lookup".to_string(),
+            Arc::new(tools::whois::WhoisTool) as Arc<dyn NetworkTool>,
+        );
+        tools.insert(
+            "ssh_command".to_string(),
+            Arc::new(tools::ssh::SshTool) as Arc<dyn NetworkTool>,
+        );
+        tools.insert(
+            "traceroute".to_string(),
+            Arc::new(tools::traceroute::TracerouteTool) as Arc<dyn NetworkTool>,
+        );
+        tools.insert(
+            "http_probe".to_string(),
+            Arc::new(tools::http_probe::HttpProbeTool) as Arc<dyn NetworkTool>,
+        );
+
         Self { tools }
     }
 
-    pub async fn call_tool(&self, name: &str, args: Value) -> anyhow::Result<Value> {
-        match name {
-            "ping_host" => self.ping_host(args).await,
-            "dns_lookup" => self.dns_lookup(args).await,
-            "port_scan" => self.port_scan(args).await,
-            "geoip_lookup" => self.geoip_lookup(args).await,
-            "ssh_command" => self.ssh_command(args).await,
-            "whois_lookup" => self.whois_lookup(args).await,
-            _ => Err(anyhow::anyhow!("Tool not implemented: {}", name)),
-        }
+    pub fn register(&mut self, tool: Arc<dyn NetworkTool>) {
+        self.tools.insert(tool.name().to_string(), tool);
     }
 
-    async fn ssh_command(&self, args: Value) -> anyhow::Result<Value> {
-        let host = args["host"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Missing host"))?;
-        let command = args["command"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Missing command"))?;
-        let username = args["username"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Missing username"))?;
-        let password = args["password"].as_str();
+    pub async fn call_tool(&self, name: &str, args: Value) -> Result<Value> {
+        let tool = self
+            .tools
+            .get(name)
+            .ok_or_else(|| anyhow::anyhow!("Tool not implemented: {}", name))?;
 
-        let tcp = std::net::TcpStream::connect(format!("{}:22", host))?;
-        let mut sess = ssh2::Session::new()?;
-        sess.set_tcp_stream(tcp);
-        sess.handshake()?;
-
-        if let Some(pw) = password {
-            sess.userauth_password(username, pw)?;
-        } else {
-            sess.userauth_agent(username)?;
-        }
-
-        let mut channel = sess.channel_session()?;
-        channel.exec(command)?;
-
-        use std::io::Read;
-        let mut s = String::new();
-        channel.read_to_string(&mut s)?;
-
-        let mut stderr = String::new();
-        channel.stderr().read_to_string(&mut stderr)?;
-
-        channel.wait_close()?;
-
-        Ok(json!({
-            "status": "success",
-            "host": host,
-            "stdout": s,
-            "stderr": stderr,
-            "exit_status": channel.exit_status()?
-        }))
-    }
-
-    async fn whois_lookup(&self, args: Value) -> anyhow::Result<Value> {
-        let domain = args["domain"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Missing domain"))?;
-
-        use std::io::{Read, Write};
-        let mut stream = std::net::TcpStream::connect("whois.iana.org:43")?;
-        stream.write_all(format!("{}\r\n", domain).as_bytes())?;
-
-        let mut response = String::new();
-        stream.read_to_string(&mut response)?;
-
-        Ok(json!({
-            "status": "success",
-            "domain": domain,
-            "raw": response
-        }))
-    }
-
-    async fn port_scan(&self, args: Value) -> anyhow::Result<Value> {
-        let host = args["host"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Missing host"))?
-            .to_string();
-        let ports_str = args["ports"].as_str().unwrap_or("1-1024");
-
-        let mut ports = Vec::new();
-        if ports_str.contains('-') {
-            let parts: Vec<&str> = ports_str.split('-').collect();
-            if parts.len() == 2 {
-                let start = parts[0].parse::<u16>()?;
-                let end = parts[1].parse::<u16>()?;
-                for p in start..=end {
-                    ports.push(p);
-                }
-            }
-        } else {
-            for p in ports_str.split(',') {
-                if let Ok(port) = p.trim().parse::<u16>() {
-                    ports.push(port);
-                }
-            }
-        }
-
-        let mut open_services = Vec::new();
-        let semaphore = Arc::new(tokio::sync::Semaphore::new(100)); // Limit to 100 concurrent tasks
-        let mut handles = Vec::new();
-
-        for port in ports {
-            let host_clone = host.clone();
-            let sem = semaphore.clone();
-            handles.push(tokio::spawn(async move {
-                let _permit = sem.acquire().await.ok();
-                let addr = format!("{}:{}", host_clone, port);
-
-                match tokio::time::timeout(
-                    Duration::from_millis(400),
-                    tokio::net::TcpStream::connect(&addr),
-                )
-                .await
-                {
-                    Ok(Ok(mut stream)) => {
-                        // Basic banner grabbing
-                        let mut banner = String::new();
-                        let mut buffer = [0u8; 1024];
-                        if let Ok(Ok(n)) = tokio::time::timeout(
-                            Duration::from_millis(500),
-                            stream.read(&mut buffer),
-                        )
-                        .await
-                        {
-                            banner = String::from_utf8_lossy(&buffer[..n]).trim().to_string();
-                        }
-                        Some(json!({ "port": port, "status": "open", "banner": banner }))
-                    }
-                    _ => None,
-                }
-            }));
-        }
-
-        for handle in handles {
-            if let Ok(Some(service)) = handle.await {
-                open_services.push(service);
-            }
-        }
-
-        open_services.sort_by_key(|s| s["port"].as_u64().unwrap_or(0));
-
-        Ok(json!({
-            "status": "success",
-            "host": host,
-            "open_ports": open_services,
-            "scan_count": open_services.len()
-        }))
-    }
-
-    async fn geoip_lookup(&self, args: Value) -> anyhow::Result<Value> {
-        let ip_str = args["ip"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Missing ip"))?;
-
-        // Refined mock response
-        let is_private = ip_str.starts_with("10.")
-            || ip_str.starts_with("192.168.")
-            || ip_str.starts_with("172.");
-
-        if is_private {
-            return Ok(json!({
-                "status": "success",
-                "ip": ip_str,
-                "location": "Internal Network",
-                "isp": "Local Authority",
-                "note": "Private IP address detected"
-            }));
-        }
-
-        Ok(json!({
-            "status": "success",
-            "ip": ip_str,
-            "city": "San Francisco",
-            "region": "California",
-            "country": "United States",
-            "isp": "Cloudflare / Google Mock",
-            "note": "GeoIP database path not configured, returning mock data"
-        }))
-    }
-
-    async fn ping_host(&self, args: Value) -> anyhow::Result<Value> {
-        let host = args["host"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Missing host"))?;
-        let count = args["count"].as_u64().unwrap_or(4) as usize;
-
-        let ip = match host.parse::<IpAddr>() {
-            Ok(ip) => ip,
-            Err(_) => {
-                use tokio::net::lookup_host;
-                let mut addrs = lookup_host(format!("{}:0", host)).await?;
-                addrs
-                    .next()
-                    .ok_or_else(|| anyhow::anyhow!("DNS resolution failed"))?
-                    .ip()
-            }
-        };
-
-        let mut results = Vec::new();
-        let payload = [0u8; 56];
-        for i in 0..count {
-            match surge_ping::ping(ip, &payload).await {
-                Ok((_, rtt)) => {
-                    let rtt_val: f64 = rtt.as_nanos() as f64 / 1_000_000.0;
-                    results.push(json!({ "rtt": rtt_val, "seq": i }));
-                }
-                Err(_) => results.push(json!(null)),
-            }
-        }
-
-        let successes: Vec<f64> = results
-            .iter()
-            .filter_map(|r| r.as_object())
-            .filter_map(|o| o.get("rtt"))
-            .filter_map(|v| v.as_f64())
-            .collect();
-
-        if successes.is_empty() {
-            return Ok(json!({
-                "status": "error",
-                "host": host,
-                "error": "No response from host"
-            }));
-        }
-
-        Ok(json!({
-            "status": "success",
-            "host": host,
-            "sent": count,
-            "received": successes.len(),
-            "rtt_min": successes.iter().cloned().fold(f64::INFINITY, f64::min),
-            "rtt_avg": successes.iter().sum::<f64>() / successes.len() as f64,
-            "rtt_max": successes.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
-        }))
-    }
-
-    async fn dns_lookup(&self, args: Value) -> anyhow::Result<Value> {
-        let query = args["query"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Missing query"))?;
-        let resolver =
-            TokioAsyncResolver::tokio(ResolverConfig::default(), ResolverOpts::default());
-
-        match query.parse::<IpAddr>() {
-            Ok(ip) => {
-                let response = resolver.reverse_lookup(ip).await?;
-                let mut names = Vec::new();
-                for n in response.into_iter() {
-                    names.push(n.to_utf8());
-                }
-                Ok(json!({
-                    "status": "success",
-                    "query": query,
-                    "type": "PTR",
-                    "results": names
-                }))
-            }
-            Err(_) => {
-                let response = resolver.lookup_ip(query).await?;
-                let mut ips = Vec::new();
-                for ip in response.into_iter() {
-                    ips.push(ip.to_string());
-                }
-                Ok(json!({
-                    "status": "success",
-                    "query": query,
-                    "type": "A",
-                    "results": ips
-                }))
-            }
-        }
+        let result = tool.execute(args).await?;
+        Ok(result.to_json())
     }
 
     pub fn get_schemas(&self) -> Vec<Value> {
-        self.tools.clone()
+        self.tools
+            .values()
+            .map(|t| {
+                json!({
+                    "name": t.name(),
+                    "description": t.description(),
+                    "input_schema": t.input_schema(),
+                })
+            })
+            .collect()
     }
 
     pub fn get_openai_schemas(&self) -> Vec<Value> {
         self.tools
-            .iter()
+            .values()
             .map(|t| {
                 json!({
                     "type": "function",
                     "function": {
-                        "name": t["name"],
-                        "description": t["description"],
-                        "parameters": t["input_schema"]
+                        "name": t.name(),
+                        "description": t.description(),
+                        "parameters": t.input_schema()
                     }
                 })
             })
@@ -392,12 +130,12 @@ impl ToolRegistry {
 
     pub fn get_gemini_schemas(&self) -> Vec<Value> {
         self.tools
-            .iter()
+            .values()
             .map(|t| {
                 json!({
-                    "name": t["name"],
-                    "description": t["description"],
-                    "parameters": t["input_schema"]
+                    "name": t.name(),
+                    "description": t.description(),
+                    "parameters": t.input_schema()
                 })
             })
             .collect()

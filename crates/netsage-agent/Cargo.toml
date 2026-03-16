@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+netsage-common = { path = "../netsage-common" }
 netsage-tools = { path = "../netsage-tools" }
 netsage-session = { path = "../netsage-session" }
 tokio = { workspace = true }
@@ -15,3 +16,4 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 tracing = { workspace = true }
 futures = "0.3"
+async-trait = { workspace = true }

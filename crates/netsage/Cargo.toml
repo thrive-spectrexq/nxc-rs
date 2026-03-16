@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+netsage-common = { path = "../netsage-common" }
 netsage-agent = { path = "../netsage-agent" }
 netsage-tui = { path = "../netsage-tui" }
 netsage-tools = { path = "../netsage-tools" }
@@ -22,3 +23,4 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dotenvy = { workspace = true }
 rand = { workspace = true }
+uuid = { workspace = true }

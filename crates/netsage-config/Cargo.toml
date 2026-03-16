@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+netsage-common = { path = "../netsage-common" }
 toml = { workspace = true }
 serde = { workspace = true }
 anyhow = { workspace = true }

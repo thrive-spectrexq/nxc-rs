@@ -9,6 +9,7 @@ members = [
     "crates/netsage-session",
     "crates/netsage-config",
     "crates/netsage-auth",
+    "crates/netsage-common",
 ]
 resolver = "2"
 
@@ -27,6 +28,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 pcap = "2.0"
 rusqlite = { version = "0.31", features = ["bundled"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.24"
 toml = "0.8"
 clap = { version = "4.0", features = ["derive"] }
 anyhow = "1.0"
@@ -46,3 +49,4 @@ trust-dns-resolver = "0.23"
 ssh2 = "0.9"
 maxminddb = "0.24"
 hostname = "0.4"
+async-trait = "0.1"
