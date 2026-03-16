@@ -71,7 +71,12 @@ impl SessionStore {
 
         while let Ok(cmd) = rx.recv() {
             match cmd {
-                SessionCommand::LogToolCall { id, tool, args, status } => {
+                SessionCommand::LogToolCall {
+                    id,
+                    tool,
+                    args,
+                    status,
+                } => {
                     let _ = conn.execute(
                         "INSERT INTO tool_calls (id, timestamp, tool, args, status)
                          VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -129,31 +134,40 @@ impl SessionStore {
     }
 
     pub fn log_tool_call(&self, id: &str, tool: &str, args: &Value, status: &str) -> Result<()> {
-        self.tx.send(SessionCommand::LogToolCall {
-            id: id.to_string(),
-            tool: tool.to_string(),
-            args: args.to_string(),
-            status: status.to_string(),
-        }).map_err(|e| anyhow::anyhow!("Failed to send log_tool_call: {}", e))
+        self.tx
+            .send(SessionCommand::LogToolCall {
+                id: id.to_string(),
+                tool: tool.to_string(),
+                args: args.to_string(),
+                status: status.to_string(),
+            })
+            .map_err(|e| anyhow::anyhow!("Failed to send log_tool_call: {}", e))
     }
 
     pub fn update_tool_result(&self, id: &str, result: &Value) -> Result<()> {
-        self.tx.send(SessionCommand::UpdateToolResult {
-            id: id.to_string(),
-            result: result.to_string(),
-        }).map_err(|e| anyhow::anyhow!("Failed to send update_tool_result: {}", e))
+        self.tx
+            .send(SessionCommand::UpdateToolResult {
+                id: id.to_string(),
+                result: result.to_string(),
+            })
+            .map_err(|e| anyhow::anyhow!("Failed to send update_tool_result: {}", e))
     }
 
     pub fn export_as_markdown(&self) -> Result<String> {
         let (resp_tx, resp_rx) = mpsc::channel();
-        self.tx.send(SessionCommand::ExportMarkdown { resp_tx })
+        self.tx
+            .send(SessionCommand::ExportMarkdown { resp_tx })
             .map_err(|e| anyhow::anyhow!("Failed to send export request: {}", e))?;
-        resp_rx.recv().map_err(|e| anyhow::anyhow!("Failed to receive export result: {}", e))?
+        resp_rx
+            .recv()
+            .map_err(|e| anyhow::anyhow!("Failed to receive export result: {}", e))?
     }
 
     pub fn log_snapshot(&self, topology_json: &Value) -> Result<()> {
-        self.tx.send(SessionCommand::LogSnapshot {
-            topology_json: topology_json.to_string(),
-        }).map_err(|e| anyhow::anyhow!("Failed to send log_snapshot: {}", e))
+        self.tx
+            .send(SessionCommand::LogSnapshot {
+                topology_json: topology_json.to_string(),
+            })
+            .map_err(|e| anyhow::anyhow!("Failed to send log_snapshot: {}", e))
     }
 }

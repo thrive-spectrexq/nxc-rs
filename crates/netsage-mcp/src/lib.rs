@@ -40,7 +40,7 @@ impl McpServer {
                 "callTool" => {
                     let name = request["params"]["name"].as_str().unwrap_or_default();
                     let args = request["params"]["arguments"].clone();
-                    
+
                     let registry = &self.registry;
                     // We need a way to run async in a sync loop or make run async
                     // Actually run is already async!

@@ -4,6 +4,8 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use netsage_agent::Persona;
+use netsage_capture::topology::SharedTopology;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -12,11 +14,9 @@ use ratatui::{
     Terminal,
 };
 use std::io;
-use tui_textarea::TextArea;
-use tokio::sync::mpsc;
 use std::time::Duration;
-use netsage_capture::topology::SharedTopology;
-use netsage_agent::Persona;
+use tokio::sync::mpsc;
+use tui_textarea::TextArea;
 
 #[derive(Debug, Clone)]
 pub enum TuiEvent {
@@ -65,7 +65,10 @@ impl<'a> App<'a> {
 
         App {
             textarea,
-            messages: vec!["NetSage Agent: System online. Waiting for network intelligence requests...".to_string()],
+            messages: vec![
+                "NetSage Agent: System online. Waiting for network intelligence requests..."
+                    .to_string(),
+            ],
             packets: vec!["[PCAP] Listening for traffic...".to_string()],
             logs: vec!["[INFO] NetSage initialization complete.".to_string()],
             mode: "SUPERVISED".to_string(),
@@ -81,7 +84,9 @@ impl<'a> App<'a> {
 
     pub fn handle_command(&mut self, cmd: String) {
         let parts: Vec<&str> = cmd.split_whitespace().collect();
-        if parts.is_empty() { return; }
+        if parts.is_empty() {
+            return;
+        }
 
         match parts[0] {
             "/clear" => {
@@ -90,41 +95,54 @@ impl<'a> App<'a> {
             }
             "/mode" if parts.len() > 1 => {
                 self.mode = parts[1].to_uppercase();
-                self.messages.push(format!("System: Approval mode changed to {}", self.mode));
+                self.messages
+                    .push(format!("System: Approval mode changed to {}", self.mode));
             }
             "/capture" if parts.len() > 1 => {
                 self.interface = parts[1].to_string();
-                self.messages.push(format!("System: Capturing on interface {}", self.interface));
+                self.messages
+                    .push(format!("System: Capturing on interface {}", self.interface));
             }
             "/topology" => self.current_view = View::Topology,
             "/export" => {
-                self.messages.push("System: Exporting session report...".to_string());
+                self.messages
+                    .push("System: Exporting session report...".to_string());
                 // We'll let the main loop handle the actual IO
             }
             "/persona" => {
-                self.messages.push("System: Usage: /persona [general|netops|secops|sre]".to_string());
+                self.messages
+                    .push("System: Usage: /persona [general|netops|secops|sre]".to_string());
             }
             "/persona general" => {
-                self.messages.push("System: Switching to General Persona".to_string());
+                self.messages
+                    .push("System: Switching to General Persona".to_string());
             }
             "/persona netops" => {
-                self.messages.push("System: Switching to NetOps Persona".to_string());
+                self.messages
+                    .push("System: Switching to NetOps Persona".to_string());
             }
             "/persona secops" => {
-                self.messages.push("System: Switching to SecOps Persona".to_string());
+                self.messages
+                    .push("System: Switching to SecOps Persona".to_string());
             }
             "/persona sre" => {
-                self.messages.push("System: Switching to SRE Persona".to_string());
+                self.messages
+                    .push("System: Switching to SRE Persona".to_string());
             }
             "/mermaid" => {
-                self.messages.push("System: Generating Mermaid diagram...".to_string());
+                self.messages
+                    .push("System: Generating Mermaid diagram...".to_string());
             }
             _ => self.messages.push(format!("You: {}", cmd)),
         }
     }
 }
 
-pub async fn run_tui(mut rx: mpsc::Receiver<TuiEvent>, tx: mpsc::Sender<TuiEvent>, topology: Option<SharedTopology>) -> Result<()> {
+pub async fn run_tui(
+    mut rx: mpsc::Receiver<TuiEvent>,
+    tx: mpsc::Sender<TuiEvent>,
+    topology: Option<SharedTopology>,
+) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -132,7 +150,7 @@ pub async fn run_tui(mut rx: mpsc::Receiver<TuiEvent>, tx: mpsc::Sender<TuiEvent
     let mut terminal = Terminal::new(backend)?;
 
     let app = App::new(topology);
-    
+
     // Create a dedicated event task to avoid blocking the UI
     let (event_tx, mut event_rx) = mpsc::channel(100);
     tokio::spawn(async move {
@@ -176,19 +194,24 @@ async fn run_app<B: ratatui::backend::Backend>(
         terminal.draw(|f| {
             let root = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Min(0),   
-                    Constraint::Length(1), 
-                ])
+                .constraints([Constraint::Min(0), Constraint::Length(1)])
                 .split(f.area());
 
-            let items: Vec<ListItem> = app.messages.iter().map(|m| {
-                let style = if m.starts_with("NetSage Agent:") { Style::default().fg(Color::Magenta) } 
-                            else if m.starts_with("System:") { Style::default().fg(Color::Cyan) }
-                            else { Style::default().fg(Color::White) };
-                ListItem::new(m.as_str()).style(style)
-            }).collect();
-            
+            let items: Vec<ListItem> = app
+                .messages
+                .iter()
+                .map(|m| {
+                    let style = if m.starts_with("NetSage Agent:") {
+                        Style::default().fg(Color::Magenta)
+                    } else if m.starts_with("System:") {
+                        Style::default().fg(Color::Cyan)
+                    } else {
+                        Style::default().fg(Color::White)
+                    };
+                    ListItem::new(m.as_str()).style(style)
+                })
+                .collect();
+
             let chat = List::new(items).block(Block::default());
             f.render_widget(chat, root[0]);
             f.render_widget(&app.textarea, root[1]);
@@ -200,7 +223,7 @@ async fn run_app<B: ratatui::backend::Backend>(
                     match key.code {
                         KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => return Ok(()),
                         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => return Ok(()),
-                        
+
                         KeyCode::Enter if !key.modifiers.contains(KeyModifiers::SHIFT) => {
                             let lines: Vec<String> = app.textarea.lines().iter().cloned().collect();
                             let cmd = lines.join(" ").trim().to_string();
@@ -262,4 +285,3 @@ async fn run_app<B: ratatui::backend::Backend>(
         }
     }
 }
-

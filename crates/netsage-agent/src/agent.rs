@@ -1,19 +1,29 @@
-use crate::{ApprovalMode, Message, Persona, Provider, stream::{ClaudeEvent, parse_sse_line}};
-use anyhow::{Result, anyhow};
+use crate::{
+    stream::{parse_sse_line, ClaudeEvent},
+    ApprovalMode, Message, Persona, Provider,
+};
+use anyhow::{anyhow, Result};
 use futures::StreamExt;
-use reqwest::Client;
-use serde_json::{json, Value, to_value};
-use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
 use netsage_session::SessionStore;
 use netsage_tools::ToolRegistry;
+use reqwest::Client;
+use serde_json::{json, to_value, Value};
+use std::sync::Arc;
+use tokio::sync::{mpsc, Mutex};
 use tracing::info;
 
 #[derive(Debug, Clone)]
 pub enum AgentEvent {
     TextDelta(String),
-    ToolCall { id: String, name: String, args: Value },
-    ToolResult { id: String, result: Value },
+    ToolCall {
+        id: String,
+        name: String,
+        args: Value,
+    },
+    ToolResult {
+        id: String,
+        result: Value,
+    },
     Error(String),
     Finished,
     Thinking(bool),
@@ -57,17 +67,18 @@ impl Agent {
         event_tx: mpsc::Sender<AgentEvent>,
     ) -> Result<()> {
         let _ = event_tx.send(AgentEvent::Thinking(true)).await;
-        
+
         loop {
             let system_prompt = self.get_system_prompt().await;
             let mut tool_calls_this_turn = Vec::new();
 
             // 1. Call LLM based on provider
             let mut assistant_text = String::new();
-            
+
             match self.provider {
                 Provider::Anthropic => {
-                    let mut response_stream = self.stream_anthropic(messages, &system_prompt).await?;
+                    let mut response_stream =
+                        self.stream_anthropic(messages, &system_prompt).await?;
                     while let Some(item) = response_stream.next().await {
                         let line = item?;
                         if let Some(event) = parse_sse_line(&line)? {
@@ -75,7 +86,9 @@ impl Agent {
                                 ClaudeEvent::ContentBlockDelta { delta, .. } => {
                                     if let Some(text) = delta["text"].as_str() {
                                         assistant_text.push_str(text);
-                                        let _ = event_tx.send(AgentEvent::TextDelta(text.to_string())).await;
+                                        let _ = event_tx
+                                            .send(AgentEvent::TextDelta(text.to_string()))
+                                            .await;
                                     }
                                 }
                                 ClaudeEvent::ContentBlockStart { content_block, .. } => {
@@ -85,7 +98,8 @@ impl Agent {
                                 }
                                 ClaudeEvent::MessageStop => break,
                                 ClaudeEvent::Error { error } => {
-                                    let msg = error["message"].as_str().unwrap_or("Unknown Claude error");
+                                    let msg =
+                                        error["message"].as_str().unwrap_or("Unknown Claude error");
                                     let _ = event_tx.send(AgentEvent::Error(msg.to_string())).await;
                                     let _ = event_tx.send(AgentEvent::Thinking(false)).await;
                                     return Err(anyhow!("Claude API Error: {}", msg));
@@ -94,12 +108,26 @@ impl Agent {
                             }
                         }
                     }
-                },
+                }
                 Provider::Gemini => {
-                    self.stream_gemini(messages, &system_prompt, &mut assistant_text, &mut tool_calls_this_turn, &event_tx).await?;
-                },
+                    self.stream_gemini(
+                        messages,
+                        &system_prompt,
+                        &mut assistant_text,
+                        &mut tool_calls_this_turn,
+                        &event_tx,
+                    )
+                    .await?;
+                }
                 Provider::OpenAI => {
-                    self.stream_openai(messages, &system_prompt, &mut assistant_text, &mut tool_calls_this_turn, &event_tx).await?;
+                    self.stream_openai(
+                        messages,
+                        &system_prompt,
+                        &mut assistant_text,
+                        &mut tool_calls_this_turn,
+                        &event_tx,
+                    )
+                    .await?;
                 }
             }
 
@@ -127,10 +155,19 @@ impl Agent {
                 let (approved, _reason) = match self.mode {
                     ApprovalMode::ReadOnly => (false, "ReadOnly mode blocks all tool calls"),
                     ApprovalMode::Supervised => {
-                        let _ = event_tx.send(AgentEvent::ToolCall { id: id.clone(), name: name.clone(), args: args.clone() }).await;
-                        // In a real TUI, we would wait for a response here. 
+                        let _ = event_tx
+                            .send(AgentEvent::ToolCall {
+                                id: id.clone(),
+                                name: name.clone(),
+                                args: args.clone(),
+                            })
+                            .await;
+                        // In a real TUI, we would wait for a response here.
                         // For now, we'll continue with the execution but note that it's supervised.
-                        (true, "Supervised mode (Awaiting TUI response in future version)") 
+                        (
+                            true,
+                            "Supervised mode (Awaiting TUI response in future version)",
+                        )
                     }
                     ApprovalMode::Autonomous => (true, "Autonomous mode"),
                 };
@@ -143,12 +180,18 @@ impl Agent {
                     continue;
                 }
 
-                self.session_store.log_tool_call(&id, &name, &args, "pending")?;
+                self.session_store
+                    .log_tool_call(&id, &name, &args, "pending")?;
 
                 let result = self.tool_registry.call_tool(&name, args.clone()).await?;
                 self.session_store.update_tool_result(&id, &result)?;
 
-                let _ = event_tx.send(AgentEvent::ToolResult { id: id.clone(), result: result.clone() }).await;
+                let _ = event_tx
+                    .send(AgentEvent::ToolResult {
+                        id: id.clone(),
+                        result: result.clone(),
+                    })
+                    .await;
 
                 messages.push(Message {
                     role: "user".to_string(),
@@ -162,10 +205,14 @@ impl Agent {
         Ok(())
     }
 
-    async fn stream_anthropic(&self, messages: &[Message], system_prompt: &str) -> Result<impl futures::Stream<Item = Result<String>>> {
+    async fn stream_anthropic(
+        &self,
+        messages: &[Message],
+        system_prompt: &str,
+    ) -> Result<impl futures::Stream<Item = Result<String>>> {
         let messages_val = to_value(messages)?;
         let tools_val = to_value(self.tool_registry.get_schemas())?;
-        
+
         let request = json!({
             "model": self.model,
             "system": system_prompt,
@@ -196,8 +243,8 @@ impl Agent {
     }
 
     async fn stream_openai(
-        &self, 
-        messages: &[Message], 
+        &self,
+        messages: &[Message],
         _system_prompt: &str,
         assistant_text: &mut String,
         tool_calls: &mut Vec<Value>,
@@ -217,7 +264,9 @@ impl Agent {
             "tools": self.tool_registry.get_openai_schemas(),
         });
 
-        let response = self.client.post("https://api.openai.com/v1/chat/completions")
+        let response = self
+            .client
+            .post("https://api.openai.com/v1/chat/completions")
             .header("Authorization", format!("Bearer {}", self.api_key))
             .json(&request)
             .send()
@@ -235,12 +284,16 @@ impl Agent {
             for line in text.lines() {
                 if line.starts_with("data: ") {
                     let data = &line[6..];
-                    if data == "[DONE]" { break; }
+                    if data == "[DONE]" {
+                        break;
+                    }
                     let val: Value = serde_json::from_str(data)?;
                     if let Some(delta) = val["choices"][0]["delta"].as_object() {
                         if let Some(content) = delta.get("content").and_then(|v| v.as_str()) {
                             assistant_text.push_str(content);
-                            let _ = event_tx.send(AgentEvent::TextDelta(content.to_string())).await;
+                            let _ = event_tx
+                                .send(AgentEvent::TextDelta(content.to_string()))
+                                .await;
                         }
                         if let Some(t_calls) = delta.get("tool_calls").and_then(|v| v.as_array()) {
                             for tc in t_calls {
@@ -255,8 +308,8 @@ impl Agent {
     }
 
     async fn stream_gemini(
-        &self, 
-        messages: &[Message], 
+        &self,
+        messages: &[Message],
         _system_prompt: &str,
         assistant_text: &mut String,
         tool_calls: &mut Vec<Value>,
@@ -264,7 +317,11 @@ impl Agent {
     ) -> Result<()> {
         let mut contents = Vec::new();
         for m in messages {
-            let role = if m.role == "assistant" { "model" } else { "user" };
+            let role = if m.role == "assistant" {
+                "model"
+            } else {
+                "user"
+            };
             contents.push(json!({
                 "role": role,
                 "parts": [{ "text": &m.content }]
@@ -282,10 +339,7 @@ impl Agent {
             "tools": [{ "function_declarations": self.tool_registry.get_gemini_schemas() }],
         });
 
-        let response = self.client.post(&url)
-            .json(&request)
-            .send()
-            .await?;
+        let response = self.client.post(&url).json(&request).send().await?;
 
         if !response.status().is_success() {
             let err = response.text().await?;
@@ -306,7 +360,9 @@ impl Agent {
                                 for part in parts {
                                     if let Some(t) = part["text"].as_str() {
                                         assistant_text.push_str(t);
-                                        let _ = event_tx.send(AgentEvent::TextDelta(t.to_string())).await;
+                                        let _ = event_tx
+                                            .send(AgentEvent::TextDelta(t.to_string()))
+                                            .await;
                                     }
                                     if let Some(fc) = part.get("functionCall") {
                                         // Gemini tool calls need to be mapped to Anthropic format for consistency

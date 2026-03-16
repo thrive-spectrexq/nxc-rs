@@ -1,10 +1,10 @@
-use tokio::net::TcpListener;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tracing::{info, error, warn};
 use crate::topology::SharedTopology;
-use serde::{Deserialize, Serialize};
 use netsage_auth::validate_token;
+use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::net::TcpListener;
 use tokio::sync::mpsc;
+use tracing::{error, info, warn};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IngestionPacket {
@@ -34,7 +34,7 @@ impl IngestionServer {
                     info!("Incoming connection from capture node: {}", addr);
                     let topo = self.topology.clone();
                     let pkt_tx_inner = packet_tx.clone();
-                    
+
                     tokio::spawn(async move {
                         let reader = BufReader::new(socket);
                         let mut lines = reader.lines();
@@ -57,16 +57,29 @@ impl IngestionServer {
                                         if parts.len() >= 2 {
                                             let src = parts[0].trim().to_string();
                                             let dst_full = parts[1].trim();
-                                            let dst = dst_full.split(' ').next().unwrap_or(dst_full).to_string();
-                                            
+                                            let dst = dst_full
+                                                .split(' ')
+                                                .next()
+                                                .unwrap_or(dst_full)
+                                                .to_string();
+
                                             if let Ok(mut graph) = topo.lock() {
-                                                graph.add_node(src.clone(), src.clone(), format!("node:{}", node_id));
-                                                graph.add_node(dst.clone(), dst.clone(), "host".to_string());
+                                                graph.add_node(
+                                                    src.clone(),
+                                                    src.clone(),
+                                                    format!("node:{}", node_id),
+                                                );
+                                                graph.add_node(
+                                                    dst.clone(),
+                                                    dst.clone(),
+                                                    "host".to_string(),
+                                                );
                                                 graph.add_edge(src, dst);
                                             }
                                         }
                                     }
-                                    let _ = pkt_tx_inner.send(format!("[{}] {}", node_id, desc)).await;
+                                    let _ =
+                                        pkt_tx_inner.send(format!("[{}] {}", node_id, desc)).await;
                                 }
                                 Err(e) => {
                                     error!("Failed to parse ingestion packet from {}: {}", addr, e);

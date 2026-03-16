@@ -3,8 +3,9 @@ use tracing::{info, warn};
 /// Validates whether the provided token matches the expected NETSAGE_AUTH_TOKEN.
 /// Uses constant-time comparison to prevent timing attacks.
 pub fn validate_token(token: &str) -> bool {
-    let expected = std::env::var("NETSAGE_AUTH_TOKEN").unwrap_or_else(|_| "netsage_default_secret".to_string());
-    
+    let expected = std::env::var("NETSAGE_AUTH_TOKEN")
+        .unwrap_or_else(|_| "netsage_default_secret".to_string());
+
     // Constant-time comparison
     if token.len() != expected.len() {
         warn!("Authentication failed: Length mismatch.");

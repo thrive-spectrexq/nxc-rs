@@ -1,10 +1,10 @@
 use serde_json::{json, Value};
 use std::net::IpAddr;
-use std::time::Duration;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::io::AsyncReadExt;
-use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::config::*;
+use trust_dns_resolver::TokioAsyncResolver;
 
 pub struct ToolRegistry {
     tools: Vec<Value>,
@@ -101,9 +101,15 @@ impl ToolRegistry {
     }
 
     async fn ssh_command(&self, args: Value) -> anyhow::Result<Value> {
-        let host = args["host"].as_str().ok_or_else(|| anyhow::anyhow!("Missing host"))?;
-        let command = args["command"].as_str().ok_or_else(|| anyhow::anyhow!("Missing command"))?;
-        let username = args["username"].as_str().ok_or_else(|| anyhow::anyhow!("Missing username"))?;
+        let host = args["host"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing host"))?;
+        let command = args["command"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing command"))?;
+        let username = args["username"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing username"))?;
         let password = args["password"].as_str();
 
         let tcp = std::net::TcpStream::connect(format!("{}:22", host))?;
@@ -119,14 +125,14 @@ impl ToolRegistry {
 
         let mut channel = sess.channel_session()?;
         channel.exec(command)?;
-        
+
         use std::io::Read;
         let mut s = String::new();
         channel.read_to_string(&mut s)?;
-        
+
         let mut stderr = String::new();
         channel.stderr().read_to_string(&mut stderr)?;
-        
+
         channel.wait_close()?;
 
         Ok(json!({
@@ -139,12 +145,14 @@ impl ToolRegistry {
     }
 
     async fn whois_lookup(&self, args: Value) -> anyhow::Result<Value> {
-        let domain = args["domain"].as_str().ok_or_else(|| anyhow::anyhow!("Missing domain"))?;
-        
-        use std::io::{Write, Read};
+        let domain = args["domain"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing domain"))?;
+
+        use std::io::{Read, Write};
         let mut stream = std::net::TcpStream::connect("whois.iana.org:43")?;
         stream.write_all(format!("{}\r\n", domain).as_bytes())?;
-        
+
         let mut response = String::new();
         stream.read_to_string(&mut response)?;
 
@@ -156,7 +164,10 @@ impl ToolRegistry {
     }
 
     async fn port_scan(&self, args: Value) -> anyhow::Result<Value> {
-        let host = args["host"].as_str().ok_or_else(|| anyhow::anyhow!("Missing host"))?.to_string();
+        let host = args["host"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing host"))?
+            .to_string();
         let ports_str = args["ports"].as_str().unwrap_or("1-1024");
 
         let mut ports = Vec::new();
@@ -187,13 +198,23 @@ impl ToolRegistry {
             handles.push(tokio::spawn(async move {
                 let _permit = sem.acquire().await.ok();
                 let addr = format!("{}:{}", host_clone, port);
-                
-                match tokio::time::timeout(Duration::from_millis(400), tokio::net::TcpStream::connect(&addr)).await {
+
+                match tokio::time::timeout(
+                    Duration::from_millis(400),
+                    tokio::net::TcpStream::connect(&addr),
+                )
+                .await
+                {
                     Ok(Ok(mut stream)) => {
                         // Basic banner grabbing
                         let mut banner = String::new();
                         let mut buffer = [0u8; 1024];
-                        if let Ok(Ok(n)) = tokio::time::timeout(Duration::from_millis(500), stream.read(&mut buffer)).await {
+                        if let Ok(Ok(n)) = tokio::time::timeout(
+                            Duration::from_millis(500),
+                            stream.read(&mut buffer),
+                        )
+                        .await
+                        {
                             banner = String::from_utf8_lossy(&buffer[..n]).trim().to_string();
                         }
                         Some(json!({ "port": port, "status": "open", "banner": banner }))
@@ -220,11 +241,15 @@ impl ToolRegistry {
     }
 
     async fn geoip_lookup(&self, args: Value) -> anyhow::Result<Value> {
-        let ip_str = args["ip"].as_str().ok_or_else(|| anyhow::anyhow!("Missing ip"))?;
-        
+        let ip_str = args["ip"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing ip"))?;
+
         // Refined mock response
-        let is_private = ip_str.starts_with("10.") || ip_str.starts_with("192.168.") || ip_str.starts_with("172.");
-        
+        let is_private = ip_str.starts_with("10.")
+            || ip_str.starts_with("192.168.")
+            || ip_str.starts_with("172.");
+
         if is_private {
             return Ok(json!({
                 "status": "success",
@@ -247,7 +272,9 @@ impl ToolRegistry {
     }
 
     async fn ping_host(&self, args: Value) -> anyhow::Result<Value> {
-        let host = args["host"].as_str().ok_or_else(|| anyhow::anyhow!("Missing host"))?;
+        let host = args["host"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing host"))?;
         let count = args["count"].as_u64().unwrap_or(4) as usize;
 
         let ip = match host.parse::<IpAddr>() {
@@ -255,7 +282,10 @@ impl ToolRegistry {
             Err(_) => {
                 use tokio::net::lookup_host;
                 let mut addrs = lookup_host(format!("{}:0", host)).await?;
-                addrs.next().ok_or_else(|| anyhow::anyhow!("DNS resolution failed"))?.ip()
+                addrs
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("DNS resolution failed"))?
+                    .ip()
             }
         };
 
@@ -271,7 +301,8 @@ impl ToolRegistry {
             }
         }
 
-        let successes: Vec<f64> = results.iter()
+        let successes: Vec<f64> = results
+            .iter()
             .filter_map(|r| r.as_object())
             .filter_map(|o| o.get("rtt"))
             .filter_map(|v| v.as_f64())
@@ -297,9 +328,12 @@ impl ToolRegistry {
     }
 
     async fn dns_lookup(&self, args: Value) -> anyhow::Result<Value> {
-        let query = args["query"].as_str().ok_or_else(|| anyhow::anyhow!("Missing query"))?;
-        let resolver = TokioAsyncResolver::tokio(ResolverConfig::default(), ResolverOpts::default());
-        
+        let query = args["query"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing query"))?;
+        let resolver =
+            TokioAsyncResolver::tokio(ResolverConfig::default(), ResolverOpts::default());
+
         match query.parse::<IpAddr>() {
             Ok(ip) => {
                 let response = resolver.reverse_lookup(ip).await?;
@@ -335,25 +369,31 @@ impl ToolRegistry {
     }
 
     pub fn get_openai_schemas(&self) -> Vec<Value> {
-        self.tools.iter().map(|t| {
-            json!({
-                "type": "function",
-                "function": {
-                    "name": t["name"],
-                    "description": t["description"],
-                    "parameters": t["input_schema"]
-                }
+        self.tools
+            .iter()
+            .map(|t| {
+                json!({
+                    "type": "function",
+                    "function": {
+                        "name": t["name"],
+                        "description": t["description"],
+                        "parameters": t["input_schema"]
+                    }
+                })
             })
-        }).collect()
+            .collect()
     }
 
     pub fn get_gemini_schemas(&self) -> Vec<Value> {
-        self.tools.iter().map(|t| {
-            json!({
-                "name": t["name"],
-                "description": t["description"],
-                "parameters": t["input_schema"]
+        self.tools
+            .iter()
+            .map(|t| {
+                json!({
+                    "name": t["name"],
+                    "description": t["description"],
+                    "parameters": t["input_schema"]
+                })
             })
-        }).collect()
+            .collect()
     }
 }

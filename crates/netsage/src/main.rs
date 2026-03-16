@@ -1,15 +1,15 @@
 use anyhow::Result;
 use chrono::Utc;
-use netsage_tui::{run_tui, TuiEvent};
-use netsage_agent::{Agent, AgentEvent, Message, Provider, ApprovalMode, Persona};
-use tracing::{info, error};
-use netsage_capture::PacketEngine;
-use netsage_capture::topology::{SharedTopology, TopologyGraph};
-use netsage_capture::ingestion::IngestionServer;
-use netsage_mcp::McpServer;
-use tokio::sync::mpsc;
-use std::sync::{Arc, Mutex as StdMutex};
 use clap::Parser;
+use netsage_agent::{Agent, AgentEvent, ApprovalMode, Message, Persona, Provider};
+use netsage_capture::ingestion::IngestionServer;
+use netsage_capture::topology::{SharedTopology, TopologyGraph};
+use netsage_capture::PacketEngine;
+use netsage_mcp::McpServer;
+use netsage_tui::{run_tui, TuiEvent};
+use std::sync::{Arc, Mutex as StdMutex};
+use tokio::sync::mpsc;
+use tracing::{error, info};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -30,10 +30,10 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    
+
     // Load .env file
     let _ = dotenvy::dotenv();
-    
+
     if args.mcp {
         // Run in MCP mode - no TUI
         let server = McpServer::new();
@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
         // Run in Node mode - streaming to central server
         tracing_subscriber::fmt::init();
         info!("Launching NetSage in NODE mode...");
-        
+
         let engine = if let Ok(engine) = PacketEngine::new(args.interface.as_deref()) {
             engine
         } else {
@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
         };
 
         engine.spawn_remote_loop(server_addr);
-        
+
         // Keep alive
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
     // Initialize Packet Engine
     let ui_tx_pcap = ui_tx.clone();
     let (pcap_tx, mut pcap_rx) = mpsc::channel::<String>(100);
-    
+
     let shared_topology = if let Ok(engine) = PacketEngine::new(args.interface.as_deref()) {
         let topo = engine.get_topology();
         engine.spawn_loop(pcap_tx);
@@ -88,9 +88,11 @@ async fn main() -> Result<()> {
             let mut byte_count = 0;
             let mut timer = tokio::time::interval(std::time::Duration::from_secs(1));
             while let Some(packet_desc) = pcap_rx.recv().await {
-                let _ = ui_tx_pcap.send(TuiEvent::PacketUpdate(packet_desc.clone())).await;
-                byte_count += 500; 
-                
+                let _ = ui_tx_pcap
+                    .send(TuiEvent::PacketUpdate(packet_desc.clone()))
+                    .await;
+                byte_count += 500;
+
                 tokio::select! {
                     _ = timer.tick() => {
                         let throughput_mbps = (byte_count as f64 * 8.0) / 1_000_000.0;
@@ -112,7 +114,11 @@ async fn main() -> Result<()> {
                 interval.tick().await;
                 let pkt = "[MOCK] TCP 192.168.1.1:443 -> 192.168.1.52:54212 [ACK]".to_string();
                 let _ = ui_tx_clone.send(TuiEvent::PacketUpdate(pkt)).await;
-                let _ = ui_tx_clone.send(TuiEvent::ThroughputUpdate(45.0 + (rand::random::<f64>() * 10.0))).await;
+                let _ = ui_tx_clone
+                    .send(TuiEvent::ThroughputUpdate(
+                        45.0 + (rand::random::<f64>() * 10.0),
+                    ))
+                    .await;
             }
         });
         Some(topo)
@@ -125,7 +131,7 @@ async fn main() -> Result<()> {
             tokio::spawn(async move {
                 let server = IngestionServer::new(topo, "0.0.0.0:9090".to_string());
                 let (pkt_tx, mut pkt_rx) = mpsc::channel::<String>(100);
-                
+
                 // Spawn a task to bridge raw ingestion strings to TuiEvents
                 let ui_tx_bridge = ui_tx_srv.clone();
                 tokio::spawn(async move {
@@ -199,14 +205,17 @@ async fn main() -> Result<()> {
                     });
 
                     let (agent_event_tx, mut agent_event_rx) = mpsc::channel::<AgentEvent>(100);
-                    
+
                     let agent_run = agent_clone.clone();
                     let mut messages_run = messages.clone();
                     let ui_tx_inner = ui_tx.clone();
-                    
+
                     tokio::spawn(async move {
-                        if let Err(e) = agent_run.run_loop(&mut messages_run, agent_event_tx).await {
-                            let _ = ui_tx_inner.send(TuiEvent::AgentResponse(format!("Error: {}", e))).await;
+                        if let Err(e) = agent_run.run_loop(&mut messages_run, agent_event_tx).await
+                        {
+                            let _ = ui_tx_inner
+                                .send(TuiEvent::AgentResponse(format!("Error: {}", e)))
+                                .await;
                         }
                     });
 
@@ -216,13 +225,20 @@ async fn main() -> Result<()> {
                                 let _ = ui_tx_agent.send(TuiEvent::TextDelta(delta)).await;
                             }
                             AgentEvent::ToolCall { name, .. } => {
-                                let _ = ui_tx_agent.send(TuiEvent::AgentResponse(format!("[Executing Tool: {}]", name))).await;
+                                let _ = ui_tx_agent
+                                    .send(TuiEvent::AgentResponse(format!(
+                                        "[Executing Tool: {}]",
+                                        name
+                                    )))
+                                    .await;
                             }
                             AgentEvent::Thinking(val) => {
                                 let _ = ui_tx_agent.send(TuiEvent::AgentThinking(val)).await;
                             }
                             AgentEvent::Error(err) => {
-                                let _ = ui_tx_agent.send(TuiEvent::AgentResponse(format!("Error: {}", err))).await;
+                                let _ = ui_tx_agent
+                                    .send(TuiEvent::AgentResponse(format!("Error: {}", err)))
+                                    .await;
                             }
                             AgentEvent::Finished => {}
                             _ => {}
@@ -245,13 +261,25 @@ async fn main() -> Result<()> {
                                 let filename = format!("reports/session_{}.md", timestamp);
                                 let _ = std::fs::create_dir_all("reports");
                                 if let Err(e) = std::fs::write(&filename, md) {
-                                    let _ = ui_tx_inner.send(TuiEvent::AgentResponse(format!("Export failed: {}", e))).await;
+                                    let _ = ui_tx_inner
+                                        .send(TuiEvent::AgentResponse(format!(
+                                            "Export failed: {}",
+                                            e
+                                        )))
+                                        .await;
                                 } else {
-                                    let _ = ui_tx_inner.send(TuiEvent::AgentResponse(format!("Session exported to {}", filename))).await;
+                                    let _ = ui_tx_inner
+                                        .send(TuiEvent::AgentResponse(format!(
+                                            "Session exported to {}",
+                                            filename
+                                        )))
+                                        .await;
                                 }
                             }
                             Err(e) => {
-                                let _ = ui_tx_inner.send(TuiEvent::AgentResponse(format!("Export failed: {}", e))).await;
+                                let _ = ui_tx_inner
+                                    .send(TuiEvent::AgentResponse(format!("Export failed: {}", e)))
+                                    .await;
                             }
                         }
                     });
@@ -275,9 +303,19 @@ async fn main() -> Result<()> {
                             if let (Some(mermaid), Some(filename)) = (mermaid, filename) {
                                 let _ = std::fs::create_dir_all("reports");
                                 if let Err(e) = std::fs::write(&filename, mermaid) {
-                                    let _ = ui_tx_inner.send(TuiEvent::AgentResponse(format!("Mermaid export failed: {}", e))).await;
+                                    let _ = ui_tx_inner
+                                        .send(TuiEvent::AgentResponse(format!(
+                                            "Mermaid export failed: {}",
+                                            e
+                                        )))
+                                        .await;
                                 } else {
-                                    let _ = ui_tx_inner.send(TuiEvent::AgentResponse(format!("Topology exported to {}", filename))).await;
+                                    let _ = ui_tx_inner
+                                        .send(TuiEvent::AgentResponse(format!(
+                                            "Topology exported to {}",
+                                            filename
+                                        )))
+                                        .await;
                                 }
                             }
                         });
