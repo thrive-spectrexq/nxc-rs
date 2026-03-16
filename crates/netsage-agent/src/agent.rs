@@ -195,7 +195,7 @@ impl Agent {
 
                 messages.push(Message {
                     role: "user".to_string(),
-                    content: format!("Tool {} result: {}", name, result.to_string()),
+                    content: format!("Tool {} result: {}", name, result),
                 });
             }
         }
@@ -282,8 +282,7 @@ impl Agent {
             let chunk = chunk?;
             let text = String::from_utf8_lossy(&chunk);
             for line in text.lines() {
-                if line.starts_with("data: ") {
-                    let data = &line[6..];
+                if let Some(data) = line.strip_prefix("data: ") {
                     if data == "[DONE]" {
                         break;
                     }
@@ -351,8 +350,7 @@ impl Agent {
             let chunk = chunk?;
             let text = String::from_utf8_lossy(&chunk);
             for line in text.lines() {
-                if line.starts_with("data: ") {
-                    let data = &line[6..];
+                if let Some(data) = line.strip_prefix("data: ") {
                     let val: Value = serde_json::from_str(data)?;
                     if let Some(candidates) = val["candidates"].as_array() {
                         for cand in candidates {

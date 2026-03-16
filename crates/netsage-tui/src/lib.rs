@@ -157,7 +157,7 @@ pub async fn run_tui(
         loop {
             if event::poll(Duration::from_millis(50)).unwrap_or(false) {
                 if let Ok(event) = event::read() {
-                    if let Err(_) = event_tx.send(event).await {
+                    if event_tx.send(event).await.is_err() {
                         break;
                     }
                 }
@@ -225,7 +225,7 @@ async fn run_app<B: ratatui::backend::Backend>(
                         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => return Ok(()),
 
                         KeyCode::Enter if !key.modifiers.contains(KeyModifiers::SHIFT) => {
-                            let lines: Vec<String> = app.textarea.lines().iter().cloned().collect();
+                            let lines: Vec<String> = app.textarea.lines().to_vec();
                             let cmd = lines.join(" ").trim().to_string();
                             if !cmd.is_empty() {
                                 if cmd.starts_with('/') {

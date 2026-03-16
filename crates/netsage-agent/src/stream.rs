@@ -24,8 +24,7 @@ pub enum ClaudeEvent {
 }
 
 pub fn parse_sse_line(line: &str) -> Result<Option<ClaudeEvent>> {
-    if line.starts_with("data: ") {
-        let data = &line[6..];
+    if let Some(data) = line.strip_prefix("data: ") {
         let event: ClaudeEvent = serde_json::from_str(data)?;
         Ok(Some(event))
     } else {

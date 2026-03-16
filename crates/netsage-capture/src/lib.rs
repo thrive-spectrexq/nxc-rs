@@ -57,7 +57,7 @@ impl PacketEngine {
     pub fn next_packet(&mut self) -> Result<Option<String>> {
         match self.capture.next_packet() {
             Ok(packet) => {
-                match PacketHeaders::from_ethernet_slice(&packet.data) {
+                match PacketHeaders::from_ethernet_slice(packet.data) {
                     Ok(headers) => {
                         let mut desc = String::new();
 
