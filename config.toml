@@ -1,6 +1,25 @@
 [core]
 provider = "gemini" # Options: anthropic | openai | gemini
-# model = "claude-3-5-sonnet-20240620"
-# model = "gpt-4o"
 model = "gemini-2.5-pro"
 approval_mode = "supervised"
+
+[agent]
+max_tokens = 4096
+max_tool_iterations = 10
+stream_timeout_secs = 30
+
+[capture]
+promiscuous = true
+snaplen = 65535
+max_packets_store = 1000
+
+[session]
+db_path = "session.db"
+retain_days = 30
+
+[tui]
+theme = "dark"
+show_timestamps = true
+packet_viewer = true
+topology_view = true
+refresh_rate_ms = 100
