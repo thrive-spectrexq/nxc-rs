@@ -2,14 +2,13 @@ use anyhow::Result;
 use chrono::Utc;
 use netsage_tui::{run_tui, TuiEvent};
 use netsage_agent::{Agent, AgentEvent, Message, Provider, ApprovalMode, Persona};
-use tracing::info;
+use tracing::{info, error};
 use netsage_capture::PacketEngine;
 use netsage_capture::topology::{SharedTopology, TopologyGraph};
 use netsage_capture::ingestion::IngestionServer;
 use netsage_mcp::McpServer;
 use tokio::sync::mpsc;
 use std::sync::{Arc, Mutex as StdMutex};
-use tokio::sync::Mutex as TokioMutex;
 use clap::Parser;
 
 #[derive(Parser, Debug)]

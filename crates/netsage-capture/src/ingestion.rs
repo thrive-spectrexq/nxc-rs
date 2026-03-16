@@ -9,6 +9,8 @@ use tokio::sync::mpsc;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IngestionPacket {
     pub auth: String,
+    pub node_id: String,
+    pub timestamp: i64,
     pub payload: String,
 }
 
@@ -46,6 +48,9 @@ impl IngestionServer {
                                     }
 
                                     let desc = pkt.payload;
+                                    let node_id = pkt.node_id;
+                                    let _ts = pkt.timestamp;
+
                                     // Basic parsing of "src -> dst"
                                     if desc.contains(" -> ") {
                                         let parts: Vec<&str> = desc.split(" -> ").collect();
@@ -55,13 +60,13 @@ impl IngestionServer {
                                             let dst = dst_full.split(' ').next().unwrap_or(dst_full).to_string();
                                             
                                             if let Ok(mut graph) = topo.lock() {
-                                                graph.add_node(src.clone(), src.clone(), "remote_host".to_string());
-                                                graph.add_node(dst.clone(), dst.clone(), "remote_host".to_string());
+                                                graph.add_node(src.clone(), src.clone(), format!("node:{}", node_id));
+                                                graph.add_node(dst.clone(), dst.clone(), "host".to_string());
                                                 graph.add_edge(src, dst);
                                             }
                                         }
                                     }
-                                    let _ = pkt_tx_inner.send(format!("[REMOTE] {}", desc)).await;
+                                    let _ = pkt_tx_inner.send(format!("[{}] {}", node_id, desc)).await;
                                 }
                                 Err(e) => {
                                     error!("Failed to parse ingestion packet from {}: {}", addr, e);

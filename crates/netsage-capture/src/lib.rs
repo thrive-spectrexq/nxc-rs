@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 use etherparse::PacketHeaders;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
+use chrono::Utc;
 
 #[cfg(feature = "pcap")]
 use pcap::{Capture, Device};
@@ -168,9 +169,12 @@ impl PacketEngine {
                 match TcpStream::connect(&server_addr).await {
                     Ok(mut stream) => {
                         info!("Connected to server. Starting remote stream.");
+                        let node_id = hostname::get().map(|h| h.to_string_lossy().into_owned()).unwrap_or_else(|_| "unknown_node".to_string());
                         while let Some(desc) = rx.recv().await {
                             let pkt = ingestion::IngestionPacket {
                                 auth: token.clone(),
+                                node_id: node_id.clone(),
+                                timestamp: Utc::now().timestamp(),
                                 payload: desc,
                             };
                             if let Ok(data) = serde_json::to_string(&pkt) {

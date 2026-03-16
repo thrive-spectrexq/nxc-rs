@@ -12,6 +12,8 @@ netsage-auth = { path = "../netsage-auth" }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
+hostname = "0.4.0"
+chrono = { workspace = true }
 
 [features]
 default = ["pcap"]

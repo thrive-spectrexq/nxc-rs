@@ -1,14 +1,26 @@
 use tracing::{info, warn};
 
 /// Validates whether the provided token matches the expected NETSAGE_AUTH_TOKEN.
+/// Uses constant-time comparison to prevent timing attacks.
 pub fn validate_token(token: &str) -> bool {
     let expected = std::env::var("NETSAGE_AUTH_TOKEN").unwrap_or_else(|_| "netsage_default_secret".to_string());
     
-    if token == expected {
+    // Constant-time comparison
+    if token.len() != expected.len() {
+        warn!("Authentication failed: Length mismatch.");
+        return false;
+    }
+
+    let mut result = 0u8;
+    for (a, b) in token.as_bytes().iter().zip(expected.as_bytes().iter()) {
+        result |= a ^ b;
+    }
+
+    if result == 0 {
         info!("Authentication successful for remote node.");
         true
     } else {
-        warn!("Authentication failed: Invalid token provided.");
+        warn!("Authentication failed: Invalid credentials.");
         false
     }
 }

@@ -1,6 +1,8 @@
 use serde_json::{json, Value};
 use std::net::IpAddr;
 use std::time::Duration;
+use std::sync::Arc;
+use tokio::io::AsyncReadExt;
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::config::*;
 
@@ -175,33 +177,45 @@ impl ToolRegistry {
             }
         }
 
-        let mut open_ports = Vec::new();
+        let mut open_services = Vec::new();
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(100)); // Limit to 100 concurrent tasks
         let mut handles = Vec::new();
 
         for port in ports {
             let host_clone = host.clone();
+            let sem = semaphore.clone();
             handles.push(tokio::spawn(async move {
+                let _permit = sem.acquire().await.ok();
                 let addr = format!("{}:{}", host_clone, port);
-                match tokio::time::timeout(Duration::from_millis(200), tokio::net::TcpStream::connect(&addr)).await {
-                    Ok(Ok(_)) => Some(port),
+                
+                match tokio::time::timeout(Duration::from_millis(400), tokio::net::TcpStream::connect(&addr)).await {
+                    Ok(Ok(mut stream)) => {
+                        // Basic banner grabbing
+                        let mut banner = String::new();
+                        let mut buffer = [0u8; 1024];
+                        if let Ok(Ok(n)) = tokio::time::timeout(Duration::from_millis(500), stream.read(&mut buffer)).await {
+                            banner = String::from_utf8_lossy(&buffer[..n]).trim().to_string();
+                        }
+                        Some(json!({ "port": port, "status": "open", "banner": banner }))
+                    }
                     _ => None,
                 }
             }));
         }
 
         for handle in handles {
-            if let Ok(Some(port)) = handle.await {
-                open_ports.push(port);
+            if let Ok(Some(service)) = handle.await {
+                open_services.push(service);
             }
         }
 
-        open_ports.sort_unstable();
+        open_services.sort_by_key(|s| s["port"].as_u64().unwrap_or(0));
 
         Ok(json!({
             "status": "success",
             "host": host,
-            "open_ports": open_ports,
-            "scan_count": open_ports.len()
+            "open_ports": open_services,
+            "scan_count": open_services.len()
         }))
     }
 
