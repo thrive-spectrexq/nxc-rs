@@ -1,6 +1,6 @@
 [core]
-provider = "anthropic" # Options: anthropic | openai | gemini
-model = "claude-3-5-sonnet-20240620"
+provider = "gemini" # Options: anthropic | openai | gemini
+# model = "claude-3-5-sonnet-20240620"
 # model = "gpt-4o"
-# model = "gemini-1.5-pro"
+model = "gemini-2.5-pro"
 approval_mode = "supervised"

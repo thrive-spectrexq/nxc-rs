@@ -1,0 +1,82 @@
+use anyhow::Result;
+use netsage_pybridge::PythonBridge;
+use netsage_tools::ToolRegistry;
+use serde_json::{json, Value};
+use std::io::{self, BufRead};
+use tokio::sync::Mutex;
+use std::sync::Arc;
+
+pub struct McpServer {
+    bridge: Arc<Mutex<PythonBridge>>,
+    registry: ToolRegistry,
+}
+
+impl McpServer {
+    pub fn new(bridge: Arc<Mutex<PythonBridge>>) -> Self {
+        Self {
+            bridge,
+            registry: ToolRegistry::new(),
+        }
+    }
+
+    pub async fn run(&self) -> Result<()> {
+        let stdin = io::stdin();
+        let mut reader = stdin.lock().lines();
+
+        while let Some(Ok(line)) = reader.next() {
+            let request: Value = match serde_json::from_str(&line) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+
+            let id = request["id"].clone();
+            let method = request["method"].as_str().unwrap_or_default();
+
+            match method {
+                "listTools" => {
+                    let tools = self.registry.get_schemas();
+                    let response = json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "result": { "tools": tools }
+                    });
+                    println!("{}", response);
+                }
+                "callTool" => {
+                    let name = request["params"]["name"].as_str().unwrap_or_default();
+                    let args = request["params"]["arguments"].clone();
+                    
+                    let mut bridge = self.bridge.lock().await;
+                    match bridge.call_tool(name, args).await {
+                        Ok(res) => {
+                            let response = json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "result": { "content": [{ "type": "text", "text": res.to_string() }] }
+                            });
+                            println!("{}", response);
+                        }
+                        Err(e) => {
+                            let response = json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "error": { "code": -32603, "message": e.to_string() }
+                            });
+                            println!("{}", response);
+                        }
+                    }
+                }
+                _ => {
+                    let response = json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": -32601, "message": "Method not found" }
+                    });
+                    println!("{}", response);
+                }
+            }
+        }
+
+        Ok(())
+    }
+}

@@ -1,5 +1,6 @@
 pub mod agent;
-pub use agent::Agent;
+pub mod stream;
+pub use agent::{Agent, AgentEvent};
 
 use serde::{Deserialize, Serialize};
 
@@ -17,20 +18,28 @@ pub enum ApprovalMode {
     Autonomous,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+pub enum Persona {
+    General,
+    NetOps,
+    SecOps,
+    SRE,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Message {
     pub role: String,
     pub content: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ToolUse {
     pub id: String,
     pub name: String,
     pub input: serde_json::Value,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum ContentBlock {
     #[serde(rename = "text")]
@@ -46,19 +55,4 @@ pub struct ClaudeRequest {
     pub max_tokens: u32,
     pub stream: bool,
     pub tools: Option<Vec<serde_json::Value>>,
-}
-
-// Phase 4: MCP (Model Context Protocol) Support
-pub struct McpServer {
-    pub name: String,
-    pub version: String,
-}
-
-impl McpServer {
-    pub fn new() -> Self {
-        Self {
-            name: "netsage-mcp".to_string(),
-            version: "0.1.0".to_string(),
-        }
-    }
 }

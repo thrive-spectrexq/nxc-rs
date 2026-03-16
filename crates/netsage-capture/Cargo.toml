@@ -4,6 +4,13 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-pcap = { workspace = true }
+pcap = { version = "2.4.0", optional = true }
+etherparse = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
 tracing = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+
+[features]
+default = ["pcap"]
+pcap = ["dep:pcap"]

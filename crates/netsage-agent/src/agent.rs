@@ -1,11 +1,24 @@
-use crate::{ApprovalMode, Message, Provider};
-use anyhow::Result;
+use crate::{ApprovalMode, Message, Persona, Provider, stream::{ClaudeEvent, parse_sse_line}};
+use anyhow::{Result, anyhow};
+use futures::StreamExt;
+use reqwest::Client;
+use serde_json::{json, Value, to_value};
+use std::sync::Arc;
+use tokio::sync::{mpsc, Mutex};
 use netsage_pybridge::PythonBridge;
 use netsage_session::SessionStore;
-use reqwest::Client;
-use serde_json::{json, Value};
-use tracing::{info, warn};
-use uuid::Uuid;
+use netsage_tools::ToolRegistry;
+use tracing::info;
+
+#[derive(Debug, Clone)]
+pub enum AgentEvent {
+    TextDelta(String),
+    ToolCall { id: String, name: String, args: Value },
+    ToolResult { id: String, result: Value },
+    Error(String),
+    Finished,
+    Thinking(bool),
+}
 
 pub struct Agent {
     client: Client,
@@ -13,7 +26,9 @@ pub struct Agent {
     model: String,
     provider: Provider,
     mode: ApprovalMode,
+    persona: Arc<Mutex<Persona>>,
     session_store: SessionStore,
+    tool_registry: ToolRegistry,
 }
 
 impl Agent {
@@ -22,6 +37,7 @@ impl Agent {
         model: String,
         provider: Provider,
         mode: ApprovalMode,
+        persona: Persona,
         session_store: SessionStore,
     ) -> Self {
         Self {
@@ -30,56 +46,135 @@ impl Agent {
             model,
             provider,
             mode,
+            persona: Arc::new(Mutex::new(persona)),
             session_store,
+            tool_registry: ToolRegistry::new(),
         }
     }
 
-    pub async fn handle_tool_call(
+    pub async fn run_loop(
         &self,
+        messages: &mut Vec<Message>,
         bridge: &mut PythonBridge,
-        name: &str,
-        args: Value,
-    ) -> Result<Value> {
-        let call_id = Uuid::new_v4().to_string();
+        event_tx: mpsc::Sender<AgentEvent>,
+    ) -> Result<()> {
+        let _ = event_tx.send(AgentEvent::Thinking(true)).await;
+        
+        loop {
+            let system_prompt = self.get_system_prompt().await;
+            let mut tool_calls_this_turn = Vec::new();
 
-        info!("Handling tool call: {} (id: {})", name, call_id);
+            // 1. Call LLM based on provider
+            let mut assistant_text = String::new();
+            
+            match self.provider {
+                Provider::Anthropic => {
+                    let mut response_stream = self.stream_anthropic(messages, &system_prompt).await?;
+                    while let Some(item) = response_stream.next().await {
+                        let line = item?;
+                        if let Some(event) = parse_sse_line(&line)? {
+                            match event {
+                                ClaudeEvent::ContentBlockDelta { delta, .. } => {
+                                    if let Some(text) = delta["text"].as_str() {
+                                        assistant_text.push_str(text);
+                                        let _ = event_tx.send(AgentEvent::TextDelta(text.to_string())).await;
+                                    }
+                                }
+                                ClaudeEvent::ContentBlockStart { content_block, .. } => {
+                                    if content_block["type"] == "tool_use" {
+                                        tool_calls_this_turn.push(content_block);
+                                    }
+                                }
+                                ClaudeEvent::MessageStop => break,
+                                ClaudeEvent::Error { error } => {
+                                    let msg = error["message"].as_str().unwrap_or("Unknown Claude error");
+                                    let _ = event_tx.send(AgentEvent::Error(msg.to_string())).await;
+                                    let _ = event_tx.send(AgentEvent::Thinking(false)).await;
+                                    return Err(anyhow!("Claude API Error: {}", msg));
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                },
+                Provider::Gemini => {
+                    self.stream_gemini(messages, &system_prompt, &mut assistant_text, &mut tool_calls_this_turn, &event_tx).await?;
+                },
+                Provider::OpenAI => {
+                    self.stream_openai(messages, &system_prompt, &mut assistant_text, &mut tool_calls_this_turn, &event_tx).await?;
+                }
+            }
 
-        match self.mode {
-            ApprovalMode::ReadOnly => {
-                warn!("Blocked tool call in ReadOnly mode: {}", name);
-                anyhow::bail!("Tool execution not allowed in Read-Only mode");
+            // Append assistant response to messages
+            if !assistant_text.is_empty() {
+                messages.push(Message {
+                    role: "assistant".to_string(),
+                    content: assistant_text,
+                });
             }
-            ApprovalMode::Supervised => {
-                info!("Requesting approval for tool: {}", name);
+
+            if tool_calls_this_turn.is_empty() {
+                break; // No more tool calls, exit loop
             }
-            ApprovalMode::Autonomous => {
-                info!("Auto-approving tool: {}", name);
+
+            // 2. Handle Tool Calls
+            for tool_use in tool_calls_this_turn {
+                let id = tool_use["id"].as_str().unwrap_or_default().to_string();
+                let name = tool_use["name"].as_str().unwrap_or_default().to_string();
+                let args = tool_use["input"].clone();
+
+                info!("Handling tool call: {} (id: {})", name, id);
+
+                // Approval check
+                let (approved, _reason) = match self.mode {
+                    ApprovalMode::ReadOnly => (false, "ReadOnly mode blocks all tool calls"),
+                    ApprovalMode::Supervised => {
+                        let _ = event_tx.send(AgentEvent::ToolCall { id: id.clone(), name: name.clone(), args: args.clone() }).await;
+                        // In a real TUI, we would wait for a response here. 
+                        // For now, we'll continue with the execution but note that it's supervised.
+                        (true, "Supervised mode (Awaiting TUI response in future version)") 
+                    }
+                    ApprovalMode::Autonomous => (true, "Autonomous mode"),
+                };
+
+                if !approved {
+                    messages.push(Message {
+                        role: "user".to_string(),
+                        content: format!("Tool call {} blocked: {}", name, _reason),
+                    });
+                    continue;
+                }
+
+                self.session_store.log_tool_call(&id, &name, &args, "pending")?;
+
+                let result = bridge.call_tool(&name, args.clone()).await?;
+                self.session_store.update_tool_result(&id, &result)?;
+
+                let _ = event_tx.send(AgentEvent::ToolResult { id: id.clone(), result: result.clone() }).await;
+
+                messages.push(Message {
+                    role: "user".to_string(),
+                    content: format!("Tool {} result: {}", name, result.to_string()),
+                });
             }
         }
 
-        self.session_store
-            .log_tool_call(&call_id, name, &args, "pending")?;
-
-        let result = bridge.call_tool(name, args).await?;
-
-        self.session_store.update_tool_result(&call_id, &result)?;
-
-        Ok(result)
+        let _ = event_tx.send(AgentEvent::Thinking(false)).await;
+        let _ = event_tx.send(AgentEvent::Finished).await;
+        Ok(())
     }
 
-    pub async fn chat(&self, messages: Vec<Message>) -> Result<String> {
-        match self.provider {
-            Provider::Anthropic => self.call_anthropic(messages).await,
-            Provider::OpenAI => self.call_openai(messages).await,
-            Provider::Gemini => self.call_gemini(messages).await,
-        }
-    }
-
-    async fn call_anthropic(&self, messages: Vec<Message>) -> Result<String> {
+    async fn stream_anthropic(&self, messages: &[Message], system_prompt: &str) -> Result<impl futures::Stream<Item = Result<String>>> {
+        let messages_val = to_value(messages)?;
+        let tools_val = to_value(self.tool_registry.get_schemas())?;
+        
         let request = json!({
             "model": self.model,
-            "messages": messages,
-            "max_tokens": 1024,
+            "system": system_prompt,
+            "messages": messages_val,
+            "max_tokens": 4096,
+            "stream": true,
+            "tools": tools_val,
         });
 
         let response = self
@@ -91,57 +186,161 @@ impl Agent {
             .send()
             .await?;
 
-        let res_json: Value = response.json().await?;
-        Ok(res_json["content"][0]["text"]
-            .as_str()
-            .unwrap_or("")
-            .to_string())
+        if !response.status().is_success() {
+            let err_text = response.text().await?;
+            return Err(anyhow!("Anthropic API failed: {}", err_text));
+        }
+
+        Ok(response.bytes_stream().map(|b| {
+            let bytes = b.map_err(|e| anyhow!("Stream error: {}", e))?;
+            String::from_utf8(bytes.to_vec()).map_err(|e| anyhow!("UTF-8 error: {}", e))
+        }))
     }
 
-    async fn call_openai(&self, messages: Vec<Message>) -> Result<String> {
+    async fn stream_openai(
+        &self, 
+        messages: &[Message], 
+        _system_prompt: &str,
+        assistant_text: &mut String,
+        tool_calls: &mut Vec<Value>,
+        event_tx: &mpsc::Sender<AgentEvent>,
+    ) -> Result<()> {
+        let mut openai_messages = Vec::new();
+        // OpenAI system prompt is usually first message
+        openai_messages.push(json!({ "role": "system", "content": _system_prompt }));
+        for m in messages {
+            openai_messages.push(json!({ "role": &m.role, "content": &m.content }));
+        }
+
         let request = json!({
             "model": self.model,
-            "messages": messages,
+            "messages": openai_messages,
+            "stream": true,
+            "tools": self.tool_registry.get_openai_schemas(),
         });
 
-        let response = self
-            .client
-            .post("https://api.openai.com/v1/chat/completions")
+        let response = self.client.post("https://api.openai.com/v1/chat/completions")
             .header("Authorization", format!("Bearer {}", self.api_key))
             .json(&request)
             .send()
             .await?;
 
-        let res_json: Value = response.json().await?;
-        Ok(res_json["choices"][0]["message"]["content"]
-            .as_str()
-            .unwrap_or("")
-            .to_string())
+        if !response.status().is_success() {
+            let err = response.text().await?;
+            return Err(anyhow!("OpenAI API error: {}", err));
+        }
+
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            let text = String::from_utf8_lossy(&chunk);
+            for line in text.lines() {
+                if line.starts_with("data: ") {
+                    let data = &line[6..];
+                    if data == "[DONE]" { break; }
+                    let val: Value = serde_json::from_str(data)?;
+                    if let Some(delta) = val["choices"][0]["delta"].as_object() {
+                        if let Some(content) = delta.get("content").and_then(|v| v.as_str()) {
+                            assistant_text.push_str(content);
+                            let _ = event_tx.send(AgentEvent::TextDelta(content.to_string())).await;
+                        }
+                        if let Some(t_calls) = delta.get("tool_calls").and_then(|v| v.as_array()) {
+                            for tc in t_calls {
+                                tool_calls.push(tc.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
-    async fn call_gemini(&self, messages: Vec<Message>) -> Result<String> {
-        let contents: Vec<Value> = messages
-            .iter()
-            .map(|m| {
-                json!({
-                    "role": if m.role == "user" { "user" } else { "model" },
-                    "parts": [{"text": m.content}]
-                })
-            })
-            .collect();
+    async fn stream_gemini(
+        &self, 
+        messages: &[Message], 
+        _system_prompt: &str,
+        assistant_text: &mut String,
+        tool_calls: &mut Vec<Value>,
+        event_tx: &mpsc::Sender<AgentEvent>,
+    ) -> Result<()> {
+        let mut contents = Vec::new();
+        for m in messages {
+            let role = if m.role == "assistant" { "model" } else { "user" };
+            contents.push(json!({
+                "role": role,
+                "parts": [{ "text": &m.content }]
+            }));
+        }
 
-        let request = json!({ "contents": contents });
         let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?alt=sse&key={}",
             self.model, self.api_key
         );
 
-        let response = self.client.post(url).json(&request).send().await?;
+        let request = json!({
+            "contents": contents,
+            "system_instruction": { "parts": [{ "text": _system_prompt }] },
+            "tools": [{ "function_declarations": self.tool_registry.get_gemini_schemas() }],
+        });
 
-        let res_json: Value = response.json().await?;
-        Ok(res_json["candidates"][0]["content"]["parts"][0]["text"]
-            .as_str()
-            .unwrap_or("")
-            .to_string())
+        let response = self.client.post(&url)
+            .json(&request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let err = response.text().await?;
+            return Err(anyhow!("Gemini API error: {}", err));
+        }
+
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            let text = String::from_utf8_lossy(&chunk);
+            for line in text.lines() {
+                if line.starts_with("data: ") {
+                    let data = &line[6..];
+                    let val: Value = serde_json::from_str(data)?;
+                    if let Some(candidates) = val["candidates"].as_array() {
+                        for cand in candidates {
+                            if let Some(parts) = cand["content"]["parts"].as_array() {
+                                for part in parts {
+                                    if let Some(t) = part["text"].as_str() {
+                                        assistant_text.push_str(t);
+                                        let _ = event_tx.send(AgentEvent::TextDelta(t.to_string())).await;
+                                    }
+                                    if let Some(fc) = part.get("functionCall") {
+                                        // Gemini tool calls need to be mapped to Anthropic format for consistency
+                                        tool_calls.push(json!({
+                                            "type": "tool_use",
+                                            "id": uuid::Uuid::new_v4().to_string(),
+                                            "name": fc["name"],
+                                            "input": fc["args"]
+                                        }));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn set_persona(&self, persona: Persona) {
+        let mut p = self.persona.lock().await;
+        *p = persona;
+    }
+
+    async fn get_system_prompt(&self) -> String {
+        let p = self.persona.lock().await;
+        match *p {
+            Persona::General => "You are NetSage, an AI network intelligence assistant. You help users diagnose and monitor networks using available tools.".to_string(),
+            Persona::NetOps => "You are a Senior Network Operations Engineer. Focus on routing, switching, ISP issues, and throughput optimization. Be precise with CIDR and protocol details.".to_string(),
+            Persona::SecOps => "You are a Cybersecurity Analyst. Focus on port scanning, service detection, potential intrusions, and unauthorized traffic. Look for anomalies.".to_string(),
+            Persona::SRE => "You are a Site Reliability Engineer. Focus on latency, availability, connectivity issues, and infrastructure health.".to_string(),
+        }
     }
 }

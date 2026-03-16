@@ -8,6 +8,6 @@ ratatui = { workspace = true }
 crossterm = { workspace = true }
 tokio = { workspace = true }
 tui-textarea = { workspace = true }
-syntect = { workspace = true }
 anyhow = { workspace = true }
-tracing = { workspace = true }
+netsage-capture = { path = "../netsage-capture", default-features = false }
+netsage-agent = { path = "../netsage-agent" }

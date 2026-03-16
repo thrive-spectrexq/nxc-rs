@@ -57,8 +57,10 @@ if __name__ == "__main__":
     engine = ToolEngine()
     
     # Phase 1 & 2
-    from netsage_tools.tools.diagnostics import ping_host
+    from netsage_tools.tools.diagnostics import ping_host, traceroute
     from netsage_tools.tools.dns import dns_lookup
+    from netsage_tools.tools.discovery import port_scan, service_detect
+    from netsage_tools.tools.lan import arp_scan
     
     # Phase 3
     from netsage_tools.tools.remote import ssh_command, netconf_get
@@ -66,7 +68,12 @@ if __name__ == "__main__":
     from netsage_tools.tools.performance import iperf_test
     
     engine.register_tool("ping_host", ping_host)
+    engine.register_tool("traceroute", traceroute)
     engine.register_tool("dns_lookup", dns_lookup)
+    engine.register_tool("port_scan", port_scan)
+    engine.register_tool("service_detect", service_detect)
+    engine.register_tool("arp_scan", arp_scan)
+
     engine.register_tool("ssh_command", ssh_command)
     engine.register_tool("netconf_get", netconf_get)
     engine.register_tool("geoip_lookup", geoip_lookup)

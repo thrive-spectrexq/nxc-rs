@@ -1,7 +1,7 @@
 import subprocess
 
 def iperf_test(server, port=5201, duration=10):
-    """Run an iperf3 bandwidth test (Mock/Wrapper)."""
+    """Run an iperf3 bandwidth test."""
     try:
         command = ["iperf3", "-c", server, "-p", str(port), "-t", str(duration), "--json"]
         output = subprocess.check_output(command, universal_newlines=True)
@@ -14,3 +14,4 @@ def iperf_test(server, port=5201, duration=10):
             "status": "error",
             "message": f"iperf3 failed: {str(e)}"
         }
+

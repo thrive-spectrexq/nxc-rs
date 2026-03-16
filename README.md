@@ -24,7 +24,7 @@ curl -sSL https://raw.githubusercontent.com/thrive-spectrexq/netsage/master/inst
    ```toml
    [core]
    provider = "gemini"
-   model = "gemini-1.5-pro"
+   model = "gemini-3.1-pro"
    ```
 4. Run `cargo build` and then the binary.
 
@@ -42,4 +42,4 @@ To build NetSage on Windows, you must have the **Npcap SDK** installed so that t
 ## Architecture
 - **Rust Core**: Ratatui TUI, Agent Loop, Packet Engine.
 - **Python Sidecar**: Scapy, Nmap, Paramiko, NAPALM.
-- **Brain**: Powered by Claude 3.5 Sonnet.
+- **Brain**: Powered by Claude 4.6 Sonnet.

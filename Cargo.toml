@@ -5,6 +5,7 @@ members = [
     "crates/netsage-tui",
     "crates/netsage-tools",
     "crates/netsage-pybridge",
+    "crates/netsage-mcp",
     "crates/netsage-capture",
     "crates/netsage-session",
     "crates/netsage-config",
@@ -19,7 +20,7 @@ authors = ["Antigravity"]
 description = "AI-Powered Network Intelligence Tool"
 
 [workspace.dependencies]
-ratatui = "0.29"
+ratatui = "0.28"
 crossterm = "0.28"
 tokio = { version = "1.0", features = ["full"] }
 reqwest = { version = "0.12", features = ["json", "stream"] }
@@ -39,3 +40,5 @@ indicatif = "0.17"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 dotenvy = "0.15"
+rand = "0.8"
+etherparse = "0.14"
