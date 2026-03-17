@@ -39,34 +39,31 @@ impl NxcModule for Whoami {
     }
 
     fn options(&self) -> Vec<ModuleOption> {
-        vec![
-            ModuleOption {
-                name: "USER".to_string(),
-                description: "Enumerate information about a different sAMAccountName".to_string(),
-                required: false,
-                default: None,
-            },
-        ]
+        vec![ModuleOption {
+            name: "USER".to_string(),
+            description: "Enumerate information about a different sAMAccountName".to_string(),
+            required: false,
+            default: None,
+        }]
     }
 
     async fn run(&self, session: &dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
-        let target_user = opts
-            .get("USER")
-            .map(|s| s.as_str())
-            .unwrap_or(""); // If empty, we'll try to find the current user context
+        let target_user = opts.get("USER").map(|s| s.as_str()).unwrap_or(""); // If empty, we'll try to find the current user context
 
         let ldap_session = match session.protocol() {
-            "ldap" => unsafe { &*(session as *const dyn NxcSession as *const nxc_protocols::ldap::LdapSession) },
+            "ldap" => unsafe {
+                &*(session as *const dyn NxcSession as *const nxc_protocols::ldap::LdapSession)
+            },
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
         // We need the protocol handler to perform the search
         // In this architecture, protocols are stateless but provide the logic
         let protocol = nxc_protocols::ldap::LdapProtocol::new();
-        
+
         // 1. Get Base DN
         let base_dn = protocol.get_base_dn(ldap_session).await?;
-        
+
         // 2. Determine target user - if USER option not provided, use the authenticated user
         let user_to_query = if target_user.is_empty() {
             if let Some(creds) = &ldap_session.credentials {
@@ -87,17 +84,26 @@ impl NxcModule for Whoami {
         // 3. Perform Search
         let filter = format!("(sAMAccountName={})", user_to_query);
         let attrs = vec![
-            "sAMAccountName", "name", "description", "userAccountControl",
-            "memberOf", "objectSid", "lastLogon", "pwdLastSet", "servicePrincipalName"
+            "sAMAccountName",
+            "name",
+            "description",
+            "userAccountControl",
+            "memberOf",
+            "objectSid",
+            "lastLogon",
+            "pwdLastSet",
+            "servicePrincipalName",
         ];
 
-        let entries = protocol.search(
-            ldap_session,
-            &base_dn,
-            ldap3::Scope::Subtree,
-            &filter,
-            attrs,
-        ).await?;
+        let entries = protocol
+            .search(
+                ldap_session,
+                &base_dn,
+                ldap3::Scope::Subtree,
+                &filter,
+                attrs,
+            )
+            .await?;
 
         if entries.is_empty() {
             return Ok(ModuleResult {
@@ -116,7 +122,9 @@ impl NxcModule for Whoami {
         }
 
         let get_attr = |name: &str| -> String {
-            entry.attrs.get(name)
+            entry
+                .attrs
+                .get(name)
                 .and_then(|v| v.first())
                 .cloned()
                 .unwrap_or_default()
@@ -125,14 +133,18 @@ impl NxcModule for Whoami {
         output_lines.push(format!("Name: {}", get_attr("name")));
         output_lines.push(format!("Description: {}", get_attr("description")));
         output_lines.push(format!("sAMAccountName: {}", get_attr("sAMAccountName")));
-        
+
         let uac = get_attr("userAccountControl").parse::<u32>().unwrap_or(0);
         output_lines.push(format!("Account Control: {}", uac));
-        output_lines.push(format!("Enabled: {}", if uac & 2 == 0 { "Yes" } else { "No" }));
-        
+        output_lines.push(format!(
+            "Enabled: {}",
+            if uac & 2 == 0 { "Yes" } else { "No" }
+        ));
+
         if let Some(spns) = entry.attrs.get("servicePrincipalName") {
             if !spns.is_empty() {
-                output_lines.push("!!! Potentially Kerberoastable user (SPNs found) !!!".to_string());
+                output_lines
+                    .push("!!! Potentially Kerberoastable user (SPNs found) !!!".to_string());
                 for spn in spns {
                     output_lines.push(format!("  SPN: {}", spn));
                 }

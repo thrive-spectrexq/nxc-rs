@@ -15,6 +15,7 @@ pub struct NxcOutput {
     pub hostname: String,
 }
 
+#[allow(dead_code)]
 impl NxcOutput {
     pub fn new(protocol: &str, host: &str, port: u16, hostname: Option<&str>) -> Self {
         Self {
@@ -42,22 +43,12 @@ impl NxcOutput {
 
     /// `[*]` informational display — blue.
     pub fn display(&self, msg: &str) {
-        println!(
-            "{} {} {}",
-            self.prefix(),
-            "[*]".bold().blue(),
-            msg
-        );
+        println!("{} {} {}", self.prefix(), "[*]".bold().blue(), msg);
     }
 
     /// `[+]` success — green. Use for auth successes.
     pub fn success(&self, msg: &str) {
-        println!(
-            "{} {} {}",
-            self.prefix(),
-            "[+]".bold().green(),
-            msg
-        );
+        println!("{} {} {}", self.prefix(), "[+]".bold().green(), msg);
     }
 
     /// `[+]` admin success (Pwn3d!) — yellow highlight.
@@ -73,31 +64,17 @@ impl NxcOutput {
 
     /// `[-]` failure — red. Use for auth failures.
     pub fn fail(&self, msg: &str) {
-        println!(
-            "{} {} {}",
-            self.prefix(),
-            "[-]".bold().red(),
-            msg
-        );
+        println!("{} {} {}", self.prefix(), "[-]".bold().red(), msg);
     }
 
     /// Highlighted important message — yellow.
     pub fn highlight(&self, msg: &str) {
-        println!(
-            "{} {}",
-            self.prefix(),
-            msg.bold().yellow()
-        );
+        println!("{} {}", self.prefix(), msg.bold().yellow());
     }
 
     /// `[!]` error — red bold.
     pub fn error(&self, msg: &str) {
-        eprintln!(
-            "{} {} {}",
-            self.prefix(),
-            "[!]".bold().red(),
-            msg.red()
-        );
+        eprintln!("{} {} {}", self.prefix(), "[!]".bold().red(), msg.red());
     }
 }
 
@@ -110,6 +87,7 @@ impl fmt::Display for NxcOutput {
 /// Global-level output (not tied to a specific connection).
 pub struct NxcGlobalOutput;
 
+#[allow(dead_code)]
 impl NxcGlobalOutput {
     pub fn banner() {
         let banner = r#"

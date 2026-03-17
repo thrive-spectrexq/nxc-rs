@@ -1,6 +1,6 @@
 //! # FTP Protocol Handler
 //!
-//! FTP protocol implementation handling banner grabbing and 
+//! FTP protocol implementation handling banner grabbing and
 //! credential authentication over port 21.
 
 use crate::{CommandOutput, NxcProtocol, NxcSession};
@@ -8,8 +8,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use std::time::Duration;
-use tokio::net::TcpStream;
 use tokio::io::AsyncReadExt;
+use tokio::net::TcpStream;
 use tracing::{debug, info};
 
 pub struct FtpSession {
@@ -70,7 +70,7 @@ impl NxcProtocol for FtpProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["ls", "get", "put"] 
+        &["ls", "get", "put"]
     }
 
     async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
@@ -87,7 +87,7 @@ impl NxcProtocol for FtpProtocol {
         // Grab the FTP welcome banner (should start with "220")
         let mut buf = vec![0; 1024];
         let mut banner = String::new();
-        
+
         let read_fut = tokio::time::timeout(self.timeout, stream.read(&mut buf));
         if let Ok(Ok(n)) = read_fut.await {
             if n > 0 {
@@ -115,15 +115,18 @@ impl NxcProtocol for FtpProtocol {
         creds: &Credentials,
     ) -> Result<AuthResult> {
         let username = creds.username.clone();
-        
+
         let ftp_sess = unsafe { &*(session as *const dyn NxcSession as *const FtpSession) };
         let addr = format!("{}:{}", ftp_sess.target, ftp_sess.port);
-        
+
         debug!("FTP: Authenticating {}@{}", username, addr);
 
         // A full FTP implementation would establish the connection again here or pass the stream,
         // then dispatch the `USER <username>` and `PASS <password>` sequence, expecting `230 Logged in`.
-        Ok(AuthResult::failure("FTP user/pass authentication sequence pending implementation", None))
+        Ok(AuthResult::failure(
+            "FTP user/pass authentication sequence pending implementation",
+            None,
+        ))
     }
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {

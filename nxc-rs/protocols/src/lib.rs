@@ -8,17 +8,17 @@ use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use serde::{Deserialize, Serialize};
 
-pub mod smb;
-pub mod ssh;
+pub mod ftp;
 pub mod ldap;
 pub mod mssql;
-pub mod winrm;
-pub mod rdp;
-pub mod wmi;
-pub mod ftp;
-pub mod vnc;
 pub mod nfs;
+pub mod rdp;
 pub mod rpc;
+pub mod smb;
+pub mod ssh;
+pub mod vnc;
+pub mod winrm;
+pub mod wmi;
 
 // ─── Core Traits ────────────────────────────────────────────────
 

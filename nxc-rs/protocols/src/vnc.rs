@@ -8,8 +8,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use std::time::Duration;
-use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 use tracing::{debug, info};
 
 pub struct VncSession {
@@ -72,7 +72,7 @@ impl NxcProtocol for VncProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["screenshot"] 
+        &["screenshot"]
     }
 
     async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
@@ -99,7 +99,7 @@ impl NxcProtocol for VncProtocol {
         }
 
         let rfb_version = String::from_utf8_lossy(&banner).trim().to_string();
-        
+
         // Return the banner back to the server to acknowledge
         let _ = stream.write_all(&banner).await;
 
@@ -108,13 +108,17 @@ impl NxcProtocol for VncProtocol {
 
         // VNC 3.7 and 3.8 return a count followed by security types
         let mut nbytes = vec![0; 1];
-        if let Ok(Ok(_)) = tokio::time::timeout(self.timeout, stream.read_exact(&mut nbytes)).await {
+        if let Ok(Ok(_)) = tokio::time::timeout(self.timeout, stream.read_exact(&mut nbytes)).await
+        {
             let n = nbytes[0];
             if n > 0 {
                 let mut types = vec![0; n as usize];
-                if let Ok(Ok(_)) = tokio::time::timeout(self.timeout, stream.read_exact(&mut types)).await {
+                if let Ok(Ok(_)) =
+                    tokio::time::timeout(self.timeout, stream.read_exact(&mut types)).await
+                {
                     security_types = types.clone();
-                    if types.contains(&1) { // 1 = None (No Auth)
+                    if types.contains(&1) {
+                        // 1 = None (No Auth)
                         no_auth_supported = true;
                     }
                 }
@@ -142,16 +146,24 @@ impl NxcProtocol for VncProtocol {
         creds: &Credentials,
     ) -> Result<AuthResult> {
         let username = creds.username.clone();
-        
+
         let vnc_sess = unsafe { &*(session as *const dyn NxcSession as *const VncSession) };
         let addr = format!("{}:{}", vnc_sess.target, vnc_sess.port);
-        
-        debug!("VNC: Authenticating {}@{} (No Auth Supported: {})", username, addr, vnc_sess.no_auth_supported);
 
-        Ok(AuthResult::failure("VNC explicit VNCAuth/DES logic pending implementation", None))
+        debug!(
+            "VNC: Authenticating {}@{} (No Auth Supported: {})",
+            username, addr, vnc_sess.no_auth_supported
+        );
+
+        Ok(AuthResult::failure(
+            "VNC explicit VNCAuth/DES logic pending implementation",
+            None,
+        ))
     }
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
-        Err(anyhow!("VNC explicit command execution requires macro injection (not yet ported)."))
+        Err(anyhow!(
+            "VNC explicit command execution requires macro injection (not yet ported)."
+        ))
     }
 }

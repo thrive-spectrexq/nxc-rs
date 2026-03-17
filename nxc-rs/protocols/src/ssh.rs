@@ -61,11 +61,10 @@ impl SshSession {
                     self.shell_access = true;
                     self.server_os = "Windows".to_string();
                     debug!("Windows shell detected");
-                    if output.contains("SeDebugPrivilege") {
-                        self.admin = true;
-                    } else if output.contains("SeUndockPrivilege") {
-                        self.admin = true;
-                    } else if output.contains("Administrators") {
+                    if output.contains("SeDebugPrivilege")
+                        || output.contains("SeUndockPrivilege")
+                        || output.contains("Administrators")
+                    {
                         self.admin = true;
                     }
                     return;
@@ -156,7 +155,9 @@ impl NxcProtocol for SshProtocol {
             debug!("SSH: Connecting to {}", addr);
 
             let tcp = TcpStream::connect_timeout(
-                &addr.parse().map_err(|e| anyhow::anyhow!("Invalid address {}: {}", addr, e))?,
+                &addr
+                    .parse()
+                    .map_err(|e| anyhow::anyhow!("Invalid address {}: {}", addr, e))?,
                 timeout,
             )?;
             tcp.set_read_timeout(Some(timeout))?;
@@ -167,10 +168,7 @@ impl NxcProtocol for SshProtocol {
             sess.set_tcp_stream(tcp);
             sess.handshake()?;
 
-            let remote_version = sess
-                .banner()
-                .unwrap_or("Unknown SSH Version")
-                .to_string();
+            let remote_version = sess.banner().unwrap_or("Unknown SSH Version").to_string();
 
             info!("SSH: Connected to {} — {}", addr, remote_version);
 
@@ -202,61 +200,64 @@ impl NxcProtocol for SshProtocol {
         let target = session.target().to_string();
         let timeout = self.timeout;
 
-        let auth_result = tokio::task::spawn_blocking(move || -> Result<(AuthResult, bool, bool, String)> {
-            let addr = format!("{}:{}", target, 22);
-            debug!("SSH: Authenticating {}@{}", username, addr);
+        let auth_result =
+            tokio::task::spawn_blocking(move || -> Result<(AuthResult, bool, bool, String)> {
+                let addr = format!("{}:{}", target, 22);
+                debug!("SSH: Authenticating {}@{}", username, addr);
 
-            let tcp = TcpStream::connect_timeout(
-                &addr.parse().map_err(|e| anyhow::anyhow!("Invalid address: {}", e))?,
-                timeout,
-            )?;
-            tcp.set_read_timeout(Some(timeout))?;
+                let tcp = TcpStream::connect_timeout(
+                    &addr
+                        .parse()
+                        .map_err(|e| anyhow::anyhow!("Invalid address: {}", e))?,
+                    timeout,
+                )?;
+                tcp.set_read_timeout(Some(timeout))?;
 
-            let mut sess = ssh2::Session::new()?;
-            sess.set_timeout(timeout.as_millis() as u32);
-            sess.set_tcp_stream(tcp);
-            sess.handshake()?;
+                let mut sess = ssh2::Session::new()?;
+                sess.set_timeout(timeout.as_millis() as u32);
+                sess.set_tcp_stream(tcp);
+                sess.handshake()?;
 
-            // Attempt password authentication
-            match sess.userauth_password(&username, &password) {
-                Ok(()) => {
-                    if sess.authenticated() {
-                        debug!("SSH: Auth successful for {}", username);
+                // Attempt password authentication
+                match sess.userauth_password(&username, &password) {
+                    Ok(()) => {
+                        if sess.authenticated() {
+                            debug!("SSH: Auth successful for {}", username);
 
-                        // Check shell access and privileges
-                        let mut ssh_sess = SshSession {
-                            target: target.clone(),
-                            port: 22,
-                            admin: false,
-                            shell_access: false,
-                            server_os: "Unknown".to_string(),
-                            remote_version: String::new(),
-                            session: Some(sess),
-                        };
-                        ssh_sess.check_shell();
+                            // Check shell access and privileges
+                            let mut ssh_sess = SshSession {
+                                target: target.clone(),
+                                port: 22,
+                                admin: false,
+                                shell_access: false,
+                                server_os: "Unknown".to_string(),
+                                remote_version: String::new(),
+                                session: Some(sess),
+                            };
+                            ssh_sess.check_shell();
 
-                        let is_admin = ssh_sess.admin;
-                        let shell = ssh_sess.shell_access;
-                        let os = ssh_sess.server_os.clone();
+                            let is_admin = ssh_sess.admin;
+                            let shell = ssh_sess.shell_access;
+                            let os = ssh_sess.server_os.clone();
 
-                        Ok((AuthResult::success(is_admin), shell, is_admin, os))
-                    } else {
-                        Ok((
-                            AuthResult::failure("Authentication failed", None),
-                            false,
-                            false,
-                            String::new(),
-                        ))
+                            Ok((AuthResult::success(is_admin), shell, is_admin, os))
+                        } else {
+                            Ok((
+                                AuthResult::failure("Authentication failed", None),
+                                false,
+                                false,
+                                String::new(),
+                            ))
+                        }
+                    }
+                    Err(e) => {
+                        let msg = format!("{}", e);
+                        debug!("SSH: Auth failed for {}: {}", username, msg);
+                        Ok((AuthResult::failure(&msg, None), false, false, String::new()))
                     }
                 }
-                Err(e) => {
-                    let msg = format!("{}", e);
-                    debug!("SSH: Auth failed for {}: {}", username, msg);
-                    Ok((AuthResult::failure(&msg, None), false, false, String::new()))
-                }
-            }
-        })
-        .await??;
+            })
+            .await??;
 
         Ok(auth_result.0)
     }
@@ -270,7 +271,9 @@ impl NxcProtocol for SshProtocol {
             let addr = format!("{}:22", target);
 
             let tcp = TcpStream::connect_timeout(
-                &addr.parse().map_err(|e| anyhow::anyhow!("Invalid address: {}", e))?,
+                &addr
+                    .parse()
+                    .map_err(|e| anyhow::anyhow!("Invalid address: {}", e))?,
                 timeout,
             )?;
 

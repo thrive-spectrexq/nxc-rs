@@ -4,15 +4,15 @@
 //! Currently provides real TCP connection with mock SMB negotiation,
 //! with the session/auth infrastructure in place for full SMB2 implementation.
 
+use crate::rpc::{DcerpcHeader, PacketType};
 use crate::{CommandOutput, NxcProtocol, NxcSession};
 use anyhow::Result;
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::time::Duration;
-use crate::rpc::{DcerpcHeader, PacketType};
 use std::sync::Mutex;
+use std::time::Duration;
 use tracing::debug;
 
 // ─── SMB Constants ──────────────────────────────────────────────
@@ -153,10 +153,10 @@ impl SmbProtocol {
     /// List shares on the target host.
     pub async fn list_shares(&self, session: &SmbSession) -> Result<Vec<ShareInfo>> {
         debug!("SMB: Enumerating shares on {}", session.target);
-        
+
         let mut shares = Vec::new();
         let common_shares = ["IPC$", "ADMIN$", "C$", "SYSVOL", "NETLOGON"];
-        
+
         for share in &common_shares {
             match self.tree_connect(session, share).await {
                 Ok(_) => {
@@ -171,14 +171,21 @@ impl SmbProtocol {
                 Err(_) => debug!("SMB: Could not connect to share {}", share),
             }
         }
-        
+
         Ok(shares)
     }
 
     /// Perform a DCE/RPC call over an SMB Named Pipe.
-    pub async fn call_rpc(&self, session: &SmbSession, pipe: &str, ptype: PacketType, call_id: u32, data: Vec<u8>) -> Result<Vec<u8>> {
+    pub async fn call_rpc(
+        &self,
+        session: &SmbSession,
+        pipe: &str,
+        ptype: PacketType,
+        call_id: u32,
+        data: Vec<u8>,
+    ) -> Result<Vec<u8>> {
         debug!("SMB: RPC Call on {} ptype={:?}", pipe, ptype);
-        
+
         // 1. Ensure connected to IPC$
         self.tree_connect(session, "IPC$").await?;
 
@@ -194,7 +201,7 @@ impl SmbProtocol {
 
         // 4. Read Response (SMB2 READ)
         let resp = self.read_pipe(session, _fid).await?;
-        
+
         Ok(resp)
     }
 
@@ -211,19 +218,25 @@ impl SmbProtocol {
     async fn read_pipe(&self, _session: &SmbSession, _fid: u32) -> Result<Vec<u8>> {
         debug!("SMB: Reading from pipe");
         // Mock Response: BindAck or RPC Response
-        Ok(vec![0x05, 0x00, 0x0c, 0x03, 0x10, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00])
+        Ok(vec![
+            0x05, 0x00, 0x0c, 0x03, 0x10, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x01, 0x00,
+            0x00, 0x00,
+        ])
     }
 
     /// Perform an SMB2 TREE_CONNECT.
     async fn tree_connect(&self, session: &SmbSession, share: &str) -> Result<u32> {
         let path = format!("\\\\{}\\{}", session.target, share);
         let _packet = Self::build_smb2_tree_connect_request(&path);
-        
-        let mut stream_lock = session.stream.lock().map_err(|_| anyhow::anyhow!("Failed to lock stream"))?;
+
+        let mut stream_lock = session
+            .stream
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Failed to lock stream"))?;
         if let Some(ref mut _stream) = *stream_lock {
             // Real network I/O logic would go here
             debug!("SMB: Stub TreeConnect to {}", path);
-            Ok(0x1) 
+            Ok(0x1)
         } else {
             Err(anyhow::anyhow!("No active stream"))
         }
@@ -245,7 +258,8 @@ impl SmbProtocol {
 
         let mut header = [0u8; 4];
         stream.read_exact(&mut header)?;
-        let response_len = ((header[1] as usize) << 16) | ((header[2] as usize) << 8) | (header[3] as usize);
+        let response_len =
+            ((header[1] as usize) << 16) | ((header[2] as usize) << 8) | (header[3] as usize);
         let mut response = vec![0u8; response_len];
         stream.read_exact(&mut response)?;
 
@@ -256,14 +270,14 @@ impl SmbProtocol {
         let header = Smb2Header::new(0x0000); // NEGOTIATE
         let mut pkt = header.to_bytes();
         pkt.extend_from_slice(&36u16.to_le_bytes()); // Structure Size
-        pkt.extend_from_slice(&2u16.to_le_bytes());  // Dialect Count
-        pkt.extend_from_slice(&[1u8, 0]);            // Security Mode
-        pkt.extend_from_slice(&[0u8; 2]);            // Reserved
-        pkt.extend_from_slice(&[0u8; 4]);            // Capabilities
-        pkt.extend_from_slice(&[0u8; 16]);           // Client GUID
-        pkt.extend_from_slice(&[0u8; 4]);            // NegotiateContextOffset
-        pkt.extend_from_slice(&[0u8; 2]);            // NegotiateContextCount
-        pkt.extend_from_slice(&[0u8; 2]);            // Reserved2
+        pkt.extend_from_slice(&2u16.to_le_bytes()); // Dialect Count
+        pkt.extend_from_slice(&[1u8, 0]); // Security Mode
+        pkt.extend_from_slice(&[0u8; 2]); // Reserved
+        pkt.extend_from_slice(&[0u8; 4]); // Capabilities
+        pkt.extend_from_slice(&[0u8; 16]); // Client GUID
+        pkt.extend_from_slice(&[0u8; 4]); // NegotiateContextOffset
+        pkt.extend_from_slice(&[0u8; 2]); // NegotiateContextCount
+        pkt.extend_from_slice(&[0u8; 2]); // Reserved2
         pkt.extend_from_slice(&0x0202u16.to_le_bytes());
         pkt.extend_from_slice(&0x0300u16.to_le_bytes());
         pkt
@@ -275,9 +289,9 @@ impl SmbProtocol {
         let path_utf16: Vec<u16> = path.encode_utf16().collect();
         let path_bytes: Vec<u8> = path_utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
 
-        pkt.extend_from_slice(&9u16.to_le_bytes());   // Structure Size
-        pkt.extend_from_slice(&[0u8; 2]);             // Reserved
-        pkt.extend_from_slice(&72u16.to_le_bytes());  // Path Offset
+        pkt.extend_from_slice(&9u16.to_le_bytes()); // Structure Size
+        pkt.extend_from_slice(&[0u8; 2]); // Reserved
+        pkt.extend_from_slice(&72u16.to_le_bytes()); // Path Offset
         pkt.extend_from_slice(&(path_bytes.len() as u16).to_le_bytes()); // Path Length
         pkt.extend_from_slice(&path_bytes);
         pkt
@@ -306,14 +320,22 @@ impl SmbProtocol {
 }
 
 impl Default for SmbProtocol {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl NxcProtocol for SmbProtocol {
-    fn name(&self) -> &'static str { "smb" }
-    fn default_port(&self) -> u16 { 445 }
-    fn supports_exec(&self) -> bool { true }
+    fn name(&self) -> &'static str {
+        "smb"
+    }
+    fn default_port(&self) -> u16 {
+        445
+    }
+    fn supports_exec(&self) -> bool {
+        true
+    }
     fn supported_modules(&self) -> &[&str] {
         &["enum_shares", "secretsdump", "sam"]
     }
@@ -325,7 +347,9 @@ impl NxcProtocol for SmbProtocol {
 
         let session = tokio::task::spawn_blocking(move || -> Result<SmbSession> {
             let mut stream = TcpStream::connect_timeout(
-                &addr.parse().map_err(|e| anyhow::anyhow!("Invalid address {}: {}", addr, e))?,
+                &addr
+                    .parse()
+                    .map_err(|e| anyhow::anyhow!("Invalid address {}: {}", addr, e))?,
                 timeout,
             )?;
             stream.set_read_timeout(Some(timeout))?;
@@ -340,14 +364,22 @@ impl NxcProtocol for SmbProtocol {
                 session_id: 0,
                 stream: Mutex::new(Some(stream)),
             })
-        }).await??;
+        })
+        .await??;
 
         Ok(Box::new(session))
     }
 
-    async fn authenticate(&self, _session: &mut dyn NxcSession, creds: &Credentials) -> Result<AuthResult> {
+    async fn authenticate(
+        &self,
+        _session: &mut dyn NxcSession,
+        creds: &Credentials,
+    ) -> Result<AuthResult> {
         if !creds.username.is_empty() {
-            Ok(AuthResult::failure("NTLM auth engine pending", Some("STUB")))
+            Ok(AuthResult::failure(
+                "NTLM auth engine pending",
+                Some("STUB"),
+            ))
         } else {
             Ok(AuthResult::success(false))
         }

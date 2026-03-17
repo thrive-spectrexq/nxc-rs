@@ -39,21 +39,21 @@ impl NxcModule for EnumDns {
     }
 
     fn options(&self) -> Vec<ModuleOption> {
-        vec![
-            ModuleOption {
-                name: "DOMAIN".to_string(),
-                description: "Domain to enumerate DNS for. Defaults to all zones.".to_string(),
-                required: false,
-                default: None,
-            },
-        ]
+        vec![ModuleOption {
+            name: "DOMAIN".to_string(),
+            description: "Domain to enumerate DNS for. Defaults to all zones.".to_string(),
+            required: false,
+            default: None,
+        }]
     }
 
     async fn run(&self, session: &dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let domain_filter = opts.get("DOMAIN").map(|s| s.as_str());
-        
+
         let ldap_session = match session.protocol() {
-            "ldap" => unsafe { &*(session as *const dyn NxcSession as *const nxc_protocols::ldap::LdapSession) },
+            "ldap" => unsafe {
+                &*(session as *const dyn NxcSession as *const nxc_protocols::ldap::LdapSession)
+            },
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
@@ -74,21 +74,29 @@ impl NxcModule for EnumDns {
 
         for partition in partitions {
             tracing::debug!("enum_dns: Checking partition {}", partition);
-            
+
             // 1. Find dnsZone objects
-            let zones = match protocol.search(
-                ldap_session,
-                &partition,
-                ldap3::Scope::Subtree,
-                "(objectClass=dnsZone)",
-                vec!["name"]
-            ).await {
+            let zones = match protocol
+                .search(
+                    ldap_session,
+                    &partition,
+                    ldap3::Scope::Subtree,
+                    "(objectClass=dnsZone)",
+                    vec!["name"],
+                )
+                .await
+            {
                 Ok(entries) => entries,
                 Err(_) => continue, // Partition likely doesn't exist or no access
             };
 
             for zone_entry in zones {
-                let zone_name = zone_entry.attrs.get("name").and_then(|v| v.first()).cloned().unwrap_or_default();
+                let zone_name = zone_entry
+                    .attrs
+                    .get("name")
+                    .and_then(|v| v.first())
+                    .cloned()
+                    .unwrap_or_default();
                 if let Some(filter) = domain_filter {
                     if !zone_name.to_lowercase().contains(&filter.to_lowercase()) {
                         continue;
@@ -99,26 +107,37 @@ impl NxcModule for EnumDns {
                 let mut zone_records = serde_json::Map::new();
 
                 // 2. Find dnsNode objects in this zone
-                let nodes = match protocol.search(
-                    ldap_session,
-                    &zone_entry.dn,
-                    ldap3::Scope::OneLevel,
-                    "(objectClass=dnsNode)",
-                    vec!["name", "dnsRecord"]
-                ).await {
+                let nodes = match protocol
+                    .search(
+                        ldap_session,
+                        &zone_entry.dn,
+                        ldap3::Scope::OneLevel,
+                        "(objectClass=dnsNode)",
+                        vec!["name", "dnsRecord"],
+                    )
+                    .await
+                {
                     Ok(entries) => entries,
                     Err(_) => continue,
                 };
 
                 for node_entry in nodes {
-                    let node_name = node_entry.attrs.get("name").and_then(|v| v.first()).cloned().unwrap_or_default();
-                    
+                    let node_name = node_entry
+                        .attrs
+                        .get("name")
+                        .and_then(|v| v.first())
+                        .cloned()
+                        .unwrap_or_default();
+
                     // dnsRecord is binary and multi-valued
                     if let Some(record_blobs) = node_entry.bin_attrs.get("dnsRecord") {
                         let mut records_for_node = Vec::new();
                         for blob in record_blobs {
                             if let Some(parsed) = parse_dns_record(blob) {
-                                output_lines.push(format!("  {:<20} {:<6} {}", node_name, parsed.rtype, parsed.value));
+                                output_lines.push(format!(
+                                    "  {:<20} {:<6} {}",
+                                    node_name, parsed.rtype, parsed.value
+                                ));
                                 records_for_node.push(serde_json::json!({
                                     "type": parsed.rtype,
                                     "value": parsed.value
@@ -149,13 +168,15 @@ struct ParsedDnsRecord {
 
 /// Rudimentary parser for MS-DNSP dnsRecord blobs.
 fn parse_dns_record(blob: &[u8]) -> Option<ParsedDnsRecord> {
-    if blob.len() < 4 { return None; }
-    
+    if blob.len() < 4 {
+        return None;
+    }
+
     // Data starts after header. Header length is usually 24 bytes for most types.
     // Offset 0-1: Data Length
     // Offset 2-3: Type
     let rtype_code = u16::from_le_bytes([blob[2], blob[3]]);
-    
+
     let (rtype, value) = match rtype_code {
         0x0001 => ("A", parse_ip_address(&blob[24..])),
         0x0002 => ("NS", parse_dns_name(&blob[24..], blob)),
@@ -175,15 +196,22 @@ fn parse_dns_record(blob: &[u8]) -> Option<ParsedDnsRecord> {
 }
 
 fn parse_ip_address(data: &[u8]) -> String {
-    if data.len() < 4 { return "invalid".to_string(); }
+    if data.len() < 4 {
+        return "invalid".to_string();
+    }
     format!("{}.{}.{}.{}", data[0], data[1], data[2], data[3])
 }
 
 fn parse_ipv6_address(data: &[u8]) -> String {
-    if data.len() < 16 { return "invalid".to_string(); }
+    if data.len() < 16 {
+        return "invalid".to_string();
+    }
     let mut parts = Vec::new();
     for i in 0..8 {
-        parts.push(format!("{:x}", u16::from_be_bytes([data[i*2], data[i*2+1]])));
+        parts.push(format!(
+            "{:x}",
+            u16::from_be_bytes([data[i * 2], data[i * 2 + 1]])
+        ));
     }
     parts.join(":")
 }
@@ -195,11 +223,17 @@ fn parse_dns_name(data: &[u8], _full_blob: &[u8]) -> String {
     let mut i = 0;
     while i < data.len() {
         let len = data[i] as usize;
-        if len == 0 { break; }
+        if len == 0 {
+            break;
+        }
         i += 1;
-        if i + len > data.len() { break; }
-        if !name.is_empty() { name.push('.'); }
-        name.push_str(&String::from_utf8_lossy(&data[i..i+len]));
+        if i + len > data.len() {
+            break;
+        }
+        if !name.is_empty() {
+            name.push('.');
+        }
+        name.push_str(&String::from_utf8_lossy(&data[i..i + len]));
         i += len;
     }
     name

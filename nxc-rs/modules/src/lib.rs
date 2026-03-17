@@ -3,14 +3,14 @@
 //! Modules are Rust structs implementing `NxcModule`, compiled into the binary.
 //! They are invoked per-protocol with `-M <module> [-o KEY=VALUE]` flags.
 
-pub mod enum_shares;
-pub mod whoami;
-pub mod laps;
-pub mod enum_dns;
-pub mod kerberoasting;
 pub mod asreproasting;
-pub mod secretsdump;
+pub mod enum_dns;
 pub mod enum_mssql;
+pub mod enum_shares;
+pub mod kerberoasting;
+pub mod laps;
+pub mod secretsdump;
+pub mod whoami;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -81,13 +81,25 @@ impl ModuleRegistry {
         let mut modules: HashMap<String, Box<dyn NxcModule>> = HashMap::new();
 
         // Register built-in modules
-        modules.insert("enum_shares".into(), Box::new(enum_shares::EnumShares::new()));
+        modules.insert(
+            "enum_shares".into(),
+            Box::new(enum_shares::EnumShares::new()),
+        );
         modules.insert("whoami".into(), Box::new(whoami::Whoami::new()));
         modules.insert("laps".into(), Box::new(laps::Laps::new()));
         modules.insert("enum_dns".into(), Box::new(enum_dns::EnumDns::new()));
-        modules.insert("kerberoasting".into(), Box::new(kerberoasting::Kerberoasting::new()));
-        modules.insert("asreproasting".into(), Box::new(asreproasting::Asreproasting::new()));
-        modules.insert("secretsdump".into(), Box::new(secretsdump::Secretsdump::new()));
+        modules.insert(
+            "kerberoasting".into(),
+            Box::new(kerberoasting::Kerberoasting::new()),
+        );
+        modules.insert(
+            "asreproasting".into(),
+            Box::new(asreproasting::Asreproasting::new()),
+        );
+        modules.insert(
+            "secretsdump".into(),
+            Box::new(secretsdump::Secretsdump::new()),
+        );
         modules.insert("mssql_enum".into(), Box::new(enum_mssql::MssqlEnum::new()));
 
         Self { modules }

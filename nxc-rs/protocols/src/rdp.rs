@@ -8,8 +8,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use std::time::Duration;
-use tokio::net::TcpStream;
 use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
 use tracing::{debug, info};
 
 pub struct RdpSession {
@@ -86,17 +86,21 @@ impl NxcProtocol for RdpProtocol {
 
         // Send a TPKT / X.224 Connection Request to fingerprint NLA support
         let x224_req: [u8; 19] = [
-            0x03, 0x00, 0x00, 0x13, 0x0e, 0xe0, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x01, 0x00, 0x08, 0x00, 0x03, // Protocol flags 0x03 (SSL + HYBRID)
-            0x00, 0x00, 0x00
+            0x03, 0x00, 0x00, 0x13, 0x0e, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x08,
+            0x00, 0x03, // Protocol flags 0x03 (SSL + HYBRID)
+            0x00, 0x00, 0x00,
         ];
 
         stream.write_all(&x224_req).await?;
-        
+
         // Read response
         let mut resp = [0u8; 19];
-        let n = tokio::time::timeout(self.timeout, tokio::io::AsyncReadExt::read(&mut stream, &mut resp)).await??;
-        
+        let n = tokio::time::timeout(
+            self.timeout,
+            tokio::io::AsyncReadExt::read(&mut stream, &mut resp),
+        )
+        .await??;
+
         let mut is_nla = false;
         if n >= 19 && resp[0] == 0x03 && resp[1] == 0x00 {
             // Check Negotiation Response flags at offset 15
@@ -121,22 +125,27 @@ impl NxcProtocol for RdpProtocol {
         creds: &Credentials,
     ) -> Result<AuthResult> {
         let username = creds.username.clone();
-        
+
         let rdp_sess = unsafe { &*(session as *const dyn NxcSession as *const RdpSession) };
         let addr = format!("{}:{}", rdp_sess.target, rdp_sess.port);
-        
+
         debug!("RDP: Authenticating {}@{}", username, addr);
 
         // NLA (Network Level Authentication) via CredSSP requires wrapping NTLM inside a TLS tunnel
         // and completing SPNEGO negotiation before exposing the RDP interface.
-        // Full CredSSP is significantly complex and usually driven by a crate like `reqwest` for HTTP, 
-        // but for RDP, raw implementations (like PyRDP or Aardwolf in Python) are used. 
+        // Full CredSSP is significantly complex and usually driven by a crate like `reqwest` for HTTP,
+        // but for RDP, raw implementations (like PyRDP or Aardwolf in Python) are used.
         // We stub this for Phase 2 implementation.
 
-        Ok(AuthResult::failure("RDP NLA/CredSSP authentication logic pending full protocol port", None))
+        Ok(AuthResult::failure(
+            "RDP NLA/CredSSP authentication logic pending full protocol port",
+            None,
+        ))
     }
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
-        Err(anyhow!("RDP explicit command execution requires injected GUI input (not yet ported)."))
+        Err(anyhow!(
+            "RDP explicit command execution requires injected GUI input (not yet ported)."
+        ))
     }
 }

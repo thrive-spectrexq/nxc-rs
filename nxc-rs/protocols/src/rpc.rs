@@ -6,13 +6,11 @@
 // ─── DCE/RPC Service UUIDs ──────────────────────────────────────
 
 pub const UUID_SAMR: [u8; 16] = [
-    0x78, 0x57, 0x34, 0x12, 0x34, 0x12, 0xcd, 0x11, 
-    0xef, 0xaf, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92
+    0x78, 0x57, 0x34, 0x12, 0x34, 0x12, 0xcd, 0x11, 0xef, 0xaf, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92,
 ];
 
 pub const UUID_LSARPC: [u8; 16] = [
-    0x78, 0x57, 0x34, 0x12, 0x34, 0x12, 0xcd, 0x11,
-    0xef, 0xaf, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92
+    0x78, 0x57, 0x34, 0x12, 0x34, 0x12, 0xcd, 0x11, 0xef, 0xaf, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92,
 ];
 
 // ─── DCE/RPC Headers ───────────────────────────────────────────
@@ -45,7 +43,7 @@ impl DcerpcHeader {
             rpc_ver: 5,
             rpc_ver_minor: 0,
             ptype,
-            pfc_flags: 0x03, // First + Last frag
+            pfc_flags: 0x03,                       // First + Last frag
             packed_drep: [0x10, 0x00, 0x00, 0x00], // Little Endian
             frag_len,
             auth_len: 0,
@@ -54,11 +52,12 @@ impl DcerpcHeader {
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(self.rpc_ver);
-        buf.push(self.rpc_ver_minor);
-        buf.push(self.ptype as u8);
-        buf.push(self.pfc_flags);
+        let mut buf = vec![
+            self.rpc_ver,
+            self.rpc_ver_minor,
+            self.ptype as u8,
+            self.pfc_flags,
+        ];
         buf.extend_from_slice(&self.packed_drep);
         buf.extend_from_slice(&self.frag_len.to_le_bytes());
         buf.extend_from_slice(&self.auth_len.to_le_bytes());
@@ -96,8 +95,8 @@ impl DcerpcBind {
             abstract_syntax_ver_major: major,
             abstract_syntax_ver_minor: minor,
             transfer_syntax_uuid: [
-                0x04, 0x5d, 0x88, 0x8a, 0xeb, 0x1c, 0xc9, 0x11, 
-                0x9f, 0xe8, 0x08, 0x00, 0x2b, 0x10, 0x48, 0x60
+                0x04, 0x5d, 0x88, 0x8a, 0xeb, 0x1c, 0xc9, 0x11, 0x9f, 0xe8, 0x08, 0x00, 0x2b, 0x10,
+                0x48, 0x60,
             ], // NDR UUID
             transfer_syntax_ver: 2,
         }

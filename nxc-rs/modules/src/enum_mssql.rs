@@ -4,8 +4,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use nxc_protocols::mssql::{MssqlProtocol, MssqlSession};
 use nxc_protocols::NxcSession;
-use nxc_protocols::mssql::{MssqlSession, MssqlProtocol};
 
 use crate::{ModuleOptions, ModuleResult, NxcModule};
 
@@ -50,13 +50,23 @@ impl NxcModule for MssqlEnum {
 
         // 1. Enumerate Logins
         output_lines.push("[*] Enumerating SQL Logins:".to_string());
-        match protocol.query_json(mssql_session, "SELECT name, type_desc, is_disabled FROM sys.sql_logins").await {
+        match protocol
+            .query_json(
+                mssql_session,
+                "SELECT name, type_desc, is_disabled FROM sys.sql_logins",
+            )
+            .await
+        {
             Ok(logins) => {
                 let mut login_list = Vec::new();
                 for login in &logins {
                     if let Some(obj) = login.as_object() {
-                        let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
-                        let disabled = obj.get("is_disabled").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
+                        let name = obj
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Unknown");
+                        let disabled =
+                            obj.get("is_disabled").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
                         output_lines.push(format!("    - {} (Disabled: {})", name, disabled));
                         login_list.push(login.clone());
                     }
@@ -70,13 +80,22 @@ impl NxcModule for MssqlEnum {
 
         // 2. Enumerate Databases
         output_lines.push("[*] Enumerating Databases:".to_string());
-        match protocol.query_json(mssql_session, "SELECT name, state_desc FROM sys.databases").await {
+        match protocol
+            .query_json(mssql_session, "SELECT name, state_desc FROM sys.databases")
+            .await
+        {
             Ok(dbs) => {
                 let mut db_list = Vec::new();
                 for db in &dbs {
                     if let Some(obj) = db.as_object() {
-                        let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
-                        let state = obj.get("state_desc").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                        let name = obj
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Unknown");
+                        let state = obj
+                            .get("state_desc")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Unknown");
                         output_lines.push(format!("    - {} (State: {})", name, state));
                         db_list.push(db.clone());
                     }

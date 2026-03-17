@@ -39,24 +39,21 @@ impl NxcModule for Laps {
     }
 
     fn options(&self) -> Vec<ModuleOption> {
-        vec![
-            ModuleOption {
-                name: "COMPUTER".to_string(),
-                description: "Computer name or wildcard ex: WIN-S10, WIN-* etc. Default: *".to_string(),
-                required: false,
-                default: None,
-            },
-        ]
+        vec![ModuleOption {
+            name: "COMPUTER".to_string(),
+            description: "Computer name or wildcard ex: WIN-S10, WIN-* etc. Default: *".to_string(),
+            required: false,
+            default: None,
+        }]
     }
 
     async fn run(&self, session: &dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
-        let computer_filter = opts
-            .get("COMPUTER")
-            .map(|s| s.as_str())
-            .unwrap_or("*");
+        let computer_filter = opts.get("COMPUTER").map(|s| s.as_str()).unwrap_or("*");
 
         let ldap_session = match session.protocol() {
-            "ldap" => unsafe { &*(session as *const dyn NxcSession as *const nxc_protocols::ldap::LdapSession) },
+            "ldap" => unsafe {
+                &*(session as *const dyn NxcSession as *const nxc_protocols::ldap::LdapSession)
+            },
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
@@ -74,16 +71,24 @@ impl NxcModule for Laps {
             "(&(objectCategory=computer)(|(ms-MCS-AdmPwd=*)(msLAPS-Password=*)(msLAPS-EncryptedPassword=*))(name={}))",
             computer_filter
         );
-        
-        let attrs = vec!["sAMAccountName", "name", "ms-MCS-AdmPwd", "msLAPS-Password", "msLAPS-EncryptedPassword"];
 
-        let entries = protocol.search(
-            ldap_session,
-            &base_dn,
-            ldap3::Scope::Subtree,
-            &filter,
-            attrs,
-        ).await?;
+        let attrs = vec![
+            "sAMAccountName",
+            "name",
+            "ms-MCS-AdmPwd",
+            "msLAPS-Password",
+            "msLAPS-EncryptedPassword",
+        ];
+
+        let entries = protocol
+            .search(
+                ldap_session,
+                &base_dn,
+                ldap3::Scope::Subtree,
+                &filter,
+                attrs,
+            )
+            .await?;
 
         let mut output_lines = Vec::new();
         let mut laps_results = Vec::new();
@@ -91,14 +96,29 @@ impl NxcModule for Laps {
         output_lines.push("Retrieving LAPS Passwords...".to_string());
 
         if entries.is_empty() {
-            output_lines.push(format!("No computers found matching filter: {}", computer_filter));
+            output_lines.push(format!(
+                "No computers found matching filter: {}",
+                computer_filter
+            ));
         } else {
             for entry in &entries {
-                let name = entry.attrs.get("name").and_then(|v| v.first()).cloned().unwrap_or_default();
-                let sam = entry.attrs.get("sAMAccountName").and_then(|v| v.first()).cloned().unwrap_or_default();
-                
+                let name = entry
+                    .attrs
+                    .get("name")
+                    .and_then(|v| v.first())
+                    .cloned()
+                    .unwrap_or_default();
+                let sam = entry
+                    .attrs
+                    .get("sAMAccountName")
+                    .and_then(|v| v.first())
+                    .cloned()
+                    .unwrap_or_default();
+
                 // Try legacy LAPS
-                let password = if let Some(p) = entry.attrs.get("ms-MCS-AdmPwd").and_then(|v| v.first()) {
+                let password = if let Some(p) =
+                    entry.attrs.get("ms-MCS-AdmPwd").and_then(|v| v.first())
+                {
                     p.clone()
                 } else if let Some(p) = entry.attrs.get("msLAPS-Password").and_then(|v| v.first()) {
                     // New LAPS (cleartext if configured, though often encrypted)
@@ -109,8 +129,11 @@ impl NxcModule for Laps {
                     continue;
                 };
 
-                output_lines.push(format!("Computer: {:<15} User: Administrator  Password: {}", name, password));
-                
+                output_lines.push(format!(
+                    "Computer: {:<15} User: Administrator  Password: {}",
+                    name, password
+                ));
+
                 laps_results.push(serde_json::json!({
                     "computer": name,
                     "sAMAccountName": sam,
@@ -120,7 +143,10 @@ impl NxcModule for Laps {
         }
 
         if laps_results.is_empty() && !entries.is_empty() {
-            output_lines.push("Matched computers but could not read LAPS attributes (permission denied?)".to_string());
+            output_lines.push(
+                "Matched computers but could not read LAPS attributes (permission denied?)"
+                    .to_string(),
+            );
         }
 
         Ok(ModuleResult {

@@ -135,20 +135,20 @@ impl NxcProtocol for MssqlProtocol {
             Ok(Ok(mut client)) => {
                 debug!("MSSQL: Auth successful for {}", username);
                 mssql_sess_mut.credentials = Some(creds.clone());
-                
+
                 let mut is_admin = false;
-                if let Ok(query_res) = tokio::time::timeout(
-                    self.timeout, 
-                    client.query("SELECT IS_SRVROLEMEMBER('sysadmin')", &[])
-                ).await {
-                    if let Ok(result) = query_res {
-                        if let Ok(rows) = result.into_first_result().await {
-                            if let Some(row) = rows.first() {
-                                if let Some(val) = row.get::<i32, _>(0) {
-                                    if val == 1 {
-                                        is_admin = true;
-                                        debug!("MSSQL: User {} is sysadmin!", username);
-                                    }
+                if let Ok(Ok(result)) = tokio::time::timeout(
+                    self.timeout,
+                    client.query("SELECT IS_SRVROLEMEMBER('sysadmin')", &[]),
+                )
+                .await
+                {
+                    if let Ok(rows) = result.into_first_result().await {
+                        if let Some(row) = rows.first() {
+                            if let Some(val) = row.get::<i32, _>(0) {
+                                if val == 1 {
+                                    is_admin = true;
+                                    debug!("MSSQL: User {} is sysadmin!", username);
                                 }
                             }
                         }
@@ -164,31 +164,42 @@ impl NxcProtocol for MssqlProtocol {
                 debug!("MSSQL: Auth failed for {}: {}", username, msg);
                 Ok(AuthResult::failure(&msg, None))
             }
-            Err(_) => {
-                Ok(AuthResult::failure("MSSQL auth timeout", None))
-            }
+            Err(_) => Ok(AuthResult::failure("MSSQL auth timeout", None)),
         }
     }
 
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput> {
-         let mssql_sess = match session.protocol() {
+        let mssql_sess = match session.protocol() {
             "mssql" => unsafe { &*(session as *const dyn NxcSession as *const MssqlSession) },
             _ => return Err(anyhow!("Invalid session type")),
         };
 
-        let creds = mssql_sess.credentials.as_ref().ok_or_else(|| anyhow!("Session not authenticated"))?;
+        let creds = mssql_sess
+            .credentials
+            .as_ref()
+            .ok_or_else(|| anyhow!("Session not authenticated"))?;
         let mut config = Config::new();
         config.host(&mssql_sess.target);
         config.port(mssql_sess.port);
-        config.authentication(AuthMethod::sql_server(&creds.username, creds.password.as_deref().unwrap_or_default()));
+        config.authentication(AuthMethod::sql_server(
+            &creds.username,
+            creds.password.as_deref().unwrap_or_default(),
+        ));
         config.trust_cert();
 
         let tcp = TcpStream::connect(format!("{}:{}", mssql_sess.target, mssql_sess.port)).await?;
         let mut client = Client::connect(config, tcp.compat_write()).await?;
 
         // 1. Ensure xp_cmdshell is enabled
-        let _ = client.execute("EXEC sp_configure 'show advanced options', 1; RECONFIGURE;", &[]).await;
-        let _ = client.execute("EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;", &[]).await;
+        let _ = client
+            .execute(
+                "EXEC sp_configure 'show advanced options', 1; RECONFIGURE;",
+                &[],
+            )
+            .await;
+        let _ = client
+            .execute("EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;", &[])
+            .await;
 
         let sql = format!("EXEC xp_cmdshell '{}'", cmd.replace('\'', "''"));
         let result = client.query(sql, &[]).await?;
@@ -212,12 +223,22 @@ impl NxcProtocol for MssqlProtocol {
 }
 
 impl MssqlProtocol {
-    pub async fn query_json(&self, session: &MssqlSession, sql: &str) -> Result<Vec<serde_json::Value>> {
-        let creds = session.credentials.as_ref().ok_or_else(|| anyhow!("Session not authenticated"))?;
+    pub async fn query_json(
+        &self,
+        session: &MssqlSession,
+        sql: &str,
+    ) -> Result<Vec<serde_json::Value>> {
+        let creds = session
+            .credentials
+            .as_ref()
+            .ok_or_else(|| anyhow!("Session not authenticated"))?;
         let mut config = Config::new();
         config.host(&session.target);
         config.port(session.port);
-        config.authentication(AuthMethod::sql_server(&creds.username, creds.password.as_deref().unwrap_or_default()));
+        config.authentication(AuthMethod::sql_server(
+            &creds.username,
+            creds.password.as_deref().unwrap_or_default(),
+        ));
         config.trust_cert();
 
         let tcp = TcpStream::connect(format!("{}:{}", session.target, session.port)).await?;

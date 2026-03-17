@@ -39,19 +39,19 @@ impl NxcModule for EnumShares {
     }
 
     fn options(&self) -> Vec<ModuleOption> {
-        vec![
-            ModuleOption {
-                name: "SHOW_ALL".to_string(),
-                description: "Show all shares including hidden ones ($ suffix)".to_string(),
-                required: false,
-                default: Some("true".to_string()),
-            },
-        ]
+        vec![ModuleOption {
+            name: "SHOW_ALL".to_string(),
+            description: "Show all shares including hidden ones ($ suffix)".to_string(),
+            required: false,
+            default: Some("true".to_string()),
+        }]
     }
 
     async fn run(&self, session: &dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb_session = match session.protocol() {
-            "smb" => unsafe { &*(session as *const dyn NxcSession as *const nxc_protocols::smb::SmbSession) },
+            "smb" => unsafe {
+                &*(session as *const dyn NxcSession as *const nxc_protocols::smb::SmbSession)
+            },
             _ => return Err(anyhow::anyhow!("Module only supports SMB")),
         };
 
@@ -59,15 +59,21 @@ impl NxcModule for EnumShares {
         let shares = protocol.list_shares(smb_session).await?;
 
         let mut output_lines = Vec::new();
-        output_lines.push(format!("{:<15} {:<10} {:<10} {}", "Share", "Read", "Write", "Remark"));
+        output_lines.push(format!(
+            "{:<15} {:<10} {:<10} {}",
+            "Share", "Read", "Write", "Remark"
+        ));
         output_lines.push("-".repeat(50));
 
         let mut share_data = Vec::new();
         for share in shares {
             let read = if share.read_access { "READ" } else { "" };
             let write = if share.write_access { "WRITE" } else { "" };
-            output_lines.push(format!("{:<15} {:<10} {:<10} {}", share.name, read, write, share.remark));
-            
+            output_lines.push(format!(
+                "{:<15} {:<10} {:<10} {}",
+                share.name, read, write, share.remark
+            ));
+
             share_data.push(serde_json::json!({
                 "name": share.name,
                 "read": share.read_access,

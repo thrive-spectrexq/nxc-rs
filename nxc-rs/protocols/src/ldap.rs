@@ -66,8 +66,11 @@ impl LdapProtocol {
         attrs: Vec<&str>,
     ) -> Result<Vec<ldap3::SearchEntry>> {
         let url = self.build_url(&session.target, session.port);
-        let creds = session.credentials.as_ref().ok_or_else(|| anyhow!("Session skipped authentication"))?;
-        
+        let creds = session
+            .credentials
+            .as_ref()
+            .ok_or_else(|| anyhow!("Session skipped authentication"))?;
+
         let username = creds.username.clone();
         let password = creds.password.clone().unwrap_or_default();
 
@@ -84,7 +87,7 @@ impl LdapProtocol {
 
         let rs = ldap.search(base_dn, scope, filter, attrs).await?;
         let mut entries = Vec::new();
-        
+
         for entry in rs.0 {
             let search_entry = ldap3::SearchEntry::construct(entry);
             entries.push(search_entry);
@@ -96,20 +99,26 @@ impl LdapProtocol {
 
     /// Resolve naming contexts to find the base DN if not provided.
     pub async fn get_base_dn(&self, session: &LdapSession) -> Result<String> {
-        let entries = self.search(
-            session,
-            "",
-            ldap3::Scope::Base,
-            "(objectClass=*)",
-            vec!["defaultNamingContext"],
-        ).await?;
+        let entries = self
+            .search(
+                session,
+                "",
+                ldap3::Scope::Base,
+                "(objectClass=*)",
+                vec!["defaultNamingContext"],
+            )
+            .await?;
 
         if let Some(entry) = entries.first() {
-            if let Some(dn) = entry.attrs.get("defaultNamingContext").and_then(|v| v.first()) {
+            if let Some(dn) = entry
+                .attrs
+                .get("defaultNamingContext")
+                .and_then(|v| v.first())
+            {
                 return Ok(dn.clone());
             }
         }
-        
+
         Err(anyhow!("Could not resolve defaultNamingContext"))
     }
 }
@@ -135,7 +144,13 @@ impl NxcProtocol for LdapProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["whoami", "laps", "enum_dns", "kerberoasting", "asreproasting"]
+        &[
+            "whoami",
+            "laps",
+            "enum_dns",
+            "kerberoasting",
+            "asreproasting",
+        ]
     }
 
     async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
@@ -145,7 +160,9 @@ impl NxcProtocol for LdapProtocol {
 
         let _ = tokio::task::spawn_blocking(move || -> Result<()> {
             let _tcp = std::net::TcpStream::connect_timeout(
-                &addr.parse().map_err(|e| anyhow!("Invalid address {}: {}", addr, e))?,
+                &addr
+                    .parse()
+                    .map_err(|e| anyhow!("Invalid address {}: {}", addr, e))?,
                 timeout,
             )?;
             Ok(())
@@ -179,11 +196,17 @@ impl NxcProtocol for LdapProtocol {
 
         debug!("LDAP: Authenticating {}@{}", username, url);
 
-        let (conn, mut ldap) = match tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::new(&url)).await {
-            Ok(Ok(res)) => res,
-            Ok(Err(e)) => return Ok(AuthResult::failure(&format!("Connection failed: {}", e), None)),
-            Err(_) => return Ok(AuthResult::failure("Connection timeout", None)),
-        };
+        let (conn, mut ldap) =
+            match tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::new(&url)).await {
+                Ok(Ok(res)) => res,
+                Ok(Err(e)) => {
+                    return Ok(AuthResult::failure(
+                        &format!("Connection failed: {}", e),
+                        None,
+                    ))
+                }
+                Err(_) => return Ok(AuthResult::failure("Connection timeout", None)),
+            };
 
         ldap3::drive!(conn);
 

@@ -43,38 +43,57 @@ impl NxcModule for Asreproasting {
 
     async fn run(&self, session: &dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let ldap_session = match session.protocol() {
-            "ldap" => unsafe { &*(session as *const dyn NxcSession as *const nxc_protocols::ldap::LdapSession) },
+            "ldap" => unsafe {
+                &*(session as *const dyn NxcSession as *const nxc_protocols::ldap::LdapSession)
+            },
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
         let protocol = nxc_protocols::ldap::LdapProtocol::new();
         let base_dn = protocol.get_base_dn(ldap_session).await?;
 
-        tracing::debug!("asreproasting: Searching for ASREProastable users in {}", base_dn);
+        tracing::debug!(
+            "asreproasting: Searching for ASREProastable users in {}",
+            base_dn
+        );
 
         // Filter: DONT_REQ_PREAUTH (0x400000 = 4194304)
         let filter = "(&(objectClass=user)(objectCategory=person)(userAccountControl:1.2.840.113556.1.4.803:=4194304))";
-        
+
         let attrs = vec!["sAMAccountName", "userAccountControl", "pwdLastSet"];
 
-        let entries = protocol.search(
-            ldap_session,
-            &base_dn,
-            ldap3::Scope::Subtree,
-            filter,
-            attrs,
-        ).await?;
+        let entries = protocol
+            .search(ldap_session, &base_dn, ldap3::Scope::Subtree, filter, attrs)
+            .await?;
 
         let mut output_lines = Vec::new();
         let mut results = Vec::new();
 
-        output_lines.push(format!("{:<20} {:<20} {:<15}", "Username", "UAC", "Password Last Set"));
+        output_lines.push(format!(
+            "{:<20} {:<20} {:<15}",
+            "Username", "UAC", "Password Last Set"
+        ));
         output_lines.push("-".repeat(55));
 
         for entry in &entries {
-            let sam = entry.attrs.get("sAMAccountName").and_then(|v| v.first()).cloned().unwrap_or_default();
-            let uac = entry.attrs.get("userAccountControl").and_then(|v| v.first()).cloned().unwrap_or_default();
-            let pwd_last_set = entry.attrs.get("pwdLastSet").and_then(|v| v.first()).cloned().unwrap_or_default();
+            let sam = entry
+                .attrs
+                .get("sAMAccountName")
+                .and_then(|v| v.first())
+                .cloned()
+                .unwrap_or_default();
+            let uac = entry
+                .attrs
+                .get("userAccountControl")
+                .and_then(|v| v.first())
+                .cloned()
+                .unwrap_or_default();
+            let pwd_last_set = entry
+                .attrs
+                .get("pwdLastSet")
+                .and_then(|v| v.first())
+                .cloned()
+                .unwrap_or_default();
 
             output_lines.push(format!("{:<20} {:<20} {:<15}", sam, uac, pwd_last_set));
             results.push(serde_json::json!({

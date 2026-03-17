@@ -138,7 +138,7 @@ impl NxcProtocol for WinrmProtocol {
             info!("WinRM: Connected to {} (NTLM Challenge received)", url);
             // In a full implementation, we would decode BASE64 _challenge here
             // and extract Target Name (Domain/Computer), OS Version, etc.
-            
+
             Ok(Box::new(WinrmSession {
                 target: target.to_string(),
                 port,
@@ -147,7 +147,10 @@ impl NxcProtocol for WinrmProtocol {
                 endpoint: url,
             }))
         } else if response.status() == 200 {
-            info!("WinRM: Connected to {} (Unauthenticated access or pre-auth)", url);
+            info!(
+                "WinRM: Connected to {} (Unauthenticated access or pre-auth)",
+                url
+            );
             Ok(Box::new(WinrmSession {
                 target: target.to_string(),
                 port,
@@ -156,7 +159,10 @@ impl NxcProtocol for WinrmProtocol {
                 endpoint: url,
             }))
         } else {
-            Err(anyhow!("Failed to get NTLM challenge from target. Status: {}", response.status()))
+            Err(anyhow!(
+                "Failed to get NTLM challenge from target. Status: {}",
+                response.status()
+            ))
         }
     }
 
@@ -167,32 +173,37 @@ impl NxcProtocol for WinrmProtocol {
     ) -> Result<AuthResult> {
         let username = creds.username.clone();
         let target = session.target().to_string();
-        
+
         let winrm_sess = unsafe { &*(session as *const dyn NxcSession as *const WinrmSession) };
         let url = self.build_url(&target, winrm_sess.port);
 
         debug!("WinRM: Authenticating {}@{}", username, url);
 
-        // WinRM authentication via Rust `reqwest` requires a specialized NTLM crate or WS-Man library 
-        // to handle the 3-exchange NTLM handshake over HTTP. 
+        // WinRM authentication via Rust `reqwest` requires a specialized NTLM crate or WS-Man library
+        // to handle the 3-exchange NTLM handshake over HTTP.
         // For the sake of this implementation plan expansion, we verify the structure works.
         // Full NTLM/WS-Man negotiation requires a crate like `winrm-rs` or custom NTLM middleware.
 
         // Placeholder for NTLM Handshake
-        let ntlm_success = false; 
-        
+        let ntlm_success = false;
+
         if ntlm_success {
             // Check admin status by attempting a WSMan enumerate namespace query
             // similar to pypsrp's `enumerate("http://schemas.microsoft.com/wbem/wsman/1/windows/shell")`
             let is_admin = false; // Stub
             Ok(AuthResult::success(is_admin))
         } else {
-            Ok(AuthResult::failure("WinRM explicit NTLM logic pending implementation (reqwest-ntlm missing)", None))
+            Ok(AuthResult::failure(
+                "WinRM explicit NTLM logic pending implementation (reqwest-ntlm missing)",
+                None,
+            ))
         }
     }
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
         // PowerShell / cmd execution via SOAP
-        Err(anyhow!("Full WS-Man execution engine not yet ported. WinRM execute pending implementation."))
+        Err(anyhow!(
+            "Full WS-Man execution engine not yet ported. WinRM execute pending implementation."
+        ))
     }
 }

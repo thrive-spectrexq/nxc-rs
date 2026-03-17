@@ -230,25 +230,33 @@ impl ExecutionEngine {
 
                 let handle = tokio::spawn(async move {
                     let start_time = std::time::Instant::now();
-                    
+
                     let result = tokio::time::timeout(timeout_duration, async {
                         // Attempt connection
                         let target_str = target_clone.display();
-                        let mut session = match protocol_clone.connect(&target_str, protocol_clone.default_port()).await {
+                        let mut session = match protocol_clone
+                            .connect(&target_str, protocol_clone.default_port())
+                            .await
+                        {
                             Ok(s) => s,
-                            Err(e) => return ExecutionResult {
-                                target: target_str,
-                                protocol: protocol_clone.name().to_string(),
-                                username: cred_clone.username.clone(),
-                                success: false,
-                                admin: false,
-                                message: format!("Connection failed: {}", e),
-                                duration_ms: start_time.elapsed().as_millis() as u64,
-                            },
+                            Err(e) => {
+                                return ExecutionResult {
+                                    target: target_str,
+                                    protocol: protocol_clone.name().to_string(),
+                                    username: cred_clone.username.clone(),
+                                    success: false,
+                                    admin: false,
+                                    message: format!("Connection failed: {}", e),
+                                    duration_ms: start_time.elapsed().as_millis() as u64,
+                                }
+                            }
                         };
 
                         // Attempt format
-                        match protocol_clone.authenticate(session.as_mut(), &cred_clone).await {
+                        match protocol_clone
+                            .authenticate(session.as_mut(), &cred_clone)
+                            .await
+                        {
                             Ok(auth_res) => ExecutionResult {
                                 target: target_str.clone(),
                                 protocol: protocol_clone.name().to_string(),
@@ -336,46 +344,70 @@ mod tests {
 
     #[tokio::test]
     async fn test_execution_engine_concurrency() {
-        use std::sync::Arc;
-        use nxc_auth::{AuthResult, Credentials};
         use anyhow::Result;
         use async_trait::async_trait;
-        use nxc_protocols::{NxcProtocol, NxcSession, CommandOutput};
+        use nxc_auth::{AuthResult, Credentials};
+        use nxc_protocols::{CommandOutput, NxcProtocol, NxcSession};
+        use std::sync::Arc;
 
         // A mock protocol that simulates network success/failure based on target IP
         struct MockSession {
             target: String,
         }
         impl NxcSession for MockSession {
-            fn protocol(&self) -> &'static str { "mock" }
-            fn target(&self) -> &str { &self.target }
-            fn is_admin(&self) -> bool { true }
+            fn protocol(&self) -> &'static str {
+                "mock"
+            }
+            fn target(&self) -> &str {
+                &self.target
+            }
+            fn is_admin(&self) -> bool {
+                true
+            }
         }
 
         struct MockProtocol;
         #[async_trait]
         impl NxcProtocol for MockProtocol {
-            fn name(&self) -> &'static str { "mock" }
-            fn default_port(&self) -> u16 { 1234 }
-            fn supports_exec(&self) -> bool { false }
-            fn supported_modules(&self) -> &[&str] { &[] }
-            
+            fn name(&self) -> &'static str {
+                "mock"
+            }
+            fn default_port(&self) -> u16 {
+                1234
+            }
+            fn supports_exec(&self) -> bool {
+                false
+            }
+            fn supported_modules(&self) -> &[&str] {
+                &[]
+            }
+
             async fn connect(&self, target: &str, _port: u16) -> Result<Box<dyn NxcSession>> {
                 if target == "192.168.1.99" {
                     return Err(anyhow::anyhow!("Connection timeout mock"));
                 }
-                Ok(Box::new(MockSession { target: target.to_string() }))
+                Ok(Box::new(MockSession {
+                    target: target.to_string(),
+                }))
             }
-            
-            async fn authenticate(&self, _session: &mut dyn NxcSession, creds: &Credentials) -> Result<AuthResult> {
+
+            async fn authenticate(
+                &self,
+                _session: &mut dyn NxcSession,
+                creds: &Credentials,
+            ) -> Result<AuthResult> {
                 if creds.password.as_deref() == Some("Password123!") {
                     Ok(AuthResult::success(true))
                 } else {
                     Ok(AuthResult::failure("Bad password", None))
                 }
             }
-            
-            async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
+
+            async fn execute(
+                &self,
+                _session: &dyn NxcSession,
+                _cmd: &str,
+            ) -> Result<CommandOutput> {
                 Err(anyhow::anyhow!("Not supported"))
             }
         }
@@ -410,9 +442,12 @@ mod tests {
         assert_eq!(results.len(), 12);
 
         // Check the connection failure for .99 matches the mock behavior
-        let failures = results.iter().filter(|r| r.target == "192.168.1.99").count();
+        let failures = results
+            .iter()
+            .filter(|r| r.target == "192.168.1.99")
+            .count();
         assert_eq!(failures, 3);
-        
+
         // Assert admin auth logic passed correctly for others
         let admins = results.iter().filter(|r| r.success && r.admin).count();
         assert_eq!(admins, 3); // 1 admin win per successful host (10, 11, 12)

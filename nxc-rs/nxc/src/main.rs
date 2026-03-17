@@ -611,7 +611,9 @@ async fn main() -> Result<()> {
             NxcGlobalOutput::banner();
             NxcGlobalOutput::info(&format!("NetExec-RS v{} — {}", VERSION, CODENAME));
             NxcGlobalOutput::info("Use 'nxc <protocol> --help' for protocol-specific options");
-            NxcGlobalOutput::info("Available protocols: smb, ssh, ldap, winrm, mssql, rdp, ftp, vnc, wmi, nfs");
+            NxcGlobalOutput::info(
+                "Available protocols: smb, ssh, ldap, winrm, mssql, rdp, ftp, vnc, wmi, nfs",
+            );
             return Ok(());
         }
     };
@@ -726,24 +728,12 @@ async fn main() -> Result<()> {
 
         if result.success {
             if result.admin {
-                output.pwned(&format!(
-                    "{} {}",
-                    result.username,
-                    result.message
-                ));
+                output.pwned(&format!("{} {}", result.username, result.message));
             } else {
-                output.success(&format!(
-                    "{} {}",
-                    result.username,
-                    result.message
-                ));
+                output.success(&format!("{} {}", result.username, result.message));
             }
         } else {
-            output.fail(&format!(
-                "{} {}",
-                result.username,
-                result.message
-            ));
+            output.fail(&format!("{} {}", result.username, result.message));
         }
     }
 
@@ -771,7 +761,13 @@ mod tests {
     fn test_cli_parse_smb_basic() {
         let app = build_cli();
         let matches = app.get_matches_from(vec![
-            "nxc", "smb", "192.168.1.0/24", "-u", "admin", "-p", "Password123!",
+            "nxc",
+            "smb",
+            "192.168.1.0/24",
+            "-u",
+            "admin",
+            "-p",
+            "Password123!",
         ]);
         let (proto, sub_m) = matches.subcommand().unwrap();
         assert_eq!(proto, "smb");
@@ -785,21 +781,31 @@ mod tests {
     fn test_cli_parse_ssh_with_key() {
         let app = build_cli();
         let matches = app.get_matches_from(vec![
-            "nxc", "ssh", "10.0.0.1", "-u", "root", "--key-file", "/path/to/key",
+            "nxc",
+            "ssh",
+            "10.0.0.1",
+            "-u",
+            "root",
+            "--key-file",
+            "/path/to/key",
         ]);
         let (proto, sub_m) = matches.subcommand().unwrap();
         assert_eq!(proto, "ssh");
-        assert_eq!(
-            sub_m.get_one::<String>("key-file").unwrap(),
-            "/path/to/key"
-        );
+        assert_eq!(sub_m.get_one::<String>("key-file").unwrap(), "/path/to/key");
     }
 
     #[test]
     fn test_cli_parse_multiple_targets() {
         let app = build_cli();
         let matches = app.get_matches_from(vec![
-            "nxc", "smb", "192.168.1.10", "192.168.2.0/24", "-u", "admin", "-p", "pass",
+            "nxc",
+            "smb",
+            "192.168.1.10",
+            "192.168.2.0/24",
+            "-u",
+            "admin",
+            "-p",
+            "pass",
         ]);
         let (_, sub_m) = matches.subcommand().unwrap();
         let targets: Vec<&String> = sub_m.get_many::<String>("target").unwrap().collect();

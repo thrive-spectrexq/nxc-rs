@@ -1,6 +1,6 @@
 //! # NFS Protocol Handler
 //!
-//! NFS protocol implementation connecting to Portmap (Port 111) 
+//! NFS protocol implementation connecting to Portmap (Port 111)
 //! to enumerate NFS daemon availability.
 
 use crate::{CommandOutput, NxcProtocol, NxcSession};
@@ -8,8 +8,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use std::time::Duration;
-use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 use tracing::{debug, info};
 
 pub struct NfsSession {
@@ -69,7 +69,7 @@ impl NxcProtocol for NfsProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["ls", "get", "put", "shares"] 
+        &["ls", "get", "put", "shares"]
     }
 
     async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
@@ -87,34 +87,35 @@ impl NxcProtocol for NfsProtocol {
         // Magic byte sequence for requesting port mapping (rpcbind GETPORT)
         let rpc_bind: [u8; 60] = [
             0x80, 0x00, 0x00, 0x34, // Fragment header
-            0x00, 0x00, 0x00, 0x01, // XID 
+            0x00, 0x00, 0x00, 0x01, // XID
             0x00, 0x00, 0x00, 0x00, // CALL (0)
             0x00, 0x00, 0x00, 0x02, // RPC Version (2)
             0x00, 0x01, 0x86, 0xa0, // Program: 100000 (Portmap)
             0x00, 0x00, 0x00, 0x02, // Version: 2
             0x00, 0x00, 0x00, 0x03, // Procedure: 3 (GETPORT)
             0x00, 0x00, 0x00, 0x00, // Credentials Flavor (AUTH_NULL)
-            0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, // Verifier Flavor (AUTH_NULL)
-            0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x01, 0x86, 0xa3, // Requested Program: 100003 (NFS)
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Verifier Flavor (AUTH_NULL)
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x86, 0xa3, // Requested Program: 100003 (NFS)
             0x00, 0x00, 0x00, 0x03, // Req. Version: 3
             0x00, 0x00, 0x00, 0x06, // Proto: 6 (TCP)
             0x00, 0x00, 0x00, 0x00, // Port: 0 (Let server respond with port)
         ];
 
         let _ = stream.write_all(&rpc_bind).await;
-        
-        // Wait for the server to respond with the port mapper output. We don't parse it fully 
+
+        // Wait for the server to respond with the port mapper output. We don't parse it fully
         // to get the true Mount port for this stub, just asserting the response confirms Portmap presence.
         let mut resp = vec![0; 28];
         let read_fut = tokio::time::timeout(self.timeout, stream.read_exact(&mut resp));
-        
+
         if let Err(e) = read_fut.await {
             return Err(anyhow!("NFS Portmap daemon unresponsive: {}", e));
         }
 
-        info!("NFS: Connected to Portmap on {} and requested NFS mappings", addr);
+        info!(
+            "NFS: Connected to Portmap on {} and requested NFS mappings",
+            addr
+        );
 
         Ok(Box::new(NfsSession {
             target: target.to_string(),
@@ -129,10 +130,10 @@ impl NxcProtocol for NfsProtocol {
         creds: &Credentials,
     ) -> Result<AuthResult> {
         let username = creds.username.clone();
-        
+
         let nfs_sess = unsafe { &*(session as *const dyn NxcSession as *const NfsSession) };
         let addr = format!("{}:{}", nfs_sess.target, nfs_sess.port);
-        
+
         debug!("NFS: Tracking auth flow {}@{}", username, addr);
 
         Ok(AuthResult::failure("NFS shares validation using UID 0 (root) and GID impersonation logic pending implementation", None))
