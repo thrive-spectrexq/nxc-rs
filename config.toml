@@ -23,3 +23,10 @@ show_timestamps = true
 packet_viewer = true
 topology_view = true
 refresh_rate_ms = 100
+
+[nxc]
+threads = 256
+timeout_secs = 30
+jitter_ms = 0
+lockout_threshold = 3
+workspace = "default"

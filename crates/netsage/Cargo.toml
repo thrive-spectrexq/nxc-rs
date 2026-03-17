@@ -1,18 +1,28 @@
 [package]
-name = "netsage"
+name = "nxc-rs"
 version.workspace = true
 edition.workspace = true
+description = "◈ NetExec-RS ◈ — Network Execution Tool (Pure Rust)"
+
+[[bin]]
+name = "nxc"
+path = "src/main.rs"
 
 [dependencies]
-netsage-common = { path = "../netsage-common" }
-netsage-agent = { path = "../netsage-agent" }
-netsage-tui = { path = "../netsage-tui" }
-netsage-tools = { path = "../netsage-tools" }
-netsage-capture = { path = "../netsage-capture", default-features = false }
-netsage-session = { path = "../netsage-session" }
-netsage-config = { path = "../netsage-config" }
-netsage-mcp = { path = "../netsage-mcp" }
-netsage-auth = { path = "../netsage-auth" }
+netsage-common = { path = "../common" }
+netsage-agent = { path = "../agent" }
+netsage-tui = { path = "../tui" }
+netsage-tools = { path = "../tools" }
+netsage-capture = { path = "../capture", default-features = false }
+netsage-session = { path = "../session" }
+netsage-config = { path = "../config" }
+netsage-mcp = { path = "../mcp" }
+netsage-auth = { path = "../auth" }
+nxc-auth = { path = "../../nxc-rs/nxc-auth" }
+nxc-protocols = { path = "../../nxc-rs/nxc-protocols" }
+nxc-modules = { path = "../../nxc-rs/nxc-modules" }
+nxc-db = { path = "../../nxc-rs/nxc-db" }
+nxc-targets = { path = "../../nxc-rs/nxc-targets" }
 tokio = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
@@ -24,3 +34,4 @@ tracing-subscriber = { workspace = true }
 dotenvy = { workspace = true }
 rand = { workspace = true }
 uuid = { workspace = true }
+indicatif = { workspace = true }

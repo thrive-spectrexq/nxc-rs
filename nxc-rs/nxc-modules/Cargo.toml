@@ -1,0 +1,17 @@
+[package]
+name = "nxc-modules"
+version.workspace = true
+edition.workspace = true
+description = "NetExec-RS module system — secretsdump, BloodHound, Kerberoast, and more"
+
+[dependencies]
+netsage-common = { path = "../../crates/common" }
+nxc-protocols = { path = "../nxc-protocols" }
+nxc-auth = { path = "../nxc-auth" }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

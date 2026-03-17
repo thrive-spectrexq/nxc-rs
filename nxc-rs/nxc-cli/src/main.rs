@@ -1,40 +1,25 @@
-//! # ◈ NetExec-RS ◈ — Network Execution Tool
+//! # nxc — NetExec-RS CLI Entry Point
 //!
-//! Single unified binary: `nxc`
-//! - No subcommand or `--tui` flag → launches interactive TUI with AI agent
-//! - Protocol subcommand (e.g. `nxc smb ...`) → runs nxc CLI mode
+//! Provides the familiar `nxc <protocol> <targets> -u -p` interface.
+//! When running non-interactively, prints coloured output to stdout.
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use netsage_agent::Agent;
-use netsage_capture::CaptureEngine;
-use netsage_common::AppEvent;
-use netsage_session::SessionManager;
-use netsage_tui::run_tui;
-use tokio::sync::{broadcast, mpsc};
-use tracing::info;
 
 /// ◈ NetExec-RS ◈ — Network Execution Tool (Pure Rust)
-///
-/// Run without arguments to launch the interactive TUI.
-/// Use a protocol subcommand for direct CLI execution.
 #[derive(Parser, Debug)]
 #[command(
     name = "nxc",
     author = "Antigravity",
     version,
     about = "◈ NetExec-RS ◈ — Network Execution Tool (Pure Rust Rewrite)",
-    long_about = "NetExec-RS: AI-powered network intelligence & execution.\n\nRun without arguments to launch the interactive TUI.\nUse a protocol subcommand (smb, ldap, ssh, etc.) for direct CLI mode."
+    long_about = "A full Rust reimplementation of the NetExec (nxc) network execution framework.\nBuilt on the NetSage platform architecture."
 )]
 struct Cli {
     #[command(subcommand)]
-    protocol: Option<ProtocolCommand>,
+    protocol: ProtocolCommand,
 
-    /// Network interface for packet capture
-    #[arg(short, long, global = true)]
-    interface: Option<String>,
-
-    /// Concurrent threads for protocol operations
+    /// Concurrent threads
     #[arg(short = 't', long, default_value = "256", global = true)]
     threads: usize,
 
@@ -94,6 +79,7 @@ struct ProtocolArgs {
     targets: Vec<String>,
 
     // ── Auth Options ──
+
     /// Username or file of usernames
     #[arg(short = 'u', long)]
     username: Option<String>,
@@ -147,6 +133,7 @@ struct ProtocolArgs {
     kdchost: Option<String>,
 
     // ── Execution Options ──
+
     /// Execute shell command
     #[arg(short = 'x')]
     exec_cmd: Option<String>,
@@ -168,6 +155,7 @@ struct ProtocolArgs {
     list_modules: bool,
 
     // ── Output Options ──
+
     /// Export results to CSV
     #[arg(long = "export")]
     export_file: Option<String>,
@@ -184,106 +172,45 @@ struct ProtocolArgs {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-    let _ = dotenvy::dotenv();
 
     // Initialize logging
-    tracing_subscriber::fmt::init();
+    let level = if cli.debug {
+        "debug"
+    } else if cli.verbose {
+        "info"
+    } else {
+        "warn"
+    };
+    tracing_subscriber::fmt()
+        .with_env_filter(level)
+        .init();
 
-    match cli.protocol {
-        // No subcommand → launch TUI mode
-        None => run_tui_mode(&cli).await,
-        // Protocol subcommand → run CLI mode
-        Some(ref proto) => run_cli_mode(&cli, proto).await,
+    println!("◈ NetExec-RS ◈ — Network Execution Tool");
+    println!();
+
+    match &cli.protocol {
+        ProtocolCommand::Smb(args) => run_protocol("smb", args, &cli).await,
+        ProtocolCommand::Ldap(args) => run_protocol("ldap", args, &cli).await,
+        ProtocolCommand::Winrm(args) => run_protocol("winrm", args, &cli).await,
+        ProtocolCommand::Wmi(args) => run_protocol("wmi", args, &cli).await,
+        ProtocolCommand::Rdp(args) => run_protocol("rdp", args, &cli).await,
+        ProtocolCommand::Mssql(args) => run_protocol("mssql", args, &cli).await,
+        ProtocolCommand::Ssh(args) => run_protocol("ssh", args, &cli).await,
+        ProtocolCommand::Ftp(args) => run_protocol("ftp", args, &cli).await,
+        ProtocolCommand::Vnc(args) => run_protocol("vnc", args, &cli).await,
+        ProtocolCommand::Nfs(args) => run_protocol("nfs", args, &cli).await,
     }
 }
 
-/// Launch the interactive TUI with AI agent.
-async fn run_tui_mode(cli: &Cli) -> Result<()> {
-    info!("◈ NetExec-RS ◈ — Launching interactive TUI...");
-
-    let config_path = std::path::Path::new("config.toml");
-    let config = if config_path.exists() {
-        netsage_config::load_config(config_path)?
-    } else {
-        anyhow::bail!("Config file not found at config.toml. Please create it.");
-    };
-
-    // Initialize broadcast bus
-    let (event_tx, _) = broadcast::channel::<AppEvent>(1024);
-
-    // Initialize Session Manager
-    let db_path = std::path::Path::new("session.db");
-    let session_manager = SessionManager::new(db_path)?;
-    let session_id = uuid::Uuid::new_v4();
-
-    // Initialize Capture Engine
-    let capture_engine = CaptureEngine::new(event_tx.clone(), cli.interface.as_deref())?;
-    let topology = capture_engine.get_topology();
-    capture_engine.start();
-
-    // Background Logging Task
-    let mut log_rx = event_tx.subscribe();
-    let logger_sm = session_manager.clone();
-    tokio::spawn(async move {
-        while let Ok(event) = log_rx.recv().await {
-            if let AppEvent::PacketCaptured(pkt) = event {
-                let _ = logger_sm.log_packet(session_id, &pkt).await;
-            }
-        }
-    });
-
-    // Initialize Agent
-    let (user_tx, user_rx) = mpsc::channel::<String>(100);
-    let agent = Agent::new(
-        config.clone(),
-        session_manager.clone(),
-        session_id,
-        event_tx.clone(),
-        user_rx,
-    );
-
-    let agent_handle = tokio::spawn(async move {
-        if let Err(e) = agent.run(Vec::new()).await {
-            tracing::error!("Agent error: {}", e);
-        }
-    });
-
-    // Run TUI
-    run_tui(event_tx.clone(), user_tx, topology).await?;
-
-    // Cleanup
-    let _ = event_tx.send(AppEvent::Quit);
-    let _ = agent_handle.await;
-
-    Ok(())
-}
-
-/// Run a protocol command in CLI mode.
-async fn run_cli_mode(cli: &Cli, proto_cmd: &ProtocolCommand) -> Result<()> {
-    let (proto_name, args) = match proto_cmd {
-        ProtocolCommand::Smb(args) => ("smb", args),
-        ProtocolCommand::Ldap(args) => ("ldap", args),
-        ProtocolCommand::Winrm(args) => ("winrm", args),
-        ProtocolCommand::Wmi(args) => ("wmi", args),
-        ProtocolCommand::Rdp(args) => ("rdp", args),
-        ProtocolCommand::Mssql(args) => ("mssql", args),
-        ProtocolCommand::Ssh(args) => ("ssh", args),
-        ProtocolCommand::Ftp(args) => ("ftp", args),
-        ProtocolCommand::Vnc(args) => ("vnc", args),
-        ProtocolCommand::Nfs(args) => ("nfs", args),
-    };
-
+async fn run_protocol(proto: &str, args: &ProtocolArgs, cli: &Cli) -> Result<()> {
     // List modules if requested
     if args.list_modules {
         let registry = nxc_modules::ModuleRegistry::new();
-        let modules = registry.list(Some(proto_name));
+        let modules = registry.list(Some(proto));
         if modules.is_empty() {
-            println!(
-                "No modules available for {} (protocol implementation pending)",
-                proto_name
-            );
+            println!("No modules available for {} (protocol implementation pending)", proto);
         } else {
-            println!("Available {} modules:", proto_name.to_uppercase());
+            println!("Available {} modules:", proto.to_uppercase());
             for m in modules {
                 println!("  {:<20} {}", m.name(), m.description());
             }
@@ -297,15 +224,13 @@ async fn run_cli_mode(cli: &Cli, proto_cmd: &ProtocolCommand) -> Result<()> {
         targets.extend(nxc_targets::parse_targets(spec)?);
     }
 
-    let proto_upper = proto_name.to_uppercase();
+    let proto_upper = proto.to_uppercase();
     let port = args.port.unwrap_or_else(|| {
-        nxc_protocols::Protocol::from_str(proto_name)
+        nxc_protocols::Protocol::from_str(proto)
             .map(|p| p.default_port())
             .unwrap_or(0)
     });
 
-    println!("◈ NetExec-RS ◈");
-    println!();
     println!(
         "{:<6} Targeting {} host(s) on port {} with {} thread(s)",
         proto_upper,

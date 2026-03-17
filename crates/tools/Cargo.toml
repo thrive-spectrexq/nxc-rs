@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-netsage-common = { path = "../netsage-common" }
+netsage-common = { path = "../common" }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }

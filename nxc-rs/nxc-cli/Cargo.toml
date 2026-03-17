@@ -1,0 +1,25 @@
+[package]
+name = "nxc-cli"
+version.workspace = true
+edition.workspace = true
+description = "NetExec-RS CLI entry point — the nxc binary"
+
+[[bin]]
+name = "nxc"
+path = "src/main.rs"
+
+[dependencies]
+netsage-common = { path = "../../crates/common" }
+nxc-auth = { path = "../nxc-auth" }
+nxc-protocols = { path = "../nxc-protocols" }
+nxc-modules = { path = "../nxc-modules" }
+nxc-db = { path = "../nxc-db" }
+nxc-targets = { path = "../nxc-targets" }
+tokio = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+indicatif = { workspace = true }

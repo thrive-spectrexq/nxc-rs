@@ -4,9 +4,9 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-netsage-common = { path = "../netsage-common" }
-netsage-tools = { path = "../netsage-tools" }
-netsage-session = { path = "../netsage-session" }
+netsage-common = { path = "../common" }
+netsage-tools = { path = "../tools" }
+netsage-session = { path = "../session" }
 tokio = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }

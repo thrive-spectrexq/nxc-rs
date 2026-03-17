@@ -1,0 +1,18 @@
+[package]
+name = "nxc-db"
+version.workspace = true
+edition.workspace = true
+description = "NetExec-RS credential database — workspace-aware host/credential/auth store"
+
+[dependencies]
+netsage-common = { path = "../../crates/common" }
+netsage-session = { path = "../../crates/session" }
+rusqlite = { workspace = true }
+r2d2 = { workspace = true }
+r2d2_sqlite = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+csv = { workspace = true }

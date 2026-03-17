@@ -1,15 +1,21 @@
 [workspace]
 members = [
     "crates/netsage",
-    "crates/netsage-agent",
-    "crates/netsage-tui",
-    "crates/netsage-tools",
-    "crates/netsage-mcp",
-    "crates/netsage-capture",
-    "crates/netsage-session",
-    "crates/netsage-config",
-    "crates/netsage-auth",
-    "crates/netsage-common",
+    "crates/agent",
+    "crates/tui",
+    "crates/tools",
+    "crates/mcp",
+    "crates/capture",
+    "crates/session",
+    "crates/config",
+    "crates/auth",
+    "crates/common",
+    # NetExec-RS crates
+    "nxc-rs/nxc-auth",
+    "nxc-rs/nxc-protocols",
+    "nxc-rs/nxc-modules",
+    "nxc-rs/nxc-db",
+    "nxc-rs/nxc-targets",
 ]
 resolver = "2"
 
@@ -17,7 +23,7 @@ resolver = "2"
 version = "0.1.0"
 edition = "2021"
 authors = ["Antigravity"]
-description = "AI-Powered Network Intelligence Tool"
+description = "AI-Powered Network Intelligence & Execution Tool — NetSage + NetExec-RS"
 
 [workspace.dependencies]
 ratatui = "0.28"
@@ -50,3 +56,14 @@ ssh2 = "0.9"
 maxminddb = "0.24"
 hostname = "0.4"
 async-trait = "0.1"
+
+# NetExec-RS dependencies
+md4 = "0.10"
+hmac = "0.12"
+md-5 = "0.10"
+rc4 = "0.1"
+aes = "0.8"
+des = "0.8"
+csv = "1.3"
+rayon = "1.10"
+zeroize = { version = "1.8", features = ["derive"] }

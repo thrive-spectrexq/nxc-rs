@@ -1,0 +1,19 @@
+[package]
+name = "nxc-targets"
+version.workspace = true
+edition.workspace = true
+description = "NetExec-RS target parsing (CIDR, ranges, files) and concurrent execution engine"
+
+[dependencies]
+netsage-common = { path = "../../crates/common" }
+nxc-auth = { path = "../nxc-auth" }
+nxc-protocols = { path = "../nxc-protocols" }
+nxc-modules = { path = "../nxc-modules" }
+nxc-db = { path = "../nxc-db" }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+indicatif = { workspace = true }

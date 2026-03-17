@@ -1,0 +1,55 @@
+# NetExec-RS — nxc-specific configuration defaults
+# This file is loaded by nxc-cli alongside the main config.toml
+
+[execution]
+threads = 256
+timeout_secs = 30
+jitter_ms = 0
+continue_on_success = false
+
+[lockout]
+threshold = 3
+observation_window_secs = 600
+
+[output]
+color = true
+verbose = false
+debug = false
+export_format = "csv"   # csv | json | bloodhound
+
+[protocols.smb]
+port = 445
+signing = true
+
+[protocols.ldap]
+port = 389
+ldaps_port = 636
+page_size = 1000
+
+[protocols.winrm]
+port = 5985
+ssl_port = 5986
+
+[protocols.mssql]
+port = 1433
+
+[protocols.ssh]
+port = 22
+
+[protocols.rdp]
+port = 3389
+
+[protocols.ftp]
+port = 21
+
+[protocols.vnc]
+port = 5900
+
+[protocols.wmi]
+port = 135
+
+[protocols.nfs]
+port = 2049
+
+[database]
+workspace = "default"

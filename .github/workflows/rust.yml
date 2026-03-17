@@ -1,4 +1,4 @@
-name: Rust CI
+name: NetExec-RS CI
 
 on:
   push:
@@ -79,7 +79,7 @@ jobs:
         run: cargo test --workspace --verbose
 
   build:
-    name: Build Release
+    name: Build nxc Release
     needs: test
     strategy:
       matrix:
@@ -104,4 +104,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       
       - name: Build
-        run: cargo build --release
+        run: cargo build --release --workspace
+
+      - name: Verify nxc binary
+        run: cargo run -p nxc-rs -- --help

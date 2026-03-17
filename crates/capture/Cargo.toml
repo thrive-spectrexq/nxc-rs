@@ -4,12 +4,12 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-netsage-common = { path = "../netsage-common" }
+netsage-common = { path = "../common" }
 pcap = { version = "2.4.0", optional = true }
 etherparse = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-netsage-auth = { path = "../netsage-auth" }
+netsage-auth = { path = "../auth" }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true, features = ["full"] }

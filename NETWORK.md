@@ -1,4 +1,4 @@
-# NetSage Example Network Context
+# NetSage + NetExec-RS — Example Network Context
 
 ## Topology
 - **Production Subnet**: 10.0.1.0/24
@@ -12,3 +12,12 @@
 ## SLA Thresholds
 - **Max Latency**: 50ms
 - **Max Packet Loss**: 1%
+
+## Active Directory (nxc Context)
+- **Domain**: corp.local
+- **Domain Controller**: DC01 — 10.0.1.10
+- **Domain Controller**: DC02 — 10.0.1.11
+- **Domain Admin**: CORP\Administrator
+- **Service Accounts**: svc_sql, svc_web, svc_backup
+- **MSSQL Server**: SQL01 — 10.0.1.30 (Port 1433)
+- **File Server**: FS01 — 10.0.1.50

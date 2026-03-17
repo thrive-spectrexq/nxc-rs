@@ -1,0 +1,16 @@
+[package]
+name = "nxc-protocols"
+version.workspace = true
+edition.workspace = true
+description = "NetExec-RS protocol handlers — SMB, LDAP, WinRM, RDP, MSSQL, SSH, FTP, VNC, WMI, NFS"
+
+[dependencies]
+netsage-common = { path = "../../crates/common" }
+nxc-auth = { path = "../nxc-auth" }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

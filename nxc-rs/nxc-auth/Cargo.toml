@@ -1,0 +1,22 @@
+[package]
+name = "nxc-auth"
+version.workspace = true
+edition.workspace = true
+description = "NetExec-RS authentication engine — NTLM, Kerberos, certificate auth"
+
+[dependencies]
+netsage-common = { path = "../../crates/common" }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+zeroize = { workspace = true }
+md4 = { workspace = true }
+hmac = { workspace = true }
+md-5 = { workspace = true }
+rc4 = { workspace = true }
+aes = { workspace = true }
+des = { workspace = true }
+hostname = { workspace = true }
