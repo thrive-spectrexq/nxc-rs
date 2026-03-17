@@ -1,0 +1,22 @@
+License Agreement for NetExec-RS (nxc-rs)
+
+Copyright (c) 2024-2026 thrive-spectrexq.
+All rights reserved.
+
+This software ("NetExec-RS") is a custom proprietary tool developed for security testing and network assessment. It is strictly NOT licensed under the MIT License or any other open-source OSI-approved license.
+
+1. Permitted Use
+This software is provided for authorized security testing, educational purposes, and lawful red team engagements only. You may use this software strictly within environments where you have explicit, written, and mutual consent to perform such assessments.
+
+2. Restrictions
+You may NOT:
+a) Redistribute, sub-license, rent, or lease the software or any of its components.
+b) Use this software for unauthorized access, malicious activities, or illegal hacking.
+c) Modify, adapt, translate, or create derivative works without explicit permission from the original author(s).
+d) Remove or alter any copyright notices or this License Agreement.
+
+3. Disclaimer of Warranty
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+
+4. Limitation of Liability
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. The developers assume no liability and are not responsible for any misuse or damage caused by this program.

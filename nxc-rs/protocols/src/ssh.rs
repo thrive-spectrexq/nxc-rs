@@ -29,12 +29,54 @@ impl SshSession {
     /// Check if the authenticated user has shell access and determine OS.
     fn check_shell(&mut self) {
         if let Some(ref sess) = self.session {
-            // Try Linux: run `id`
+            // First, check basic system info to distinguish Linux, Android, macOS, and iOS
+            if let Ok(uname_out) = Self::exec_on_session(sess, "uname -sm") {
+                let uname = uname_out.trim();
+                if uname.contains("Darwin") {
+                    self.shell_access = true;
+                    if uname.contains("iPhone") || uname.contains("iPad") || uname.contains("iPod") {
+                        self.server_os = "iOS".to_string();
+                        debug!("iOS shell detected: {}", uname);
+                    } else {
+                        self.server_os = "macOS".to_string();
+                        debug!("macOS shell detected: {}", uname);
+                    }
+
+                    // Simple check for root on Darwin
+                    if let Ok(id_out) = Self::exec_on_session(sess, "id") {
+                        if id_out.contains("uid=0") {
+                            self.admin = true;
+                            debug!("User is root (Darwin)");
+                        } else if let Ok(sudo_out) = Self::exec_on_session(sess, "sudo -ln 2>&1") {
+                            if sudo_out.contains("NOPASSWD: ALL") || sudo_out.contains("(root)") {
+                                self.admin = true;
+                                debug!("User has sudo NOPASSWD privileges (Darwin)");
+                            }
+                        }
+                    }
+                    return;
+                }
+            }
+
+            // Try generic Linux (or Android)
             if let Ok(output) = Self::exec_on_session(sess, "id") {
                 if !output.is_empty() {
                     self.shell_access = true;
-                    self.server_os = "Linux".to_string();
-                    debug!("Linux shell detected: {}", output.trim());
+                    
+                    // Check if it's Android
+                    if let Ok(getprop_out) = Self::exec_on_session(sess, "getprop ro.build.version.release") {
+                        if !getprop_out.trim().is_empty() && !getprop_out.contains("not found") && !getprop_out.contains("command not found") {
+                            self.server_os = "Android".to_string();
+                            debug!("Android shell detected: Linux (Android {})", getprop_out.trim());
+                        } else {
+                            self.server_os = "Linux".to_string();
+                            debug!("Linux shell detected: {}", output.trim());
+                        }
+                    } else {
+                        self.server_os = "Linux".to_string();
+                        debug!("Linux shell detected: {}", output.trim());
+                    }
+
                     // Check for root
                     if output.contains("uid=0") {
                         self.admin = true;

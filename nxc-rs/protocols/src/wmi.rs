@@ -112,7 +112,7 @@ impl NxcProtocol for WmiProtocol {
     async fn authenticate(
         &self,
         session: &mut dyn NxcSession,
-        creds: &Credentials,
+        _creds: &Credentials,
     ) -> Result<AuthResult> {
         let wmi_sess = match session.downcast_mut::<WmiSession>() {
             Some(s) => s,

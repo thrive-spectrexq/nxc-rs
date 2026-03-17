@@ -439,6 +439,22 @@ fn build_cli() -> Command {
                 .action(ArgAction::SetTrue),
         );
 
+    let adb_cmd = Command::new("adb")
+        .about("ADB protocol (Android Debug Bridge, port 5555)")
+        .args(&auth_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("5555")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("exec-command")
+                .short('x')
+                .long("exec-command")
+                .help("Execute command on Android target"),
+        );
+
     Command::new("nxc")
         .about(banner)
         .version(VERSION)
@@ -503,6 +519,7 @@ fn build_cli() -> Command {
         .subcommand(vnc_cmd)
         .subcommand(wmi_cmd)
         .subcommand(nfs_cmd)
+        .subcommand(adb_cmd)
 }
 
 /// Build credentials from CLI arguments.
@@ -580,6 +597,7 @@ fn get_protocol_handler(protocol_name: &str) -> Option<Arc<dyn nxc_protocols::Nx
         "ftp" => Some(Arc::new(nxc_protocols::ftp::FtpProtocol::new())),
         "vnc" => Some(Arc::new(nxc_protocols::vnc::VncProtocol::new())),
         "nfs" => Some(Arc::new(nxc_protocols::nfs::NfsProtocol::new())),
+        "adb" => Some(Arc::new(nxc_protocols::adb::AdbProtocol::new())),
         // Future protocols will be added here:
         _ => None,
     }
@@ -612,7 +630,7 @@ async fn main() -> Result<()> {
             NxcGlobalOutput::info(&format!("NetExec-RS v{} — {}", VERSION, CODENAME));
             NxcGlobalOutput::info("Use 'nxc <protocol> --help' for protocol-specific options");
             NxcGlobalOutput::info(
-                "Available protocols: smb, ssh, ldap, winrm, mssql, rdp, ftp, vnc, wmi, nfs",
+                "Available protocols: smb, ssh, ldap, winrm, mssql, rdp, ftp, vnc, wmi, nfs, adb",
             );
             return Ok(());
         }

@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use serde::{Deserialize, Serialize};
 
+pub mod adb;
 pub mod ftp;
 pub mod ldap;
 pub mod mssql;
@@ -96,6 +97,7 @@ pub enum Protocol {
     Ftp,
     Vnc,
     Nfs,
+    Adb,
 }
 
 impl Protocol {
@@ -111,6 +113,7 @@ impl Protocol {
             Protocol::Ftp => "ftp",
             Protocol::Vnc => "vnc",
             Protocol::Nfs => "nfs",
+            Protocol::Adb => "adb",
         }
     }
 
@@ -126,6 +129,7 @@ impl Protocol {
             Protocol::Ftp => 21,
             Protocol::Vnc => 5900,
             Protocol::Nfs => 2049,
+            Protocol::Adb => 5555,
         }
     }
 
@@ -143,6 +147,7 @@ impl Protocol {
             "ftp" => Some(Protocol::Ftp),
             "vnc" => Some(Protocol::Vnc),
             "nfs" => Some(Protocol::Nfs),
+            "adb" => Some(Protocol::Adb),
             _ => None,
         }
     }
