@@ -5,8 +5,8 @@ edition.workspace = true
 description = "NetExec-RS credential database — workspace-aware host/credential/auth store"
 
 [dependencies]
-netsage-common = { path = "../../crates/common" }
-netsage-session = { path = "../../crates/session" }
+
+
 rusqlite = { workspace = true }
 r2d2 = { workspace = true }
 r2d2_sqlite = { workspace = true }

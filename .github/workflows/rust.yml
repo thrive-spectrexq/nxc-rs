@@ -16,8 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install libpcap
-        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
@@ -32,8 +30,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install libpcap
-        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.80.0
@@ -59,19 +55,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
-        
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Invoke-WebRequest -Uri "https://nmap.org/npcap/dist/npcap-sdk-1.13.zip" -OutFile "npcap-sdk.zip"
-          Expand-Archive -Path "npcap-sdk.zip" -DestinationPath "npcap-sdk"
-          echo "LIB=$((Get-Location).Path)\npcap-sdk\Lib\x64" >> $env:GITHUB_ENV
-          
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       
@@ -87,19 +70,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
-        
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Invoke-WebRequest -Uri "https://nmap.org/npcap/dist/npcap-sdk-1.13.zip" -OutFile "npcap-sdk.zip"
-          Expand-Archive -Path "npcap-sdk.zip" -DestinationPath "npcap-sdk"
-          echo "LIB=$((Get-Location).Path)\npcap-sdk\Lib\x64" >> $env:GITHUB_ENV
-          
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       
@@ -107,4 +77,4 @@ jobs:
         run: cargo build --release --workspace
 
       - name: Verify nxc binary
-        run: cargo run -p nxc-rs -- --help
+        run: cargo run -p nxc -- --help

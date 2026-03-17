@@ -1,19 +1,22 @@
 [package]
-name = "nxc-targets"
+name = "nxc"
 version.workspace = true
 edition.workspace = true
-description = "NetExec-RS target parsing (CIDR, ranges, files) and concurrent execution engine"
+description = "NetExec-RS — Network Execution Tool"
+
+[[bin]]
+name = "nxc"
+path = "src/main.rs"
 
 [dependencies]
-
 nxc-auth = { path = "../auth" }
 nxc-protocols = { path = "../protocols" }
 nxc-modules = { path = "../modules" }
 nxc-db = { path = "../db" }
-async-trait = { workspace = true }
+nxc-targets = { path = "../targets" }
 tokio = { workspace = true }
+clap = { workspace = true }
 anyhow = { workspace = true }
-thiserror = { workspace = true }
 tracing = { workspace = true }
-serde = { workspace = true }
+tracing-subscriber = { workspace = true }
 indicatif = { workspace = true }

@@ -8,6 +8,8 @@ use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use serde::{Deserialize, Serialize};
 
+pub mod smb;
+
 // ─── Core Traits ────────────────────────────────────────────────
 
 /// Trait for an active protocol session.

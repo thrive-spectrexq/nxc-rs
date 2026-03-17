@@ -5,7 +5,7 @@ edition.workspace = true
 description = "NetExec-RS authentication engine — NTLM, Kerberos, certificate auth"
 
 [dependencies]
-netsage-common = { path = "../../crates/common" }
+
 async-trait = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }

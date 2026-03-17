@@ -5,7 +5,7 @@ edition.workspace = true
 description = "NetExec-RS protocol handlers — SMB, LDAP, WinRM, RDP, MSSQL, SSH, FTP, VNC, WMI, NFS"
 
 [dependencies]
-netsage-common = { path = "../../crates/common" }
+
 nxc-auth = { path = "../auth" }
 async-trait = { workspace = true }
 tokio = { workspace = true }

@@ -4,9 +4,14 @@
 //! drives the concurrent multi-target execution engine.
 
 use anyhow::Result;
+use nxc_auth::Credentials;
+use nxc_protocols::NxcProtocol;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Semaphore;
+use tokio::task::JoinHandle;
 
 // ─── Target Types ───────────────────────────────────────────────
 
@@ -205,8 +210,97 @@ impl ExecutionEngine {
         &self.opts
     }
 
-    // TODO: Implement run() method that takes protocol, targets, creds, modules
-    // and drives concurrent execution with semaphore-bounded task pool
+    /// Execute the given protocol against the targets using the provided credentials.
+    pub async fn run(
+        &self,
+        protocol: Arc<dyn NxcProtocol>,
+        targets: Vec<Target>,
+        creds: Vec<Credentials>,
+    ) -> Vec<ExecutionResult> {
+        let semaphore = Arc::new(Semaphore::new(self.opts.threads));
+        let mut join_handles: Vec<JoinHandle<ExecutionResult>> = Vec::new();
+
+        for target in targets {
+            for cred in creds.iter() {
+                let permit = semaphore.clone().acquire_owned().await.unwrap();
+                let protocol_clone = protocol.clone();
+                let target_clone = target.clone();
+                let cred_clone = cred.clone();
+                let timeout_duration = self.opts.timeout;
+
+                let handle = tokio::spawn(async move {
+                    let start_time = std::time::Instant::now();
+                    
+                    let result = tokio::time::timeout(timeout_duration, async {
+                        // Attempt connection
+                        let target_str = target_clone.display();
+                        let mut session = match protocol_clone.connect(&target_str, protocol_clone.default_port()).await {
+                            Ok(s) => s,
+                            Err(e) => return ExecutionResult {
+                                target: target_str,
+                                protocol: protocol_clone.name().to_string(),
+                                username: cred_clone.username.clone(),
+                                success: false,
+                                admin: false,
+                                message: format!("Connection failed: {}", e),
+                                duration_ms: start_time.elapsed().as_millis() as u64,
+                            },
+                        };
+
+                        // Attempt format
+                        match protocol_clone.authenticate(session.as_mut(), &cred_clone).await {
+                            Ok(auth_res) => ExecutionResult {
+                                target: target_str.clone(),
+                                protocol: protocol_clone.name().to_string(),
+                                username: cred_clone.username.clone(),
+                                success: auth_res.success,
+                                admin: auth_res.admin,
+                                message: auth_res.message,
+                                duration_ms: start_time.elapsed().as_millis() as u64,
+                            },
+                            Err(e) => ExecutionResult {
+                                target: target_str,
+                                protocol: protocol_clone.name().to_string(),
+                                username: cred_clone.username.clone(),
+                                success: false,
+                                admin: false,
+                                message: format!("Auth error: {}", e),
+                                duration_ms: start_time.elapsed().as_millis() as u64,
+                            },
+                        }
+                    })
+                    .await;
+
+                    // Drop permit to allow next task
+                    drop(permit);
+
+                    match result {
+                        Ok(exec_res) => exec_res,
+                        Err(_) => ExecutionResult {
+                            target: target_clone.display(),
+                            protocol: protocol_clone.name().to_string(),
+                            username: cred_clone.username.clone(),
+                            success: false,
+                            admin: false,
+                            message: "Timeout".to_string(),
+                            duration_ms: start_time.elapsed().as_millis() as u64,
+                        },
+                    }
+                });
+
+                join_handles.push(handle);
+            }
+        }
+
+        let mut results = Vec::new();
+        for handle in join_handles {
+            if let Ok(res) = handle.await {
+                results.push(res);
+            }
+        }
+
+        results
+    }
 }
 
 // ─── Tests ──────────────────────────────────────────────────────
@@ -238,5 +332,49 @@ mod tests {
     fn test_target_display() {
         let t = Target::new("10.0.0.1".parse().unwrap()).with_hostname("dc01.corp.local");
         assert_eq!(t.display(), "10.0.0.1 (dc01.corp.local)");
+    }
+
+    #[tokio::test]
+    async fn test_execution_engine_concurrency() {
+        use std::sync::Arc;
+        use nxc_auth::Credentials;
+        use nxc_protocols::smb::SmbProtocol;
+
+        let opts = ExecutionOpts {
+            threads: 5,
+            timeout: std::time::Duration::from_secs(5),
+            jitter_ms: None,
+            continue_on_success: false,
+            no_bruteforce: false,
+        };
+
+        let engine = ExecutionEngine::new(opts);
+        let smb_proto: Arc<dyn nxc_protocols::NxcProtocol> = Arc::new(SmbProtocol::new());
+
+        let targets = vec![
+            Target::new("192.168.1.10".parse().unwrap()),
+            Target::new("192.168.1.11".parse().unwrap()),
+            Target::new("192.168.1.12".parse().unwrap()),
+            Target::new("192.168.1.99".parse().unwrap()), // Mocks connection failure
+        ];
+
+        let creds = vec![
+            Credentials::password("admin", "wrong", None),
+            Credentials::password("admin", "Password123!", None),
+            Credentials::password("user", "pass", None),
+        ];
+
+        // 4 targets * 3 creds = 12 total tasks
+        let results = engine.run(smb_proto, targets, creds).await;
+
+        assert_eq!(results.len(), 12);
+
+        // Check the connection failure for .99 matches the mock behavior
+        let failures = results.iter().filter(|r| r.target == "192.168.1.99").count();
+        assert_eq!(failures, 3);
+        
+        // Assert admin auth logic passed correctly for others
+        let admins = results.iter().filter(|r| r.success && r.admin).count();
+        assert_eq!(admins, 3); // 1 admin win per successful host (10, 11, 12)
     }
 }

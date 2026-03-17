@@ -1,17 +1,15 @@
 # ◈ NetExec-RS ◈
 
-**Network Execution Tool — Pure Rust Rewrite**
+**Network Execution Tool — Pure Rust**
 
 ---
 
 | | |
 |---|---|
 | **Project** | NetExec-RS (`nxc-rs`) |
-| **Base Platform** | NetSage v0.2→1.0 Workspace |
 | **Language** | Pure Rust 2021 Edition |
-| **Architecture** | Cargo Workspace Monorepo (extends NetSage) |
+| **Architecture** | Cargo Workspace (`nxc` binary) |
 | **Async Runtime** | Tokio (full features) |
-| **TUI Framework** | Ratatui 0.28 (inherits NetSage TUI) |
 | **Target Protocols** | SMB · LDAP · WinRM · RDP · MSSQL · SSH · FTP · VNC · WMI · NFS |
 | **Auth Methods** | Password · NTLM Hash · Kerberos TGT/TGS · Certificate |
 | **Min Rust Version** | 1.80.0 |
@@ -19,59 +17,35 @@
 
 ## Overview
 
-NetExec-RS is a full Rust reimplementation of the [NetExec (nxc)](https://github.com/Pennyw0rth/NetExec) network execution and penetration testing framework, built as a seamless extension of the existing **NetSage** workspace architecture.
+NetExec-RS is a native Rust reimplementation of the [NetExec (nxc)](https://github.com/Pennyw0rth/NetExec) network execution framework. It is focused entirely on **offensive capability and Active Directory assessment**: multi-protocol authentication, credential spraying, post-exploitation module execution, and lateral movement automation.
 
-Where NetSage provides AI-powered network intelligence, diagnostics, and packet capture, NetExec-RS adds the **offensive and assessment layer**: multi-protocol authentication, credential spraying, post-exploitation modules, Active Directory enumeration, and lateral movement automation.
+### Design Principles
 
-### Design North Stars
-
-- **Zero-dependency single binary** — no Python runtime, no impacket, no external tools
+- **Zero-dependency binary** — no Python runtime, no impacket, no external tools
 - **Memory-safe protocol implementation** — all SMB/NTLM/Kerberos implemented natively in Rust
-- **NetSage-native** — shares TUI, session store, agent loop, and event bus with NetSage
-- **NetExec CLI parity** — same `nxc <protocol> <targets> -u -p` idiom, compatible flags
-- **AI-augmented execution** — LLM agent can invoke nxc tools via the existing tool registry
-- **Audit-complete** — every authentication attempt and command execution logged to SQLite
+- **Execution engine parity** — consistent `nxc <protocol> <targets> -u -p` CLI idiom.
+- **Concurrent Spray Engine** - heavily multithreaded Tokio execution for speed.
 
 ## Features
 
-- **Multi-Protocol Support**: SMB, LDAP, WinRM, RDP, MSSQL, SSH, FTP, VNC, WMI, NFS
+- **Multi-Protocol Support**: SMB, LDAP, WinRM, RDP, MSSQL, SSH, FTP, VNC, WMI, NFS (Pending impl)
 - **Authentication Engine**: NTLM (v1/v2), Kerberos (AS-REQ/TGS-REQ, PKINIT, S4U), Pass-the-Hash, Pass-the-Ticket
 - **Credential Spraying**: Concurrent multi-target execution engine with lockout detection
 - **Module System**: secretsdump, SAM/LSA dump, Kerberoasting, BloodHound, ADCS, and 30+ modules
 - **Credential Database**: SQLite workspace-aware cred store (`nxcdb` equivalent)
-- **AI Integration**: LLM agent invokes nxc tools via NetSage's ToolRegistry with approval gating
-- **Live TUI**: Real-time spray progress, Pwn3d! host list, credential store — all in the NetSage Ratatui interface
-- **Multi-Model Support**: Integrated with **Anthropic Claude**, **OpenAI GPT**, and **Google Gemini**
-- **Topology Visualization**: Real-time ASCII network mapping (`Ctrl+T`)
-- **Audit Logging**: Every action recorded in a SQLite session store
 
 ## Workspace Layout
 
 ```
 nxc-rs/                           # Workspace root
 ├── Cargo.toml                    # [workspace] manifest
-├── crates/                       # Core crates
-│   ├── netsage/                  # ◈ nxc binary (unified entry point)
-│   ├── agent/                    # LLM agent loop + nxc tool dispatch
-│   ├── tui/                      # Ratatui TUI + nxc panels
-│   ├── tools/                    # Tool registry (network + nxc tools)
-│   ├── capture/                  # Packet capture engine
-│   ├── session/                  # SQLite session store + nxc cred store
-│   ├── common/                   # Shared types — NxcError, NxcEvent
-│   ├── config/                   # Configuration loader
-│   ├── auth/                     # API key management
-│   └── mcp/                      # MCP server — tools auto-exposed
-├── nxc-rs/                       # NetExec-RS protocol & auth crates
-│   ├── auth/                     # NTLM, Kerberos, password auth engines
-│   ├── protocols/                # SMB, LDAP, WinRM, RDP, MSSQL, SSH…
-│   ├── modules/                  # Module system (secretsdump, etc.)
-│   ├── db/                       # Credential workspace / nxcdb equiv
-│   ├── targets/                  # Target parsing: CIDR, ranges, files
-│   └── cli/                      # nxc binary CLI entry point
-├── config/
-│   └── nxc.toml                  # nxc-specific defaults
-├── config.toml                   # Main config
-└── NETWORK.md                    # Network context file
+└── nxc-rs/                       # Sub-crates
+    ├── nxc/                      # ◈ nxc binary (CLI entry point)
+    ├── auth/                     # NTLM, Kerberos, password auth engines
+    ├── protocols/                # SMB, LDAP, WinRM, RDP, MSSQL, SSH…
+    ├── modules/                  # Module system (secretsdump, etc.)
+    ├── db/                       # Credential workspace / nxcdb equiv
+    └── targets/                  # Target parsing: CIDR, ranges, files
 ```
 
 ## Installation
@@ -89,49 +63,10 @@ cargo build --release --workspace
 # The binary is at:
 #   target/release/nxc
 #
-# Run without args → interactive TUI
 # Run with protocol → CLI mode (e.g. nxc smb 192.168.1.0/24 -u admin -p pass)
 ```
 
-### One-Line Install
-
-**Linux / macOS:**
-```bash
-curl -sSL https://raw.githubusercontent.com/thrive-spectrexq/nxc-rs/master/install.sh | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-irm https://raw.githubusercontent.com/thrive-spectrexq/nxc-rs/master/install.ps1 | iex
-```
-
-### Windows Build Requirements
-
-To build on Windows, you need the **Npcap SDK** for the packet engine:
-1. Download from [nmap.org/npcap/](https://nmap.org/npcap/)
-2. Extract and set `LIB` to point to the `Lib\x64` folder
-
-### Configuration
-
-1. Set your API key:
-   - **Windows**: `$env:GEMINI_API_KEY = "your_key_here"`
-   - **Linux/macOS**: `export GEMINI_API_KEY=your_key_here`
-2. Create a `NETWORK.md` file for network context
-3. Select provider in `config.toml`:
-   ```toml
-   [core]
-   provider = "gemini"
-   model = "gemini-2.5-pro"
-   ```
-
 ## Usage
-
-### Interactive TUI (default)
-
-```bash
-# Launch — no arguments opens the AI-powered TUI
-nxc
-```
 
 ### Protocol CLI Mode
 
@@ -149,43 +84,18 @@ nxc smb 192.168.1.10 -u admin -H aad3b435b51404ee... -M secretsdump
 nxc --help
 ```
 
-### AI-Assisted Assessment
-
-```
-> I have admin:Password1 for corp.local — do a full assessment
-# Agent runs nxc tools automatically with approval gates
-```
-
-## Key Commands
-
-| Key | Action |
-|---|---|
-| `q` | Quit |
-| `Ctrl+T` | Toggle Topology View |
-| `/clear` | Clear investigation history |
-| `/export` | Generate Markdown report |
-
 ## Architecture
 
-| Layer | Technology | Responsibility |
-|---|---|---|
-| **L6 — AI Reasoning** | Claude / GPT / Gemini | Natural language → nxc command translation |
-| **L5 — Agent Loop** | netsage-agent (Rust) | SSE streaming, tool dispatch, approval gating |
-| **L4 — NXC Engine** | nxc-* crates (Rust) | Protocol auth, credential spray, module execution |
-| **L3 — TUI / UX** | Ratatui + nxc panels | Real-time spray progress, Pwn3d! list, topology |
-| **L2 — Protocol Stack** | nxc-protocols (Rust) | SMB/LDAP/WinRM/MSSQL/RDP — native Rust |
-| **L1 — Auth Engine** | nxc-auth (Rust) | NTLM, Kerberos, certificate — pure Rust |
-| **L0 — Packet Engine** | netsage-capture | Raw packet capture, BPF filtering |
+| Layer | Responsibility |
+|---|---|
+| **L3 — CLI UX** | CLI parsing and results formatting |
+| **L2 — NXC Engine** | Protocol routing, credential spraying via Tokio pool, tracking nxcdb |
+| **L1 — Protocol Stack** | SMB/LDAP/WinRM/MSSQL/RDP network handling |
+| **L0 — Auth Engine** | NTLM, Kerberos, certificate crypto math |
 
 ## Security & Responsible Use
 
-NetExec-RS is a **dual-use security research tool** designed exclusively for **authorized penetration testing** and security assessments.
-
-**Built-in Safeguards:**
-- 🔒 **Lockout Detection** — automatic spray halting on `STATUS_ACCOUNT_LOCKED_OUT`
-- 📋 **Audit-Complete** — every auth attempt logged to SQLite with timestamp
-- ✅ **Approval Gating** — WRITE/ACTIVE tools require TUI approval in Supervised mode
-- 🧹 **Credential Zeroization** — secrets zeroized on drop, never in logs
+NetExec-RS is designed exclusively for **authorized penetration testing** and security assessments.
 
 **Intended Use Cases:**
 - Authorized red team and penetration testing
