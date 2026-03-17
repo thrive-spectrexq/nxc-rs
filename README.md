@@ -38,10 +38,19 @@
 
 ## 📦 Installation & Setup
 
-### Prerequisites
-- [Rust Toolchain](https://rustup.rs/) (v1.94.0+)
+### One-Line Install (Recommended)
 
-### Building from Source
+**Linux / macOS:**
+```bash
+curl -sSf https://raw.githubusercontent.com/thrive-spectrexq/nxc-rs/master/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+iex (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/thrive-spectrexq/nxc-rs/master/install.ps1')
+```
+
+### Building from Source Manually
 ```bash
 # Clone the repository
 git clone https://github.com/thrive-spectrexq/nxc-rs.git
