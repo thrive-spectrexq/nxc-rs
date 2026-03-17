@@ -1,17 +1,19 @@
 [package]
-name = "nxc-modules"
+name = "nxc-targets"
 version.workspace = true
 edition.workspace = true
-description = "NetExec-RS module system — secretsdump, BloodHound, Kerberoast, and more"
+description = "NetExec-RS target parsing (CIDR, ranges, files) and concurrent execution engine"
 
 [dependencies]
 netsage-common = { path = "../../crates/common" }
-nxc-protocols = { path = "../nxc-protocols" }
-nxc-auth = { path = "../nxc-auth" }
+nxc-auth = { path = "../auth" }
+nxc-protocols = { path = "../protocols" }
+nxc-modules = { path = "../modules" }
+nxc-db = { path = "../db" }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+indicatif = { workspace = true }

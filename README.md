@@ -62,11 +62,12 @@ netsage/                          # Workspace root
 │   ├── auth/                     # API key management
 │   └── mcp/                      # MCP server — tools auto-exposed
 ├── nxc-rs/                       # NetExec-RS protocol & auth crates
-│   ├── nxc-auth/                 # NTLM, Kerberos, password auth engines
-│   ├── nxc-protocols/            # SMB, LDAP, WinRM, RDP, MSSQL, SSH…
-│   ├── nxc-modules/              # Module system (secretsdump, etc.)
-│   ├── nxc-db/                   # Credential workspace / nxcdb equiv
-│   └── nxc-targets/              # Target parsing: CIDR, ranges, files
+│   ├── auth/                     # NTLM, Kerberos, password auth engines
+│   ├── protocols/                # SMB, LDAP, WinRM, RDP, MSSQL, SSH…
+│   ├── modules/                  # Module system (secretsdump, etc.)
+│   ├── db/                       # Credential workspace / nxcdb equiv
+│   ├── targets/                  # Target parsing: CIDR, ranges, files
+│   └── cli/                      # nxc binary CLI entry point
 ├── config/
 │   └── nxc.toml                  # nxc-specific defaults
 ├── config.toml                   # Main config

@@ -18,11 +18,11 @@ netsage-session = { path = "../session" }
 netsage-config = { path = "../config" }
 netsage-mcp = { path = "../mcp" }
 netsage-auth = { path = "../auth" }
-nxc-auth = { path = "../../nxc-rs/nxc-auth" }
-nxc-protocols = { path = "../../nxc-rs/nxc-protocols" }
-nxc-modules = { path = "../../nxc-rs/nxc-modules" }
-nxc-db = { path = "../../nxc-rs/nxc-db" }
-nxc-targets = { path = "../../nxc-rs/nxc-targets" }
+nxc-auth = { path = "../../nxc-rs/auth" }
+nxc-protocols = { path = "../../nxc-rs/protocols" }
+nxc-modules = { path = "../../nxc-rs/modules" }
+nxc-db = { path = "../../nxc-rs/db" }
+nxc-targets = { path = "../../nxc-rs/targets" }
 tokio = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }

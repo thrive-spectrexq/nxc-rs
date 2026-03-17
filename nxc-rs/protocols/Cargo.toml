@@ -1,19 +1,16 @@
 [package]
-name = "nxc-targets"
+name = "nxc-protocols"
 version.workspace = true
 edition.workspace = true
-description = "NetExec-RS target parsing (CIDR, ranges, files) and concurrent execution engine"
+description = "NetExec-RS protocol handlers — SMB, LDAP, WinRM, RDP, MSSQL, SSH, FTP, VNC, WMI, NFS"
 
 [dependencies]
 netsage-common = { path = "../../crates/common" }
-nxc-auth = { path = "../nxc-auth" }
-nxc-protocols = { path = "../nxc-protocols" }
-nxc-modules = { path = "../nxc-modules" }
-nxc-db = { path = "../nxc-db" }
+nxc-auth = { path = "../auth" }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
-indicatif = { workspace = true }
+serde_json = { workspace = true }

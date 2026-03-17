@@ -1,12 +1,13 @@
 [package]
-name = "nxc-protocols"
+name = "nxc-modules"
 version.workspace = true
 edition.workspace = true
-description = "NetExec-RS protocol handlers — SMB, LDAP, WinRM, RDP, MSSQL, SSH, FTP, VNC, WMI, NFS"
+description = "NetExec-RS module system — secretsdump, BloodHound, Kerberoast, and more"
 
 [dependencies]
 netsage-common = { path = "../../crates/common" }
-nxc-auth = { path = "../nxc-auth" }
+nxc-protocols = { path = "../protocols" }
+nxc-auth = { path = "../auth" }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }

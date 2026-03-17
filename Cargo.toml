@@ -11,11 +11,11 @@ members = [
     "crates/auth",
     "crates/common",
     # NetExec-RS crates
-    "nxc-rs/nxc-auth",
-    "nxc-rs/nxc-protocols",
-    "nxc-rs/nxc-modules",
-    "nxc-rs/nxc-db",
-    "nxc-rs/nxc-targets",
+    "nxc-rs/auth",
+    "nxc-rs/protocols",
+    "nxc-rs/modules",
+    "nxc-rs/db",
+    "nxc-rs/targets",
 ]
 resolver = "2"
 
