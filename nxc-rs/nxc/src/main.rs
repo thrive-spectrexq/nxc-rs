@@ -455,6 +455,70 @@ fn build_cli() -> Command {
                 .help("Execute command on Android target"),
         );
 
+    let http_cmd = Command::new("http")
+        .about("HTTP protocol (Web Request & Auth Brute-force)")
+        .args(&auth_args)
+        .args(&module_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("80")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("ssl")
+                .long("ssl")
+                .help("Connect via HTTPS instead of HTTP")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("verify-ssl")
+                .long("verify-ssl")
+                .help("Verify HTTPS certificates (default is to ignore cert errors)")
+                .action(ArgAction::SetTrue),
+        );
+
+    let wifi_cmd = Command::new("wifi")
+        .about("WiFi protocol (Network Discovery, Scanning, and Connection)")
+        .args(&auth_args)
+        .args(&module_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("0")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("scan")
+                .long("scan")
+                .help("Scan for nearby WiFi networks")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("connect")
+                .long("connect")
+                .help("Connect to a specific SSID")
+                .num_args(1),
+        )
+        .arg(
+            Arg::new("devices")
+                .long("devices")
+                .help("Sweep local LAN for connected devices (ARP)")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("profiles")
+                .long("profiles")
+                .help("List saved WiFi profiles")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("dump")
+                .long("dump")
+                .help("Dump cleartext passwords for all saved WiFi profiles")
+                .action(ArgAction::SetTrue),
+        );
+
     Command::new("nxc")
         .about(banner)
         .version(VERSION)
@@ -520,6 +584,8 @@ fn build_cli() -> Command {
         .subcommand(wmi_cmd)
         .subcommand(nfs_cmd)
         .subcommand(adb_cmd)
+        .subcommand(wifi_cmd)
+        .subcommand(http_cmd)
 }
 
 /// Build credentials from CLI arguments.
@@ -585,7 +651,10 @@ fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
 }
 
 /// Resolve the protocol handler from the subcommand name.
-fn get_protocol_handler(protocol_name: &str) -> Option<Arc<dyn nxc_protocols::NxcProtocol>> {
+fn get_protocol_handler(
+    protocol_name: &str,
+    sub_matches: &clap::ArgMatches,
+) -> Option<Arc<dyn nxc_protocols::NxcProtocol>> {
     match protocol_name {
         "smb" => Some(Arc::new(nxc_protocols::smb::SmbProtocol::new())),
         "ssh" => Some(Arc::new(nxc_protocols::ssh::SshProtocol::new())),
@@ -598,6 +667,23 @@ fn get_protocol_handler(protocol_name: &str) -> Option<Arc<dyn nxc_protocols::Nx
         "vnc" => Some(Arc::new(nxc_protocols::vnc::VncProtocol::new())),
         "nfs" => Some(Arc::new(nxc_protocols::nfs::NfsProtocol::new())),
         "adb" => Some(Arc::new(nxc_protocols::adb::AdbProtocol::new())),
+        "wifi" => {
+            let scan = sub_matches.get_flag("scan");
+            let connect = sub_matches.get_one::<String>("connect").cloned();
+            let devices = sub_matches.get_flag("devices");
+            let profiles = sub_matches.get_flag("profiles");
+            let dump = sub_matches.get_flag("dump");
+            Some(Arc::new(nxc_protocols::wifi::WifiProtocol::new(
+                scan, connect, devices, profiles, dump,
+            )))
+        }
+        "http" => {
+            let ssl = sub_matches.get_flag("ssl");
+            let verify_ssl = sub_matches.get_flag("verify-ssl");
+            Some(Arc::new(nxc_protocols::http::HttpProtocol::new(
+                ssl, verify_ssl,
+            )))
+        }
         // Future protocols will be added here:
         _ => None,
     }
@@ -662,7 +748,7 @@ async fn main() -> Result<()> {
     }
 
     // ── Resolve protocol handler ──
-    let protocol = match get_protocol_handler(protocol_name) {
+    let protocol = match get_protocol_handler(protocol_name, sub_matches) {
         Some(p) => p,
         None => {
             NxcGlobalOutput::error(&format!(

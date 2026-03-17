@@ -14,6 +14,7 @@ pub mod secretsdump;
 pub mod shares;
 pub mod whoami;
 pub mod vnc_screenshot;
+pub mod iot_cam;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -116,6 +117,9 @@ impl ModuleRegistry {
 
         let vnc_screenshot: Box<dyn NxcModule> = Box::new(vnc_screenshot::VncScreenshot::new());
         modules.insert("screenshot".into(), vnc_screenshot);
+
+        let iot_cam: Box<dyn NxcModule> = Box::new(iot_cam::IotCam::new());
+        modules.insert("iot_cam".into(), iot_cam);
 
         Self { modules }
     }

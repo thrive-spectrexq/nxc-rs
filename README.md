@@ -31,9 +31,9 @@
 | **FTP** | ✅ Active | Real authentication, Directory listing (`ls`) |
 | **NFS** | ✅ Active | Export/Share enumeration via MOUNT RPC |
 | **ADB** | ✅ Active | Handshake, Open Android Debug Bridge shell execution |
-| **RDP** | 🚧 Impl | NLA authentication, Screenshotting |
-| **WMI** | 🚧 Impl | Direct WMI execution |
-| **VNC** | 🚧 Impl | Screenshotting |
+| **RDP** | ✅ Active | NLA authentication, Screenshotting |
+| **WMI** | ✅ Active | Direct WMI execution |
+| **VNC** | ✅ Active | Screenshotting |
 
 ---
 

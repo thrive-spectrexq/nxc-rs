@@ -20,6 +20,8 @@ pub mod ssh;
 pub mod vnc;
 pub mod winrm;
 pub mod wmi;
+pub mod wifi;
+pub mod http;
 
 // ─── Core Traits ────────────────────────────────────────────────
 
@@ -98,6 +100,8 @@ pub enum Protocol {
     Vnc,
     Nfs,
     Adb,
+    Wifi,
+    Http,
 }
 
 impl Protocol {
@@ -114,6 +118,8 @@ impl Protocol {
             Protocol::Vnc => "vnc",
             Protocol::Nfs => "nfs",
             Protocol::Adb => "adb",
+            Protocol::Wifi => "wifi",
+            Protocol::Http => "http",
         }
     }
 
@@ -130,6 +136,8 @@ impl Protocol {
             Protocol::Vnc => 5900,
             Protocol::Nfs => 2049,
             Protocol::Adb => 5555,
+            Protocol::Wifi => 0,
+            Protocol::Http => 80,
         }
     }
 
@@ -148,6 +156,8 @@ impl Protocol {
             "vnc" => Some(Protocol::Vnc),
             "nfs" => Some(Protocol::Nfs),
             "adb" => Some(Protocol::Adb),
+            "wifi" => Some(Protocol::Wifi),
+            "http" => Some(Protocol::Http),
             _ => None,
         }
     }
