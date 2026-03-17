@@ -21,6 +21,7 @@ env/
 *.swo
 
 # Project specific
+._reference/
 session.db
 .gemini/
 .agents/
