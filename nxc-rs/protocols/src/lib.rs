@@ -13,6 +13,8 @@ pub mod ssh;
 pub mod ldap;
 pub mod mssql;
 pub mod winrm;
+pub mod rdp;
+pub mod wmi;
 
 // ─── Core Traits ────────────────────────────────────────────────
 

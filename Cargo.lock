@@ -1357,6 +1357,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bytes",
  "ldap3",
  "nxc-auth",
  "reqwest",
@@ -1368,6 +1369,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -2337,6 +2339,7 @@ dependencies = [
  "getrandom 0.4.2",
  "js-sys",
  "rand 0.10.0",
+ "serde_core",
  "wasm-bindgen",
 ]
 

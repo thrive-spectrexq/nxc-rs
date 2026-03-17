@@ -575,11 +575,11 @@ fn get_protocol_handler(protocol_name: &str) -> Option<Arc<dyn nxc_protocols::Nx
         "ldap" => Some(Arc::new(nxc_protocols::ldap::LdapProtocol::new())),
         "winrm" => Some(Arc::new(nxc_protocols::winrm::WinrmProtocol::new())),
         "mssql" => Some(Arc::new(nxc_protocols::mssql::MssqlProtocol::new())),
+        "rdp" => Some(Arc::new(nxc_protocols::rdp::RdpProtocol::new())),
+        "wmi" => Some(Arc::new(nxc_protocols::wmi::WmiProtocol::new())),
         // Future protocols will be added here:
-        // "rdp" => Some(Arc::new(nxc_protocols::rdp::RdpProtocol::new())),
         // "ftp" => Some(Arc::new(nxc_protocols::ftp::FtpProtocol::new())),
         // "vnc" => Some(Arc::new(nxc_protocols::vnc::VncProtocol::new())),
-        // "wmi" => Some(Arc::new(nxc_protocols::wmi::WmiProtocol::new())),
         // "nfs" => Some(Arc::new(nxc_protocols::nfs::NfsProtocol::new())),
         _ => None,
     }
