@@ -18,6 +18,7 @@ pub mod wmi;
 pub mod ftp;
 pub mod vnc;
 pub mod nfs;
+pub mod rpc;
 
 // ─── Core Traits ────────────────────────────────────────────────
 

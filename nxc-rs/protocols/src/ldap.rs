@@ -17,6 +17,7 @@ pub struct LdapSession {
     pub port: u16,
     pub admin: bool,
     pub is_ldaps: bool,
+    pub credentials: Option<Credentials>,
 }
 
 impl NxcSession for LdapSession {
@@ -54,6 +55,63 @@ impl LdapProtocol {
         let scheme = if port == 636 { "ldaps" } else { "ldap" };
         format!("{}://{}:{}", scheme, target, port)
     }
+
+    /// Perform an authenticated search against the LDAP server.
+    pub async fn search(
+        &self,
+        session: &LdapSession,
+        base_dn: &str,
+        scope: ldap3::Scope,
+        filter: &str,
+        attrs: Vec<&str>,
+    ) -> Result<Vec<ldap3::SearchEntry>> {
+        let url = self.build_url(&session.target, session.port);
+        let creds = session.credentials.as_ref().ok_or_else(|| anyhow!("Session skipped authentication"))?;
+        
+        let username = creds.username.clone();
+        let password = creds.password.clone().unwrap_or_default();
+
+        let (conn, mut ldap) = tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::new(&url))
+            .await
+            .map_err(|_| anyhow!("LDAP connection timeout"))??;
+
+        ldap3::drive!(conn);
+
+        let res = ldap.simple_bind(&username, &password).await?;
+        if res.rc != 0 {
+            return Err(anyhow!("LDAP bind failed for search: {}", res.text));
+        }
+
+        let rs = ldap.search(base_dn, scope, filter, attrs).await?;
+        let mut entries = Vec::new();
+        
+        for entry in rs.0 {
+            let search_entry = ldap3::SearchEntry::construct(entry);
+            entries.push(search_entry);
+        }
+
+        let _ = ldap.unbind().await;
+        Ok(entries)
+    }
+
+    /// Resolve naming contexts to find the base DN if not provided.
+    pub async fn get_base_dn(&self, session: &LdapSession) -> Result<String> {
+        let entries = self.search(
+            session,
+            "",
+            ldap3::Scope::Base,
+            "(objectClass=*)",
+            vec!["defaultNamingContext"],
+        ).await?;
+
+        if let Some(entry) = entries.first() {
+            if let Some(dn) = entry.attrs.get("defaultNamingContext").and_then(|v| v.first()) {
+                return Ok(dn.clone());
+            }
+        }
+        
+        Err(anyhow!("Could not resolve defaultNamingContext"))
+    }
 }
 
 impl Default for LdapProtocol {
@@ -77,39 +135,32 @@ impl NxcProtocol for LdapProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["kerberoasting", "asreproasting"] // Based on NetExec modules
+        &["whoami", "laps", "enum_dns", "kerberoasting", "asreproasting"]
     }
 
     async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
-        let url = self.build_url(target, port);
-        debug!("LDAP: Connecting to {}", url);
-
-        // Simple connection check (the actual bind happens in authenticate)
-        // With ldap3, we establish the connection and bind later, but here we just
-        // verify we can connect to the port.
-
-        let timeout = self.timeout;
+        let addr = format!("{}:{}", target, port);
         let target_owned = target.to_string();
+        let timeout = self.timeout;
 
-        let session_result = tokio::task::spawn_blocking(move || -> Result<LdapSession> {
-            let addr = format!("{}:{}", target_owned, port);
+        let _ = tokio::task::spawn_blocking(move || -> Result<()> {
             let _tcp = std::net::TcpStream::connect_timeout(
                 &addr.parse().map_err(|e| anyhow!("Invalid address {}: {}", addr, e))?,
-                timeout, // Connect timeout
+                timeout,
             )?;
-
-            info!("LDAP: Connected to {}", url);
-
-            Ok(LdapSession {
-                target: target_owned,
-                port,
-                admin: false,
-                is_ldaps: port == 636,
-            })
+            Ok(())
         })
         .await??;
 
-        Ok(Box::new(session_result))
+        info!("LDAP: Connected to {}", self.build_url(target, port));
+
+        Ok(Box::new(LdapSession {
+            target: target_owned,
+            port,
+            admin: false,
+            is_ldaps: port == 636,
+            credentials: None,
+        }))
     }
 
     async fn authenticate(
@@ -117,67 +168,38 @@ impl NxcProtocol for LdapProtocol {
         session: &mut dyn NxcSession,
         creds: &Credentials,
     ) -> Result<AuthResult> {
+        let ldap_session = match session.protocol() {
+            "ldap" => unsafe { &mut *(session as *mut dyn NxcSession as *mut LdapSession) },
+            _ => return Err(anyhow!("Invalid session type")),
+        };
+
+        let url = self.build_url(&ldap_session.target, ldap_session.port);
         let username = creds.username.clone();
         let password = creds.password.clone().unwrap_or_default();
-        let target = session.target().to_string();
-        let ldap_session = unsafe { &*(session as *const dyn NxcSession as *const LdapSession) };
-        let port = ldap_session.port;
-        let url = self.build_url(&target, port);
-
-        // NTLM/Kerberos auth for LDAP might be more complex, but we fallback to simple bind
-        // if password is provided.
-        // For basic NXC functionality, we need a simple bind.
 
         debug!("LDAP: Authenticating {}@{}", username, url);
 
-        // Use ldap3 async API
         let (conn, mut ldap) = match tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::new(&url)).await {
             Ok(Ok(res)) => res,
-            Ok(Err(e)) => {
-                let msg = format!("LDAP connection failed: {}", e);
-                debug!("{}", msg);
-                return Ok(AuthResult::failure(&msg, None));
-            }
-            Err(_) => {
-                return Ok(AuthResult::failure("LDAP connection timeout", None));
-            }
+            Ok(Err(e)) => return Ok(AuthResult::failure(&format!("Connection failed: {}", e), None)),
+            Err(_) => return Ok(AuthResult::failure("Connection timeout", None)),
         };
 
         ldap3::drive!(conn);
 
-        // Try simple bind
-        let bind_result = tokio::time::timeout(self.timeout, ldap.simple_bind(&username, &password)).await;
-
-        match bind_result {
-            Ok(Ok(res)) => {
-                if res.rc == 0 {
-                    debug!("LDAP: Auth successful for {}", username);
-                    // Disconnect cleanly
-                    let _ = ldap.unbind().await;
-                    // For LDAP, "admin" usually requires context, so we default to false or check generic indicators
-                    Ok(AuthResult::success(false))
-                } else {
-                    let msg = format!("Bind failed: {}", res.text);
-                    debug!("LDAP: Auth failed for {}: {}", username, msg);
-                    let _ = ldap.unbind().await;
-                    Ok(AuthResult::failure(&msg, None))
-                }
-            }
-            Ok(Err(e)) => {
-                let msg = format!("Bind error: {}", e);
-                debug!("LDAP: Auth failed for {}: {}", username, msg);
-                let _ = ldap.unbind().await;
-                Ok(AuthResult::failure(&msg, None))
-            }
-            Err(_) => {
-                let _ = ldap.unbind().await;
-                Ok(AuthResult::failure("LDAP bind timeout", None))
-            }
+        let res = ldap.simple_bind(&username, &password).await?;
+        if res.rc == 0 {
+            debug!("LDAP: Auth successful for {}", username);
+            ldap_session.credentials = Some(creds.clone());
+            let _ = ldap.unbind().await;
+            Ok(AuthResult::success(false))
+        } else {
+            let _ = ldap.unbind().await;
+            Ok(AuthResult::failure(&res.text, None))
         }
     }
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
-        // LDAP does not support arbitrary command execution like SMB/SSH.
         Err(anyhow!("Command execution is not supported over LDAP."))
     }
 }

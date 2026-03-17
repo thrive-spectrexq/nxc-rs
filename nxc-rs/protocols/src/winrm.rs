@@ -8,7 +8,7 @@ use crate::{CommandOutput, NxcProtocol, NxcSession};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
-use reqwest::{Client, IntoUrl};
+use reqwest::Client;
 use std::time::Duration;
 use tracing::{debug, info};
 
@@ -98,17 +98,18 @@ impl NxcProtocol for WinrmProtocol {
 
         let client = self.build_client()?;
 
-        // Send a baseline POST request with 0 Content-Length to trigger the 401 Challenge
-        // WinRM/WS-Man technically responds to this to advertise Negotiate/NTLM.
-        let body = "";
+        // NTLM Type 1 Message (Negotiate)
+        // Format: NTLMSSP\0 + MessageType(1) + Flags + Domain(optional) + Workstation(optional)
+        // Simple Type 1 message (Negotiate NTLM, Negotiate Unicode, Negotiate OEM, etc.)
+        let ntlm_type1 = "TlRMTVNTUAABAAAAB4IIogAAAAAAAAAAAAAAAAAAAAAGAbEdAAAADw==";
+
         let request = client
             .post(&url)
             .header("Content-Length", "0")
             .header("Content-Type", "application/soap+xml;charset=UTF-8")
             .header("User-Agent", "Microsoft WinRM Client")
-            // Send a dummy authorization header to aggressively provoke the WWW-Authenticate response
-            .header("Authorization", "Negotiate TlRMTVNTUAABAAAAB4IIogAAAAAAAAAAAAAAAAAAAAAGAbEdAAAADw==")
-            .body(body);
+            .header("Authorization", format!("Negotiate {}", ntlm_type1))
+            .body("");
 
         let response = match request.send().await {
             Ok(resp) => resp,
@@ -117,25 +118,46 @@ impl NxcProtocol for WinrmProtocol {
 
         debug!("WinRM: Received response code: {}", response.status());
 
-        // Check if we got a WWW-Authenticate header indicating NTLM/Negotiate support
+        // Check for WWW-Authenticate header with NTLM challenge (Type 2)
         let headers = response.headers();
-        let www_auth = headers.get("WWW-Authenticate");
+        let www_auth = headers.get_all("WWW-Authenticate");
 
-        if let Some(auth_header) = www_auth {
-            if auth_header.to_str().unwrap_or("").contains("Negotiate") {
-                info!("WinRM: Connected to {} (NTLM supported)", url);
-                
-                return Ok(Box::new(WinrmSession {
-                    target: target.to_string(),
-                    port,
-                    admin: false,
-                    is_ssl: port == 5986,
-                    endpoint: url,
-                }));
+        let mut ntlm_challenge = None;
+        for auth in www_auth {
+            let auth_str = auth.to_str().unwrap_or("");
+            if let Some(challenge) = auth_str.strip_prefix("Negotiate ") {
+                ntlm_challenge = Some(challenge.to_string());
+                break;
+            } else if let Some(challenge) = auth_str.strip_prefix("NTLM ") {
+                ntlm_challenge = Some(challenge.to_string());
+                break;
             }
         }
 
-        Err(anyhow!("Failed to get NTLM challenge from target '/wsman' endpoint. Service may not be WinRM."))
+        if let Some(_challenge) = ntlm_challenge {
+            info!("WinRM: Connected to {} (NTLM Challenge received)", url);
+            // In a full implementation, we would decode BASE64 _challenge here
+            // and extract Target Name (Domain/Computer), OS Version, etc.
+            
+            Ok(Box::new(WinrmSession {
+                target: target.to_string(),
+                port,
+                admin: false,
+                is_ssl: port == 5986,
+                endpoint: url,
+            }))
+        } else if response.status() == 200 {
+            info!("WinRM: Connected to {} (Unauthenticated access or pre-auth)", url);
+            Ok(Box::new(WinrmSession {
+                target: target.to_string(),
+                port,
+                admin: false,
+                is_ssl: port == 5986,
+                endpoint: url,
+            }))
+        } else {
+            Err(anyhow!("Failed to get NTLM challenge from target. Status: {}", response.status()))
+        }
     }
 
     async fn authenticate(

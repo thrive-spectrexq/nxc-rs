@@ -51,64 +51,158 @@ impl NxcModule for EnumDns {
 
     async fn run(&self, session: &dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let domain_filter = opts.get("DOMAIN").map(|s| s.as_str());
-        let target = session.target();
-
-        tracing::debug!(
-            "enum_dns: Enumerating AD DNS zones on {}",
-            target
-        );
-
-        // Stub: return a demonstration result.
-        // Real implementation would query `root\microsoftdns` (WMI) or `DC=DomainDnsZones` (LDAP).
-        let queried_domains = if let Some(d) = domain_filter {
-            vec![d.to_string()]
-        } else {
-            vec!["inlanefreight.local".to_string(), "_msdcs.inlanefreight.local".to_string()]
+        
+        let ldap_session = match session.protocol() {
+            "ldap" => unsafe { &*(session as *const dyn NxcSession as *const nxc_protocols::ldap::LdapSession) },
+            _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
-        let dns_data = serde_json::json!({
-            "target": target,
-            "domains_retrieved": queried_domains,
-            "records": {
-                "inlanefreight.local": {
-                    "A": [
-                        "dc01: 10.10.10.10",
-                        "ws01: 10.10.10.11"
-                    ],
-                    "SRV": [
-                        "_ldap._tcp: 0 100 389 dc01.inlanefreight.local.",
-                        "_kerberos._tcp: 0 100 88 dc01.inlanefreight.local."
-                    ]
-                }
-            },
-            "note": "DNS enumeration via LDAP/WMI pending implementation"
-        });
+        let protocol = nxc_protocols::ldap::LdapProtocol::new();
+        let base_dn = protocol.get_base_dn(ldap_session).await?;
 
+        // Possible partitions for DNS information
+        let partitions = vec![
+            format!("DC=DomainDnsZones,{}", base_dn),
+            format!("DC=ForestDnsZones,{}", base_dn),
+            format!("CN=MicrosoftDNS,CN=System,{}", base_dn),
+        ];
+
+        let mut all_records = serde_json::Map::new();
         let mut output_lines = Vec::new();
-        output_lines.push(format!("Domains retrieved: {:?}", queried_domains));
-        
-        if let Some(records) = dns_data["records"].as_object() {
-            for (domain, rtypes) in records {
-                output_lines.push(format!("Results for {}", domain));
-                if let Some(rtypes_obj) = rtypes.as_object() {
-                    for (rtype, rvalues) in rtypes_obj {
-                        output_lines.push(format!("Record Type: {}", rtype));
-                        if let Some(rvs) = rvalues.as_array() {
-                            for rv in rvs {
-                                output_lines.push(format!("\t{}", rv.as_str().unwrap_or("")));
+
+        output_lines.push("Enumerating AD DNS Zones...".to_string());
+
+        for partition in partitions {
+            tracing::debug!("enum_dns: Checking partition {}", partition);
+            
+            // 1. Find dnsZone objects
+            let zones = match protocol.search(
+                ldap_session,
+                &partition,
+                ldap3::Scope::Subtree,
+                "(objectClass=dnsZone)",
+                vec!["name"]
+            ).await {
+                Ok(entries) => entries,
+                Err(_) => continue, // Partition likely doesn't exist or no access
+            };
+
+            for zone_entry in zones {
+                let zone_name = zone_entry.attrs.get("name").and_then(|v| v.first()).cloned().unwrap_or_default();
+                if let Some(filter) = domain_filter {
+                    if !zone_name.to_lowercase().contains(&filter.to_lowercase()) {
+                        continue;
+                    }
+                }
+
+                output_lines.push(format!("Found Zone: {}", zone_name));
+                let mut zone_records = serde_json::Map::new();
+
+                // 2. Find dnsNode objects in this zone
+                let nodes = match protocol.search(
+                    ldap_session,
+                    &zone_entry.dn,
+                    ldap3::Scope::OneLevel,
+                    "(objectClass=dnsNode)",
+                    vec!["name", "dnsRecord"]
+                ).await {
+                    Ok(entries) => entries,
+                    Err(_) => continue,
+                };
+
+                for node_entry in nodes {
+                    let node_name = node_entry.attrs.get("name").and_then(|v| v.first()).cloned().unwrap_or_default();
+                    
+                    // dnsRecord is binary and multi-valued
+                    if let Some(record_blobs) = node_entry.bin_attrs.get("dnsRecord") {
+                        let mut records_for_node = Vec::new();
+                        for blob in record_blobs {
+                            if let Some(parsed) = parse_dns_record(blob) {
+                                output_lines.push(format!("  {:<20} {:<6} {}", node_name, parsed.rtype, parsed.value));
+                                records_for_node.push(serde_json::json!({
+                                    "type": parsed.rtype,
+                                    "value": parsed.value
+                                }));
                             }
+                        }
+                        if !records_for_node.is_empty() {
+                            zone_records.insert(node_name, serde_json::json!(records_for_node));
                         }
                     }
                 }
+                all_records.insert(zone_name, serde_json::Value::Object(zone_records));
             }
         }
 
         Ok(ModuleResult {
             success: true,
             output: output_lines.join("\n"),
-            data: dns_data,
+            data: serde_json::Value::Object(all_records),
         })
     }
+}
+
+struct ParsedDnsRecord {
+    rtype: String,
+    value: String,
+}
+
+/// Rudimentary parser for MS-DNSP dnsRecord blobs.
+fn parse_dns_record(blob: &[u8]) -> Option<ParsedDnsRecord> {
+    if blob.len() < 4 { return None; }
+    
+    // Data starts after header. Header length is usually 24 bytes for most types.
+    // Offset 0-1: Data Length
+    // Offset 2-3: Type
+    let rtype_code = u16::from_le_bytes([blob[2], blob[3]]);
+    
+    let (rtype, value) = match rtype_code {
+        0x0001 => ("A", parse_ip_address(&blob[24..])),
+        0x0002 => ("NS", parse_dns_name(&blob[24..], blob)),
+        0x0005 => ("CNAME", parse_dns_name(&blob[24..], blob)),
+        0x0006 => ("SOA", "SOA Record".to_string()),
+        0x000c => ("PTR", parse_dns_name(&blob[24..], blob)),
+        0x000f => ("MX", "MX Record".to_string()),
+        0x001c => ("AAAA", parse_ipv6_address(&blob[24..])),
+        0x0021 => ("SRV", "SRV Record".to_string()),
+        _ => return None,
+    };
+
+    Some(ParsedDnsRecord {
+        rtype: rtype.to_string(),
+        value,
+    })
+}
+
+fn parse_ip_address(data: &[u8]) -> String {
+    if data.len() < 4 { return "invalid".to_string(); }
+    format!("{}.{}.{}.{}", data[0], data[1], data[2], data[3])
+}
+
+fn parse_ipv6_address(data: &[u8]) -> String {
+    if data.len() < 16 { return "invalid".to_string(); }
+    let mut parts = Vec::new();
+    for i in 0..8 {
+        parts.push(format!("{:x}", u16::from_be_bytes([data[i*2], data[i*2+1]])));
+    }
+    parts.join(":")
+}
+
+/// AD DNS names are often compressed or encoded in a specific way.
+/// This is a simplified version that tries to extract plain strings.
+fn parse_dns_name(data: &[u8], _full_blob: &[u8]) -> String {
+    let mut name = String::new();
+    let mut i = 0;
+    while i < data.len() {
+        let len = data[i] as usize;
+        if len == 0 { break; }
+        i += 1;
+        if i + len > data.len() { break; }
+        if !name.is_empty() { name.push('.'); }
+        name.push_str(&String::from_utf8_lossy(&data[i..i+len]));
+        i += len;
+    }
+    name
 }
 
 #[cfg(test)]

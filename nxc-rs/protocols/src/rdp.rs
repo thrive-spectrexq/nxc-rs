@@ -85,27 +85,25 @@ impl NxcProtocol for RdpProtocol {
         };
 
         // Send a TPKT / X.224 Connection Request to fingerprint NLA support
-        // Magic bytes for an RDP Negotiation Request:
-        // 03 00 00 13 (TPKT Header) -> Length 19
-        // 0e (X.224 Length)
-        // e0 00 00 (X.224 Connection Request)
-        // 00 00 (Destination reference)
-        // 00 00 (Source reference)
-        // 00 (Class 0)
-        // 01 00 08 00 (RDP Negotiation Request) => 03 (SSL + CredSSP) => 0x03
-        
-        // This is a rough byte matching for the aardwolf `network/x224.client_negotiate()` approach
         let x224_req: [u8; 19] = [
             0x03, 0x00, 0x00, 0x13, 0x0e, 0xe0, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x01, 0x00, 0x08, 0x00, 0x0b, 
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x08, 0x00, 0x03, // Protocol flags 0x03 (SSL + HYBRID)
             0x00, 0x00, 0x00
         ];
 
-        let _ = stream.write_all(&x224_req).await;
+        stream.write_all(&x224_req).await?;
         
-        // In a real implementation, we'd wait for the response and parse the Negotiation Response
-        // flags to check for Extented Client Data indicating CRED_SSP (Network Level Auth) requirement.
-        let is_nla = true; // Most modern servers enforce NLA
+        // Read response
+        let mut resp = [0u8; 19];
+        let n = tokio::time::timeout(self.timeout, tokio::io::AsyncReadExt::read(&mut stream, &mut resp)).await??;
+        
+        let mut is_nla = false;
+        if n >= 19 && resp[0] == 0x03 && resp[1] == 0x00 {
+            // Check Negotiation Response flags at offset 15
+            let selected_proto = resp[15];
+            is_nla = selected_proto & 0x02 != 0; // HYBRID (NLA) flag
+            debug!("RDP: Selected protocol flags: 0x{:02x}", selected_proto);
+        }
 
         info!("RDP: Connected to {} (NLA: {})", addr, is_nla);
 

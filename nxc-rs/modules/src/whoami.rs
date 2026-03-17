@@ -50,72 +50,107 @@ impl NxcModule for Whoami {
     }
 
     async fn run(&self, session: &dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
-        // Fallback to the session target user if the USER option is not provided.
-        // For the stub, we just simulate the target user name.
         let target_user = opts
             .get("USER")
             .map(|s| s.as_str())
-            .unwrap_or("current_user");
+            .unwrap_or(""); // If empty, we'll try to find the current user context
 
-        let target = session.target();
+        let ldap_session = match session.protocol() {
+            "ldap" => unsafe { &*(session as *const dyn NxcSession as *const nxc_protocols::ldap::LdapSession) },
+            _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
+        };
+
+        // We need the protocol handler to perform the search
+        // In this architecture, protocols are stateless but provide the logic
+        let protocol = nxc_protocols::ldap::LdapProtocol::new();
+        
+        // 1. Get Base DN
+        let base_dn = protocol.get_base_dn(ldap_session).await?;
+        
+        // 2. Determine target user - if USER option not provided, use the authenticated user
+        let user_to_query = if target_user.is_empty() {
+            if let Some(creds) = &ldap_session.credentials {
+                &creds.username
+            } else {
+                "current_user"
+            }
+        } else {
+            target_user
+        };
 
         tracing::debug!(
-            "whoami: Enumerating LDAP attributes for user '{}' on {}",
-            target_user,
-            target
+            "whoami: Querying LDAP for user '{}' in {}",
+            user_to_query,
+            base_dn
         );
 
-        // Stub: return a demonstration result.
-        // In a real implementation, this would use the LDAP session to issue a search
-        // with filter `(sAMAccountName=target_user)` and extract attributes.
-        let user_data = serde_json::json!({
-            "target": target,
-            "sAMAccountName": target_user,
-            "name": format!("{} Admin", target_user),
-            "description": "Built-in account for administering the computer/domain",
-            "userAccountControl": 512, // NORMAL_ACCOUNT
-            "enabled": true,
-            "password_never_expires": true,
-            "memberOf": [
-                "CN=Domain Admins,CN=Users,DC=INLANEFREIGHT,DC=LOCAL",
-                "CN=Administrators,CN=Builtin,DC=INLANEFREIGHT,DC=LOCAL"
-            ],
-            "objectSid": "S-1-5-21-123456789-123456789-123456789-500",
-            "lastLogon": "2023-10-05 14:32:00 UTC",
-            "pwdLastSet": "2023-01-01 00:00:00 UTC",
-            "badPwdCount": 0,
-            "servicePrincipalName": ["cifs/dc01.inlanefreight.local"],
-            "note": "LDAP search query pending implementation"
-        });
+        // 3. Perform Search
+        let filter = format!("(sAMAccountName={})", user_to_query);
+        let attrs = vec![
+            "sAMAccountName", "name", "description", "userAccountControl",
+            "memberOf", "objectSid", "lastLogon", "pwdLastSet", "servicePrincipalName"
+        ];
 
+        let entries = protocol.search(
+            ldap_session,
+            &base_dn,
+            ldap3::Scope::Subtree,
+            &filter,
+            attrs,
+        ).await?;
+
+        if entries.is_empty() {
+            return Ok(ModuleResult {
+                success: false,
+                output: format!("User '{}' not found in LDAP", user_to_query),
+                data: serde_json::Value::Null,
+            });
+        }
+
+        let entry = &entries[0];
+        let mut user_data = serde_json::Map::new();
         let mut output_lines = Vec::new();
-        output_lines.push(format!("Name: {}", user_data["name"].as_str().unwrap_or("")));
-        output_lines.push(format!("Description: {}", user_data["description"].as_str().unwrap_or("")));
-        output_lines.push(format!("sAMAccountName: {}", user_data["sAMAccountName"].as_str().unwrap_or("")));
-        output_lines.push(format!("Enabled: {}", if user_data["enabled"].as_bool().unwrap_or(false) { "Yes" } else { "No" }));
-        output_lines.push(format!("Password Never Expires: {}", if user_data["password_never_expires"].as_bool().unwrap_or(false) { "Yes" } else { "No" }));
-        output_lines.push(format!("Last logon: {}", user_data["lastLogon"].as_str().unwrap_or("")));
-        output_lines.push(format!("Password Last Set: {}", user_data["pwdLastSet"].as_str().unwrap_or("")));
-        output_lines.push(format!("Bad Password Count: {}", user_data["badPwdCount"].as_i64().unwrap_or(0)));
+
+        for (attr, values) in &entry.attrs {
+            user_data.insert(attr.clone(), serde_json::json!(values));
+        }
+
+        let get_attr = |name: &str| -> String {
+            entry.attrs.get(name)
+                .and_then(|v| v.first())
+                .cloned()
+                .unwrap_or_default()
+        };
+
+        output_lines.push(format!("Name: {}", get_attr("name")));
+        output_lines.push(format!("Description: {}", get_attr("description")));
+        output_lines.push(format!("sAMAccountName: {}", get_attr("sAMAccountName")));
         
-        output_lines.push("Service Account Name(s) found - Potentially Kerberoastable user!".to_string());
-        if let Some(spns) = user_data["servicePrincipalName"].as_array() {
-            for spn in spns {
-                output_lines.push(format!("Service Account Name: {}", spn.as_str().unwrap_or("")));
+        let uac = get_attr("userAccountControl").parse::<u32>().unwrap_or(0);
+        output_lines.push(format!("Account Control: {}", uac));
+        output_lines.push(format!("Enabled: {}", if uac & 2 == 0 { "Yes" } else { "No" }));
+        
+        if let Some(spns) = entry.attrs.get("servicePrincipalName") {
+            if !spns.is_empty() {
+                output_lines.push("!!! Potentially Kerberoastable user (SPNs found) !!!".to_string());
+                for spn in spns {
+                    output_lines.push(format!("  SPN: {}", spn));
+                }
             }
         }
-        
-        if let Some(groups) = user_data["memberOf"].as_array() {
+
+        if let Some(groups) = entry.attrs.get("memberOf") {
             for group in groups {
-                output_lines.push(format!("Member of: {}", group.as_str().unwrap_or("")));
+                output_lines.push(format!("Member of: {}", group));
             }
         }
-        output_lines.push(format!("User SID: {}", user_data["objectSid"].as_str().unwrap_or("")));
+
+        output_lines.push(format!("SID: {}", get_attr("objectSid")));
 
         Ok(ModuleResult {
             success: true,
             output: output_lines.join("\n"),
-            data: user_data,
+            data: serde_json::Value::Object(user_data),
         })
     }
 }

@@ -1342,6 +1342,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "ldap3",
  "nxc-auth",
  "nxc-protocols",
  "serde",

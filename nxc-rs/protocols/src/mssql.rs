@@ -19,11 +19,7 @@ pub struct MssqlSession {
     pub target: String,
     pub port: u16,
     pub admin: bool,
-    // Note: tiberius::Client doesn't easily derive Send/Sync as part of a trait box,
-    // so we maintain connection state loosely similar to SSH.
-    // In a full implementation, we'd multiplex or hold the connection open safely.
-    // To conform to the trait quickly, we'll store basic info and reconnect on execute,
-    // or wrap it in Arc<Mutex> depending on upstream abstractions.
+    pub credentials: Option<Credentials>,
 }
 
 impl NxcSession for MssqlSession {
@@ -75,19 +71,17 @@ impl NxcProtocol for MssqlProtocol {
     }
 
     fn supports_exec(&self) -> bool {
-        // MSSQL supports execution via xp_cmdshell, which we map to the execute function.
         true
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["enum_logins", "enum_databases", "sam", "lsa"]
+        &["enum_logins", "enum_databases", "mssql_enum"]
     }
 
     async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         debug!("MSSQL: Connecting to {}", addr);
 
-        // Pre-connection check
         let timeout_fut = tokio::time::timeout(self.timeout, TcpStream::connect(&addr));
         match timeout_fut.await {
             Ok(Ok(_stream)) => {
@@ -96,6 +90,7 @@ impl NxcProtocol for MssqlProtocol {
                     target: target.to_string(),
                     port,
                     admin: false,
+                    credentials: None,
                 }))
             }
             Ok(Err(e)) => Err(anyhow!("Connection refused or unreachable: {}", e)),
@@ -108,12 +103,15 @@ impl NxcProtocol for MssqlProtocol {
         session: &mut dyn NxcSession,
         creds: &Credentials,
     ) -> Result<AuthResult> {
+        let mssql_sess_mut = match session.protocol() {
+            "mssql" => unsafe { &mut *(session as *mut dyn NxcSession as *mut MssqlSession) },
+            _ => return Err(anyhow!("Invalid session type")),
+        };
+
         let username = creds.username.clone();
         let password = creds.password.clone().unwrap_or_default();
-        let target = session.target().to_string();
-
-        let mssql_sess = unsafe { &*(session as *const dyn NxcSession as *const MssqlSession) };
-        let port = mssql_sess.port;
+        let target = mssql_sess_mut.target.clone();
+        let port = mssql_sess_mut.port;
 
         let addr = format!("{}:{}", target, port);
         debug!("MSSQL: Authenticating {}@{}", username, addr);
@@ -121,10 +119,8 @@ impl NxcProtocol for MssqlProtocol {
         let mut config = Config::new();
         config.host(&target);
         config.port(port);
-        // Tiberius supports SQL auth or Windows Auth (NTLM) if compiled with features.
-        // For baseline testing, we attempt SQL auth or NTLM fallback depending on credentials.
         config.authentication(AuthMethod::sql_server(&username, &password));
-        config.trust_cert(); // Like impacket, don't validate TLS rigorously
+        config.trust_cert();
 
         let tcp_fut = tokio::time::timeout(self.timeout, TcpStream::connect(&addr));
         let tcp = match tcp_fut.await {
@@ -138,25 +134,28 @@ impl NxcProtocol for MssqlProtocol {
         match client_fut.await {
             Ok(Ok(mut client)) => {
                 debug!("MSSQL: Auth successful for {}", username);
+                mssql_sess_mut.credentials = Some(creds.clone());
                 
-                // Check if admin (sysadmin)
                 let mut is_admin = false;
                 if let Ok(query_res) = tokio::time::timeout(
                     self.timeout, 
                     client.query("SELECT IS_SRVROLEMEMBER('sysadmin')", &[])
                 ).await {
-                    if let Ok(stream) = query_res {
-                        if let Ok(Some(row)) = stream.into_row().await {
-                            if let Some(val) = row.get::<i32, _>(0) {
-                                if val == 1 {
-                                    is_admin = true;
-                                    debug!("MSSQL: User {} is sysadmin!", username);
+                    if let Ok(result) = query_res {
+                        if let Ok(rows) = result.into_first_result().await {
+                            if let Some(row) = rows.first() {
+                                if let Some(val) = row.get::<i32, _>(0) {
+                                    if val == 1 {
+                                        is_admin = true;
+                                        debug!("MSSQL: User {} is sysadmin!", username);
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
+                mssql_sess_mut.admin = is_admin;
                 let _ = client.close().await;
                 Ok(AuthResult::success(is_admin))
             }
@@ -171,8 +170,80 @@ impl NxcProtocol for MssqlProtocol {
         }
     }
 
-    async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
-         // To execute via xp_cmdshell, we must establish a connection
-        Err(anyhow!("Full xp_cmdshell execution wrapper not yet ported. MSSQL execute pending implementation."))
+    async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput> {
+         let mssql_sess = match session.protocol() {
+            "mssql" => unsafe { &*(session as *const dyn NxcSession as *const MssqlSession) },
+            _ => return Err(anyhow!("Invalid session type")),
+        };
+
+        let creds = mssql_sess.credentials.as_ref().ok_or_else(|| anyhow!("Session not authenticated"))?;
+        let mut config = Config::new();
+        config.host(&mssql_sess.target);
+        config.port(mssql_sess.port);
+        config.authentication(AuthMethod::sql_server(&creds.username, creds.password.as_deref().unwrap_or_default()));
+        config.trust_cert();
+
+        let tcp = TcpStream::connect(format!("{}:{}", mssql_sess.target, mssql_sess.port)).await?;
+        let mut client = Client::connect(config, tcp.compat_write()).await?;
+
+        // 1. Ensure xp_cmdshell is enabled
+        let _ = client.execute("EXEC sp_configure 'show advanced options', 1; RECONFIGURE;", &[]).await;
+        let _ = client.execute("EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;", &[]).await;
+
+        let sql = format!("EXEC xp_cmdshell '{}'", cmd.replace('\'', "''"));
+        let result = client.query(sql, &[]).await?;
+        let rows = result.into_first_result().await?;
+
+        let mut stdout = String::new();
+        for row in rows {
+            if let Some(line) = row.get::<&str, _>(0) {
+                stdout.push_str(line);
+                stdout.push('\n');
+            }
+        }
+
+        let _ = client.close().await;
+        Ok(CommandOutput {
+            stdout,
+            stderr: String::new(),
+            exit_code: Some(0),
+        })
+    }
+}
+
+impl MssqlProtocol {
+    pub async fn query_json(&self, session: &MssqlSession, sql: &str) -> Result<Vec<serde_json::Value>> {
+        let creds = session.credentials.as_ref().ok_or_else(|| anyhow!("Session not authenticated"))?;
+        let mut config = Config::new();
+        config.host(&session.target);
+        config.port(session.port);
+        config.authentication(AuthMethod::sql_server(&creds.username, creds.password.as_deref().unwrap_or_default()));
+        config.trust_cert();
+
+        let tcp = TcpStream::connect(format!("{}:{}", session.target, session.port)).await?;
+        let mut client = Client::connect(config, tcp.compat_write()).await?;
+
+        let result = client.query(sql, &[]).await?;
+        let rows = result.into_first_result().await?;
+        let mut results = Vec::new();
+
+        for row in rows {
+            let mut row_map = serde_json::Map::new();
+            for (i, column) in row.columns().iter().enumerate() {
+                let name = column.name();
+                let val = if let Ok(Some(s)) = row.try_get::<&str, _>(i) {
+                    serde_json::Value::String(s.to_string())
+                } else if let Ok(Some(n)) = row.try_get::<i32, _>(i) {
+                    serde_json::Value::Number(n.into())
+                } else {
+                    serde_json::Value::Null
+                };
+                row_map.insert(name.to_string(), val);
+            }
+            results.push(serde_json::Value::Object(row_map));
+        }
+
+        let _ = client.close().await;
+        Ok(results)
     }
 }

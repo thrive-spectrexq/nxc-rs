@@ -7,6 +7,10 @@ pub mod enum_shares;
 pub mod whoami;
 pub mod laps;
 pub mod enum_dns;
+pub mod kerberoasting;
+pub mod asreproasting;
+pub mod secretsdump;
+pub mod enum_mssql;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -81,6 +85,10 @@ impl ModuleRegistry {
         modules.insert("whoami".into(), Box::new(whoami::Whoami::new()));
         modules.insert("laps".into(), Box::new(laps::Laps::new()));
         modules.insert("enum_dns".into(), Box::new(enum_dns::EnumDns::new()));
+        modules.insert("kerberoasting".into(), Box::new(kerberoasting::Kerberoasting::new()));
+        modules.insert("asreproasting".into(), Box::new(asreproasting::Asreproasting::new()));
+        modules.insert("secretsdump".into(), Box::new(secretsdump::Secretsdump::new()));
+        modules.insert("mssql_enum".into(), Box::new(enum_mssql::MssqlEnum::new()));
 
         Self { modules }
     }

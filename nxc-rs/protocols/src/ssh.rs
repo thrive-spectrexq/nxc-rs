@@ -65,6 +65,8 @@ impl SshSession {
                         self.admin = true;
                     } else if output.contains("SeUndockPrivilege") {
                         self.admin = true;
+                    } else if output.contains("Administrators") {
+                        self.admin = true;
                     }
                     return;
                 }

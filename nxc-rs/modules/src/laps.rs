@@ -55,54 +55,78 @@ impl NxcModule for Laps {
             .map(|s| s.as_str())
             .unwrap_or("*");
 
-        let target = session.target();
+        let ldap_session = match session.protocol() {
+            "ldap" => unsafe { &*(session as *const dyn NxcSession as *const nxc_protocols::ldap::LdapSession) },
+            _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
+        };
+
+        let protocol = nxc_protocols::ldap::LdapProtocol::new();
+        let base_dn = protocol.get_base_dn(ldap_session).await?;
 
         tracing::debug!(
-            "laps: Querying LAPS passwords for computer '{}' on {}",
+            "laps: Querying LAPS passwords for computer '{}' in {}",
             computer_filter,
-            target
+            base_dn
         );
 
-        // Stub: return a demonstration result.
-        // Real implementation would search LDAP for (&(objectCategory=computer)(|(msLAPS-EncryptedPassword=*)(ms-MCS-AdmPwd=*)(msLAPS-Password=*))(name=...))
-        let laps_data = serde_json::json!({
-            "target": target,
-            "filter": computer_filter,
-            "computers": [
-                {
-                    "sAMAccountName": "DC01$",
-                    "user": "Administrator",
-                    "password": "Password123!"
-                },
-                {
-                    "sAMAccountName": "WS01$",
-                    "user": "Administrator",
-                    "password": "ComplexPassword456@"
-                }
-            ],
-            "note": "LDAP search query for ms-MCS-AdmPwd pending implementation"
-        });
+        // Filter for computers with LAPS passwords (supporting both legacy ms-MCS-AdmPwd and new msLAPS-Password)
+        let filter = format!(
+            "(&(objectCategory=computer)(|(ms-MCS-AdmPwd=*)(msLAPS-Password=*)(msLAPS-EncryptedPassword=*))(name={}))",
+            computer_filter
+        );
+        
+        let attrs = vec!["sAMAccountName", "name", "ms-MCS-AdmPwd", "msLAPS-Password", "msLAPS-EncryptedPassword"];
+
+        let entries = protocol.search(
+            ldap_session,
+            &base_dn,
+            ldap3::Scope::Subtree,
+            &filter,
+            attrs,
+        ).await?;
 
         let mut output_lines = Vec::new();
-        output_lines.push("Getting LAPS Passwords".to_string());
-        
-        if let Some(computers) = laps_data["computers"].as_array() {
-            if computers.is_empty() {
-                output_lines.push("No result found with attribute ms-MCS-AdmPwd or msLAPS-Password !".to_string());
-            } else {
-                for comp in computers {
-                    let sam = comp["sAMAccountName"].as_str().unwrap_or("");
-                    let user = comp["user"].as_str().unwrap_or("");
-                    let pwd = comp["password"].as_str().unwrap_or("");
-                    output_lines.push(format!("Computer:{} User:{:<15} Password:{}", sam, user, pwd));
-                }
+        let mut laps_results = Vec::new();
+
+        output_lines.push("Retrieving LAPS Passwords...".to_string());
+
+        if entries.is_empty() {
+            output_lines.push(format!("No computers found matching filter: {}", computer_filter));
+        } else {
+            for entry in &entries {
+                let name = entry.attrs.get("name").and_then(|v| v.first()).cloned().unwrap_or_default();
+                let sam = entry.attrs.get("sAMAccountName").and_then(|v| v.first()).cloned().unwrap_or_default();
+                
+                // Try legacy LAPS
+                let password = if let Some(p) = entry.attrs.get("ms-MCS-AdmPwd").and_then(|v| v.first()) {
+                    p.clone()
+                } else if let Some(p) = entry.attrs.get("msLAPS-Password").and_then(|v| v.first()) {
+                    // New LAPS (cleartext if configured, though often encrypted)
+                    p.clone()
+                } else if entry.attrs.contains_key("msLAPS-EncryptedPassword") {
+                    "[Encrypted - Decryption pending implementation]".to_string()
+                } else {
+                    continue;
+                };
+
+                output_lines.push(format!("Computer: {:<15} User: Administrator  Password: {}", name, password));
+                
+                laps_results.push(serde_json::json!({
+                    "computer": name,
+                    "sAMAccountName": sam,
+                    "password": password
+                }));
             }
+        }
+
+        if laps_results.is_empty() && !entries.is_empty() {
+            output_lines.push("Matched computers but could not read LAPS attributes (permission denied?)".to_string());
         }
 
         Ok(ModuleResult {
             success: true,
             output: output_lines.join("\n"),
-            data: laps_data,
+            data: serde_json::json!(laps_results),
         })
     }
 }
