@@ -4,6 +4,9 @@
 //! They are invoked per-protocol with `-M <module> [-o KEY=VALUE]` flags.
 
 pub mod enum_shares;
+pub mod whoami;
+pub mod laps;
+pub mod enum_dns;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -75,11 +78,9 @@ impl ModuleRegistry {
 
         // Register built-in modules
         modules.insert("enum_shares".into(), Box::new(enum_shares::EnumShares::new()));
-
-        // TODO: Register additional modules here
-        // modules.insert("secretsdump".into(), Box::new(SecretsDump));
-        // modules.insert("bloodhound".into(), Box::new(BloodHound));
-        // modules.insert("kerberoast".into(), Box::new(Kerberoast));
+        modules.insert("whoami".into(), Box::new(whoami::Whoami::new()));
+        modules.insert("laps".into(), Box::new(laps::Laps::new()));
+        modules.insert("enum_dns".into(), Box::new(enum_dns::EnumDns::new()));
 
         Self { modules }
     }
