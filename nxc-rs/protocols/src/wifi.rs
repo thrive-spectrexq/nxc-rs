@@ -189,7 +189,7 @@ impl NxcProtocol for WifiProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &[]
+        &["wifi_recon"]
     }
 
     async fn connect(&self, target: &str, _port: u16) -> Result<Box<dyn NxcSession>> {
