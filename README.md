@@ -28,10 +28,10 @@ NetExec-RS is a native Rust reimplementation of the [NetExec (nxc)](https://gith
 
 ## Features
 
-- **Multi-Protocol Support**: SMB, LDAP, WinRM, RDP, MSSQL, SSH, FTP, VNC, WMI, NFS (Pending impl)
+- **Multi-Protocol Support**: SMB, LDAP, WinRM, RDP, MSSQL, SSH, FTP, VNC, WMI, NFS
 - **Authentication Engine**: NTLM (v1/v2), Kerberos (AS-REQ/TGS-REQ, PKINIT, S4U), Pass-the-Hash, Pass-the-Ticket
 - **Credential Spraying**: Concurrent multi-target execution engine with lockout detection
-- **Module System**: secretsdump, SAM/LSA dump, Kerberoasting, BloodHound, ADCS, and 30+ modules
+- **Module System**: secretsdump, SAM/LSA dump, Kerberoasting, ASREProasting, FTP file listing, NFS share enumeration, BloodHound, ADCS, and 40+ modules
 - **Credential Database**: SQLite workspace-aware cred store (`nxcdb` equivalent)
 
 ## Workspace Layout
@@ -48,7 +48,7 @@ nxc-rs/                           # Workspace root
     └── targets/                  # Target parsing: CIDR, ranges, files
 ```
 
-## Installation
+## Installation & Local Development
 
 ### From Source (All Platforms)
 
@@ -58,17 +58,55 @@ git clone https://github.com/thrive-spectrexq/nxc-rs.git
 cd nxc-rs
 
 # Build
-cargo build --release --workspace
-
-# The binary is at:
-#   target/release/nxc
-#
-# Run with protocol → CLI mode (e.g. nxc smb 192.168.1.0/24 -u admin -p pass)
+cargo build --workspace
 ```
 
-## Usage
+## Running Locally
 
-### Protocol CLI Mode
+### 1. View Global Help
+To see all available protocols and global options:
+```powershell
+cargo run --package nxc -- --help
+```
+
+### 2. Protocol-Specific Help
+Each protocol has its own set of flags. For example, to see options for the FTP or NFS handlers:
+```powershell
+# FTP Help
+cargo run --package nxc -- ftp --help
+
+# NFS Help
+cargo run --package nxc -- nfs --help
+```
+
+### 3. Example Execution Commands
+Here are a few ways to test the current capabilities (replace `<target>` with a lab IP):
+
+**FTP Navigation**: Authenticate as anonymous and list files.
+```powershell
+cargo run --package nxc -- ftp <target> -u anonymous -p anonymous --ls
+```
+
+**NFS Enumeration**: List exported shares via the MOUNT service.
+```powershell
+cargo run --package nxc -- nfs <target> --enum-shares
+```
+
+**Module Listing**: See which offensive modules are available for a protocol.
+```powershell
+cargo run --package nxc -- smb <target> -L
+```
+
+### 4. Build for Production
+If you want to use the compiled binary directly without `cargo run`, you can build a release version:
+```powershell
+cargo build --release --package nxc
+```
+The binary will be located at `target\release\nxc.exe` (Windows) or `target/release/nxc` (Unix).
+
+## Usage Examples (Binary)
+
+If you have built the release binary or have it in your path:
 
 ```bash
 # Password spray a /24
@@ -79,9 +117,6 @@ nxc ldap dc01.corp.local -u user -p pass --kerberoasting out.txt
 
 # Pass-the-Hash + secretsdump
 nxc smb 192.168.1.10 -u admin -H aad3b435b51404ee... -M secretsdump
-
-# See all options
-nxc --help
 ```
 
 ## Architecture
