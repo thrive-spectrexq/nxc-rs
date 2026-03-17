@@ -1404,6 +1404,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bytes",
+ "des",
  "ldap3",
  "nxc-auth",
  "reqwest",

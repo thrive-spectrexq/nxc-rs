@@ -252,19 +252,24 @@ impl ExecutionEngine {
                             }
                         };
 
-                        // Attempt format
+                        // Attempt auth
                         match protocol_clone
                             .authenticate(session.as_mut(), &cred_clone)
                             .await
                         {
-                            Ok(auth_res) => ExecutionResult {
-                                target: target_str.clone(),
-                                protocol: protocol_clone.name().to_string(),
-                                username: cred_clone.username.clone(),
-                                success: auth_res.success,
-                                admin: auth_res.admin,
-                                message: auth_res.message,
-                                duration_ms: start_time.elapsed().as_millis() as u64,
+                            Ok(auth_res) => {
+                                // Execute modules if requested
+                                // (Implementation pending for multi-module execution, 
+                                // currently just handling the core auth flow in the engine)
+                                ExecutionResult {
+                                    target: target_str.clone(),
+                                    protocol: protocol_clone.name().to_string(),
+                                    username: cred_clone.username.clone(),
+                                    success: auth_res.success,
+                                    admin: auth_res.admin,
+                                    message: auth_res.message,
+                                    duration_ms: start_time.elapsed().as_millis() as u64,
+                                }
                             },
                             Err(e) => ExecutionResult {
                                 target: target_str,
@@ -363,6 +368,9 @@ mod tests {
             }
             fn is_admin(&self) -> bool {
                 true
+            }
+            fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+                self
             }
         }
 

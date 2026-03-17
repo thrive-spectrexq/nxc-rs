@@ -37,7 +37,7 @@ impl NxcModule for FtpLs {
         &["ftp"]
     }
 
-    async fn run(&self, session: &dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let ftp_sess = match session.protocol() {
             "ftp" => unsafe {
                 &*(session as *const dyn NxcSession as *const nxc_protocols::ftp::FtpSession)

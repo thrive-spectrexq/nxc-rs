@@ -9,17 +9,17 @@
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
-*   **⚡ Blazing Fast**: Powered by Tokio's async runtime for massive concurrency.
-*   **🦀 Pure Rust**: Zero dependencies on Python, Impacket, or external binaries. Native implementation of NTLM, Kerberos, and SMB.
-*   **🛡️ Stealthy & Robust**: Built-in lockout detection and jitter to bypass defensive monitoring.
-*   **🔌 Multi-Protocol**: Native support for **SMB, SSH, LDAP, WinRM, MSSQL, FTP, and NFS**.
-*   **📦 Module System**: Extensible architecture supporting post-exploitation modules like `secretsdump`, `laps`, and more.
+*   **Blazing Fast**: Powered by Tokio's async runtime for massive concurrency.
+*   **Pure Rust**: Zero dependencies on Python, Impacket, or external binaries. Native implementation of NTLM, Kerberos, and SMB.
+*   **Stealthy & Robust**: Built-in lockout detection and jitter to bypass defensive monitoring.
+*   **Multi-Protocol**: Native support for **SMB, SSH, LDAP, WinRM, MSSQL, FTP, and NFS**.
+*   **Module System**: Extensible architecture supporting post-exploitation modules like `secretsdump`, `laps`, and more.
 
 ---
 
-## 🛠️ Protocols & Capabilities
+## Protocols & Capabilities
 
 | Protocol | Status | Capabilities |
 | :--- | :--- | :--- |
@@ -36,7 +36,7 @@
 
 ---
 
-## 📦 Installation & Setup
+## Installation & Setup
 
 ### One-Line Install (Recommended)
 
@@ -62,7 +62,7 @@ cargo build --workspace
 
 ---
 
-## 💻 Local Development & Usage
+## Local Development & Usage
 
 ### 1. View Global Help
 To see all available protocols and global options:
@@ -107,7 +107,7 @@ The binary will be located at `target\release\nxc.exe` (Windows) or `target/rele
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 NetExec-RS is designed with a layered approach for maximum maintainability:
 
@@ -120,17 +120,7 @@ NetExec-RS is designed with a layered approach for maximum maintainability:
 
 ---
 
-## 🗺️ Roadmap
-
-- [ ] Support for RDP screenshots.
-- [ ] Integration of a centralized SQLite database (`nxcdb` parity).
-- [ ] BloodHound (SharpHound) compatible ingestion module.
-- [ ] More execution methods (DCOM, Task Scheduler).
-- [ ] Interactive shell mode.
-
----
-
-## 🤝 Contributing
+## Contributing
 
 Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
@@ -142,7 +132,7 @@ Contributions are what make the open-source community such an amazing place to l
 
 ---
 
-## 📜 License & Disclaimer
+## License & Disclaimer
 
 Distributed under the MIT License. See `LICENSE` for more information.
 

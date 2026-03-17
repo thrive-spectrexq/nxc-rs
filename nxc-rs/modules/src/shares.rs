@@ -37,12 +37,10 @@ impl NxcModule for NfsShares {
         &["nfs"]
     }
 
-    async fn run(&self, session: &dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
-        let nfs_sess = match session.protocol() {
-            "nfs" => unsafe {
-                &*(session as *const dyn NxcSession as *const nxc_protocols::nfs::NfsSession)
-            },
-            _ => return Err(anyhow::anyhow!("Module only supports NFS")),
+    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+        let nfs_sess = match session.downcast_mut::<nxc_protocols::nfs::NfsSession>() {
+            Some(s) => s,
+            None => return Err(anyhow::anyhow!("Module only supports NFS")),
         };
 
         let protocol = nxc_protocols::nfs::NfsProtocol::new();

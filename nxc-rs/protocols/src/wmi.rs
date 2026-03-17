@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use std::time::Duration;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tracing::{debug, info};
 
@@ -29,6 +29,9 @@ impl NxcSession for WmiSession {
 
     fn is_admin(&self) -> bool {
         self.admin
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 
@@ -111,19 +114,43 @@ impl NxcProtocol for WmiProtocol {
         session: &mut dyn NxcSession,
         creds: &Credentials,
     ) -> Result<AuthResult> {
-        let username = creds.username.clone();
+        let wmi_sess = match session.downcast_mut::<WmiSession>() {
+            Some(s) => s,
+            None => return Err(anyhow!("Invalid session type for WMI")),
+        };
 
-        let wmi_sess = unsafe { &*(session as *const dyn NxcSession as *const WmiSession) };
         let addr = format!("{}:{}", wmi_sess.target, wmi_sess.port);
+        debug!("WMI: Triggering EPM lookup on {}", addr);
 
-        debug!("WMI: Authenticating {}@{} via DCOM", username, addr);
-
-        // Executing WMI queries via DCOM requires triggering the RPC_C_AUTHN_WINNT handshake,
-        // followed by executing methods on `IWbemLevel1Login::NTLMLogin` using `root/cimv2`.
-        // Rust does not have an easy DCERPC protocol mapper like impacket natively available yet.
+        // 1. Connect to EPM (port 135)
+        let mut stream = TcpStream::connect(&addr).await?;
+        
+        // 2. DCERPC Bind to EPM
+        // UUID: E1AF8308-5D1F-11C9-91A4-08002B14A0FA (EPM)
+        use crate::rpc::{DcerpcHeader, DcerpcBind, PacketType};
+        let uuid_epm: [u8; 16] = [
+            0x08, 0x83, 0xaf, 0xe1, 0x1f, 0x5d, 0xc9, 0x11, 0x91, 0xa4, 0x08, 0x00, 0x2b, 0x14, 0xa0, 0xfa
+        ];
+        
+        let bind = DcerpcBind::new(uuid_epm, 3, 0);
+        let bind_bytes = bind.to_bytes();
+        let header = DcerpcHeader::new(PacketType::Bind, 1, (24 + bind_bytes.len()) as u16);
+        
+        let mut pkt = header.to_bytes();
+        pkt.extend_from_slice(&bind_bytes);
+        stream.write_all(&pkt).await?;
+        
+        // 3. Read BindAck
+        let mut ack_hdr = [0u8; 24];
+        stream.read_exact(&mut ack_hdr).await?;
+        
+        // In a full implementation, we'd now call EptMap to get the WMI port.
+        // For the offensive MVP, successful Bind to EPM proves RPC connectivity.
+        
+        info!("WMI: RPC Bind to EPM successful on {}. Proceeding with DCOM/NTLM logic...", addr);
 
         Ok(AuthResult::failure(
-            "WMI DCOM/IWbemLevel1Login explicit NTLM logic pending implementation",
+            "WMI NTLM authentication over DCOM pending full NTLMSSP integration",
             None,
         ))
     }

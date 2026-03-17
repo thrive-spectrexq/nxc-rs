@@ -47,7 +47,7 @@ impl NxcModule for EnumShares {
         }]
     }
 
-    async fn run(&self, session: &dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb_session = match session.protocol() {
             "smb" => unsafe {
                 &*(session as *const dyn NxcSession as *const nxc_protocols::smb::SmbSession)

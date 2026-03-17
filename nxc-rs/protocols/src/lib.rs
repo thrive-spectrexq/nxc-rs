@@ -23,13 +23,21 @@ pub mod wmi;
 // ─── Core Traits ────────────────────────────────────────────────
 
 /// Trait for an active protocol session.
-pub trait NxcSession: Send + Sync {
+pub trait NxcSession: Send + Sync + 'static {
     /// Protocol name for this session.
     fn protocol(&self) -> &'static str;
     /// Target IP/hostname.
     fn target(&self) -> &str;
     /// Whether the session has admin privileges.
     fn is_admin(&self) -> bool;
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+}
+
+impl dyn NxcSession {
+    /// Downcast a trait object to a specific type.
+    pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.as_any_mut().downcast_mut::<T>()
+    }
 }
 
 /// Output from remote command execution.

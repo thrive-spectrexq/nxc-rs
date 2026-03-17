@@ -21,4 +21,5 @@ reqwest = "0.12"
 tokio-util = { version = "0.7.18", features = ["compat"] }
 uuid = { workspace = true, features = ["v4"] }
 bytes = "1.11.1"
+des = { workspace = true }
 suppaftp = { workspace = true }

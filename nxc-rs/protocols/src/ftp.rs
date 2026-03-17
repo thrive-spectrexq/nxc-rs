@@ -33,6 +33,9 @@ impl NxcSession for FtpSession {
     fn is_admin(&self) -> bool {
         self.admin
     }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 pub struct FtpProtocol {

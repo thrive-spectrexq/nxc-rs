@@ -13,6 +13,7 @@ pub mod ls;
 pub mod secretsdump;
 pub mod shares;
 pub mod whoami;
+pub mod vnc_screenshot;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -62,7 +63,7 @@ pub trait NxcModule: Send + Sync {
     }
 
     /// Execute the module against an authenticated session.
-    async fn run(&self, session: &dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult>;
+    async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult>;
 }
 
 // ─── Module Registry ────────────────────────────────────────────
@@ -112,6 +113,9 @@ impl ModuleRegistry {
 
         let shares_mod: Box<dyn NxcModule> = Box::new(shares::NfsShares::new());
         modules.insert("shares".into(), shares_mod);
+
+        let vnc_screenshot: Box<dyn NxcModule> = Box::new(vnc_screenshot::VncScreenshot::new());
+        modules.insert("screenshot".into(), vnc_screenshot);
 
         Self { modules }
     }

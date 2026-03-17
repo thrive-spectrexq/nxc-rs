@@ -119,6 +119,9 @@ impl NxcSession for SmbSession {
     fn is_admin(&self) -> bool {
         self.admin
     }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 // ─── SMB Share Info ─────────────────────────────────────────────
