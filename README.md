@@ -48,7 +48,7 @@ Where NetSage provides AI-powered network intelligence, diagnostics, and packet 
 ## Workspace Layout
 
 ```
-netsage/                          # Workspace root
+nxc-rs/                           # Workspace root
 ├── Cargo.toml                    # [workspace] manifest
 ├── crates/                       # Core crates
 │   ├── netsage/                  # ◈ nxc binary (unified entry point)
@@ -80,8 +80,8 @@ netsage/                          # Workspace root
 
 ```bash
 # Clone the repository
-git clone https://github.com/thrive-spectrexq/netsage.git
-cd netsage
+git clone https://github.com/thrive-spectrexq/nxc-rs.git
+cd nxc-rs
 
 # Build
 cargo build --release --workspace
@@ -97,12 +97,12 @@ cargo build --release --workspace
 
 **Linux / macOS:**
 ```bash
-curl -sSL https://raw.githubusercontent.com/thrive-spectrexq/netsage/master/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/thrive-spectrexq/nxc-rs/master/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/thrive-spectrexq/netsage/master/install.ps1 | iex
+irm https://raw.githubusercontent.com/thrive-spectrexq/nxc-rs/master/install.ps1 | iex
 ```
 
 ### Windows Build Requirements
