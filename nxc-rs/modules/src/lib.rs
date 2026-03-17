@@ -9,7 +9,9 @@ pub mod enum_mssql;
 pub mod enum_shares;
 pub mod kerberoasting;
 pub mod laps;
+pub mod ls;
 pub mod secretsdump;
+pub mod shares;
 pub mod whoami;
 
 use anyhow::Result;
@@ -81,26 +83,35 @@ impl ModuleRegistry {
         let mut modules: HashMap<String, Box<dyn NxcModule>> = HashMap::new();
 
         // Register built-in modules
-        modules.insert(
-            "enum_shares".into(),
-            Box::new(enum_shares::EnumShares::new()),
-        );
-        modules.insert("whoami".into(), Box::new(whoami::Whoami::new()));
-        modules.insert("laps".into(), Box::new(laps::Laps::new()));
-        modules.insert("enum_dns".into(), Box::new(enum_dns::EnumDns::new()));
-        modules.insert(
-            "kerberoasting".into(),
-            Box::new(kerberoasting::Kerberoasting::new()),
-        );
-        modules.insert(
-            "asreproasting".into(),
-            Box::new(asreproasting::Asreproasting::new()),
-        );
-        modules.insert(
-            "secretsdump".into(),
-            Box::new(secretsdump::Secretsdump::new()),
-        );
-        modules.insert("mssql_enum".into(), Box::new(enum_mssql::MssqlEnum::new()));
+        let enum_shares: Box<dyn NxcModule> = Box::new(enum_shares::EnumShares::new());
+        modules.insert("enum_shares".into(), enum_shares);
+
+        let whoami: Box<dyn NxcModule> = Box::new(whoami::Whoami::new());
+        modules.insert("whoami".into(), whoami);
+
+        let laps: Box<dyn NxcModule> = Box::new(laps::Laps::new());
+        modules.insert("laps".into(), laps);
+
+        let enum_dns: Box<dyn NxcModule> = Box::new(enum_dns::EnumDns::new());
+        modules.insert("enum_dns".into(), enum_dns);
+
+        let kerberoasting: Box<dyn NxcModule> = Box::new(kerberoasting::Kerberoasting::new());
+        modules.insert("kerberoasting".into(), kerberoasting);
+
+        let asreproasting: Box<dyn NxcModule> = Box::new(asreproasting::Asreproasting::new());
+        modules.insert("asreproasting".into(), asreproasting);
+
+        let secretsdump: Box<dyn NxcModule> = Box::new(secretsdump::Secretsdump::new());
+        modules.insert("secretsdump".into(), secretsdump);
+
+        let mssql_enum: Box<dyn NxcModule> = Box::new(enum_mssql::MssqlEnum::new());
+        modules.insert("mssql_enum".into(), mssql_enum);
+
+        let ls_mod: Box<dyn NxcModule> = Box::new(ls::FtpLs::new());
+        modules.insert("ls".into(), ls_mod);
+
+        let shares_mod: Box<dyn NxcModule> = Box::new(shares::NfsShares::new());
+        modules.insert("shares".into(), shares_mod);
 
         Self { modules }
     }

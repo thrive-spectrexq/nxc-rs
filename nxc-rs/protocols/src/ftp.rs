@@ -11,12 +11,14 @@ use std::time::Duration;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 use tracing::{debug, info};
+use suppaftp::tokio::AsyncFtpStream;
 
 pub struct FtpSession {
     pub target: String,
     pub port: u16,
     pub banner: String,
     pub admin: bool,
+    pub credentials: Credentials,
 }
 
 impl NxcSession for FtpSession {
@@ -106,6 +108,7 @@ impl NxcProtocol for FtpProtocol {
             port,
             banner,
             admin: false, // FTP doesn't really have "admin", just file perms
+            credentials: Credentials::null_session(),
         }))
     }
 
@@ -115,21 +118,47 @@ impl NxcProtocol for FtpProtocol {
         creds: &Credentials,
     ) -> Result<AuthResult> {
         let username = creds.username.clone();
+        let password = creds.password.clone().unwrap_or_default();
 
         let ftp_sess = unsafe { &*(session as *const dyn NxcSession as *const FtpSession) };
         let addr = format!("{}:{}", ftp_sess.target, ftp_sess.port);
 
         debug!("FTP: Authenticating {}@{}", username, addr);
 
-        // A full FTP implementation would establish the connection again here or pass the stream,
-        // then dispatch the `USER <username>` and `PASS <password>` sequence, expecting `230 Logged in`.
-        Ok(AuthResult::failure(
-            "FTP user/pass authentication sequence pending implementation",
-            None,
-        ))
+        let mut ftp_stream = AsyncFtpStream::connect(&addr).await?;
+        
+        match ftp_stream.login(&username, &password).await {
+            Ok(_) => {
+                info!("FTP: Auth success for {}@{}", username, addr);
+                // Update session with successful credentials
+                let ftp_sess_mut = unsafe { &mut *(session as *mut dyn NxcSession as *mut FtpSession) };
+                ftp_sess_mut.credentials = creds.clone();
+                Ok(AuthResult::success(false)) // FTP doesn't really have "admin"
+            }
+            Err(e) => {
+                debug!("FTP: Auth failed for {}@{}: {}", username, addr, e);
+                Ok(AuthResult::failure(&format!("FTP Auth failed: {}", e), None))
+            }
+        }
     }
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
         Err(anyhow!("FTP does not support explicit command execution."))
+    }
+}
+
+impl FtpProtocol {
+    /// Helper to list files in the current directory.
+    pub async fn list_files(&self, target: &str, port: u16, creds: &Credentials) -> Result<Vec<String>> {
+        let addr = format!("{}:{}", target, port);
+        let mut ftp_stream = AsyncFtpStream::connect(&addr).await?;
+        
+        let username = creds.username.clone();
+        let password = creds.password.clone().unwrap_or_default();
+        
+        ftp_stream.login(&username, &password).await?;
+        
+        let list = ftp_stream.list(None).await?;
+        Ok(list)
     }
 }
