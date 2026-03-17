@@ -337,8 +337,48 @@ mod tests {
     #[tokio::test]
     async fn test_execution_engine_concurrency() {
         use std::sync::Arc;
-        use nxc_auth::Credentials;
-        use nxc_protocols::smb::SmbProtocol;
+        use nxc_auth::{AuthResult, Credentials};
+        use anyhow::Result;
+        use async_trait::async_trait;
+        use nxc_protocols::{NxcProtocol, NxcSession, CommandOutput};
+
+        // A mock protocol that simulates network success/failure based on target IP
+        struct MockSession {
+            target: String,
+        }
+        impl NxcSession for MockSession {
+            fn protocol(&self) -> &'static str { "mock" }
+            fn target(&self) -> &str { &self.target }
+            fn is_admin(&self) -> bool { true }
+        }
+
+        struct MockProtocol;
+        #[async_trait]
+        impl NxcProtocol for MockProtocol {
+            fn name(&self) -> &'static str { "mock" }
+            fn default_port(&self) -> u16 { 1234 }
+            fn supports_exec(&self) -> bool { false }
+            fn supported_modules(&self) -> &[&str] { &[] }
+            
+            async fn connect(&self, target: &str, _port: u16) -> Result<Box<dyn NxcSession>> {
+                if target == "192.168.1.99" {
+                    return Err(anyhow::anyhow!("Connection timeout mock"));
+                }
+                Ok(Box::new(MockSession { target: target.to_string() }))
+            }
+            
+            async fn authenticate(&self, _session: &mut dyn NxcSession, creds: &Credentials) -> Result<AuthResult> {
+                if creds.password.as_deref() == Some("Password123!") {
+                    Ok(AuthResult::success(true))
+                } else {
+                    Ok(AuthResult::failure("Bad password", None))
+                }
+            }
+            
+            async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
+                Err(anyhow::anyhow!("Not supported"))
+            }
+        }
 
         let opts = ExecutionOpts {
             threads: 5,
@@ -349,7 +389,7 @@ mod tests {
         };
 
         let engine = ExecutionEngine::new(opts);
-        let smb_proto: Arc<dyn nxc_protocols::NxcProtocol> = Arc::new(SmbProtocol::new());
+        let smb_proto: Arc<dyn nxc_protocols::NxcProtocol> = Arc::new(MockProtocol);
 
         let targets = vec![
             Target::new("192.168.1.10".parse().unwrap()),

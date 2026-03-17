@@ -3,6 +3,8 @@
 //! Modules are Rust structs implementing `NxcModule`, compiled into the binary.
 //! They are invoked per-protocol with `-M <module> [-o KEY=VALUE]` flags.
 
+pub mod enum_shares;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use nxc_protocols::NxcSession;
@@ -69,9 +71,12 @@ impl Default for ModuleRegistry {
 
 impl ModuleRegistry {
     pub fn new() -> Self {
-        let modules: HashMap<String, Box<dyn NxcModule>> = HashMap::new();
+        let mut modules: HashMap<String, Box<dyn NxcModule>> = HashMap::new();
 
-        // TODO: Register all built-in modules here
+        // Register built-in modules
+        modules.insert("enum_shares".into(), Box::new(enum_shares::EnumShares::new()));
+
+        // TODO: Register additional modules here
         // modules.insert("secretsdump".into(), Box::new(SecretsDump));
         // modules.insert("bloodhound".into(), Box::new(BloodHound));
         // modules.insert("kerberoast".into(), Box::new(Kerberoast));

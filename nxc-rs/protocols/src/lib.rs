@@ -9,6 +9,7 @@ use nxc_auth::{AuthResult, Credentials};
 use serde::{Deserialize, Serialize};
 
 pub mod smb;
+pub mod ssh;
 
 // ─── Core Traits ────────────────────────────────────────────────
 
