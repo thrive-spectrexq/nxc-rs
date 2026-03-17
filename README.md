@@ -53,33 +53,48 @@ cargo build --workspace
 
 ---
 
-## 💻 Local Development
+## 💻 Local Development & Usage
 
 ### 1. View Global Help
-```bash
+To see all available protocols and global options:
+```powershell
 cargo run --package nxc -- --help
 ```
 
 ### 2. Protocol-Specific Help
-```bash
-# Get help for a specific protocol (e.g., SMB)
-cargo run --package nxc -- smb --help
-```
-
-### 3. Quick Start Examples
+Each protocol has its own set of flags. For example, to see options for the newly implemented **FTP** or **NFS** handlers:
 ```powershell
-# SMB Share Enumeration
-cargo run --package nxc -- smb 192.168.1.0/24 -u admin -p 'Password123' --shares
+# FTP Help
+cargo run --package nxc -- ftp --help
 
-# LDAP Kerberoasting
-cargo run --package nxc -- ldap dc01.corp.local -u user -p pass --kerberoasting
-
-# FTP File Listing
-cargo run --package nxc -- ftp 192.168.1.50 -u anonymous -p anonymous --ls
-
-# NFS Share Listing
-cargo run --package nxc -- nfs 192.168.1.60 --enum-shares
+# NFS Help
+cargo run --package nxc -- nfs --help
 ```
+
+### 3. Example Execution Commands
+Here are a few ways to test the current capabilities (replace `<target>` with a lab IP):
+
+**FTP Navigation**: Authenticate as anonymous and list files.
+```powershell
+cargo run --package nxc -- ftp <target> -u anonymous -p anonymous --ls
+```
+
+**NFS Enumeration**: List exported shares via the MOUNT service.
+```powershell
+cargo run --package nxc -- nfs <target> --enum-shares
+```
+
+**Module Listing**: See which offensive modules are available for a protocol.
+```powershell
+cargo run --package nxc -- smb <target> -L
+```
+
+### 4. Build for Production
+If you want to use the compiled binary directly without `cargo run`, you can build a release version:
+```powershell
+cargo build --release --package nxc
+```
+The binary will be located at `target\release\nxc.exe` (Windows) or `target/release/nxc` (Linux).
 
 ---
 
