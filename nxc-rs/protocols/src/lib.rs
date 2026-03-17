@@ -15,6 +15,9 @@ pub mod mssql;
 pub mod winrm;
 pub mod rdp;
 pub mod wmi;
+pub mod ftp;
+pub mod vnc;
+pub mod nfs;
 
 // ─── Core Traits ────────────────────────────────────────────────
 
