@@ -5,6 +5,7 @@ edition.workspace = true
 description = "NetExec-RS protocol handlers — SMB, LDAP, WinRM, RDP, MSSQL, SSH, FTP, VNC, WMI, NFS"
 
 [dependencies]
+ldap3 = "0.11"
 
 nxc-auth = { path = "../auth" }
 async-trait = { workspace = true }
@@ -15,3 +16,6 @@ tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 ssh2 = { workspace = true }
+tiberius = "0.12"
+reqwest = "0.12"
+tokio-util = { version = "0.7.18", features = ["compat"] }

@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 
 pub mod smb;
 pub mod ssh;
+pub mod ldap;
+pub mod mssql;
+pub mod winrm;
 
 // ─── Core Traits ────────────────────────────────────────────────
 

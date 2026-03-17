@@ -572,10 +572,10 @@ fn get_protocol_handler(protocol_name: &str) -> Option<Arc<dyn nxc_protocols::Nx
     match protocol_name {
         "smb" => Some(Arc::new(nxc_protocols::smb::SmbProtocol::new())),
         "ssh" => Some(Arc::new(nxc_protocols::ssh::SshProtocol::new())),
+        "ldap" => Some(Arc::new(nxc_protocols::ldap::LdapProtocol::new())),
+        "winrm" => Some(Arc::new(nxc_protocols::winrm::WinrmProtocol::new())),
+        "mssql" => Some(Arc::new(nxc_protocols::mssql::MssqlProtocol::new())),
         // Future protocols will be added here:
-        // "ldap" => Some(Arc::new(nxc_protocols::ldap::LdapProtocol::new())),
-        // "winrm" => Some(Arc::new(nxc_protocols::winrm::WinrmProtocol::new())),
-        // "mssql" => Some(Arc::new(nxc_protocols::mssql::MssqlProtocol::new())),
         // "rdp" => Some(Arc::new(nxc_protocols::rdp::RdpProtocol::new())),
         // "ftp" => Some(Arc::new(nxc_protocols::ftp::FtpProtocol::new())),
         // "vnc" => Some(Arc::new(nxc_protocols::vnc::VncProtocol::new())),

@@ -12,7 +12,7 @@
 | **Async Runtime** | Tokio (full features) |
 | **Target Protocols** | SMB · LDAP · WinRM · RDP · MSSQL · SSH · FTP · VNC · WMI · NFS |
 | **Auth Methods** | Password · NTLM Hash · Kerberos TGT/TGS · Certificate |
-| **Min Rust Version** | 1.80.0 |
+| **Min Rust Version** | 1.94.0 |
 | **Target Platforms** | Linux · macOS · Windows |
 
 ## Overview
