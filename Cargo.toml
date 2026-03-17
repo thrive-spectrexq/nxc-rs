@@ -24,7 +24,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 r2d2 = "0.8"
 r2d2_sqlite = "0.24"
 toml = "0.8"
-clap = { version = "4.0", features = ["derive"] }
+clap = { version = "4.0", features = ["derive", "env"] }
 anyhow = "1.0"
 thiserror = "1.0"
 tracing = "0.1"
@@ -38,6 +38,8 @@ hostname = "0.4"
 async-trait = "0.1"
 ldap3 = "0.11"
 suppaftp = { version = "8.0", features = ["tokio", "tokio-rustls-ring"] }
+teloxide = { version = "0.13", features = ["macros", "ctrlc_handler"] }
+dotenvy = "0.15"
 
 # NetExec-RS dependencies
 md4 = "0.10"

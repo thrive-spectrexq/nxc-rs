@@ -60,7 +60,7 @@ impl NxcModule for WifiRecon {
             if parts.len() >= 2 {
                 let ip = parts[0].trim();
                 // Basic IP validation
-                if ip.chars().all(|c| c.is_digit(10) || c == '.') && ip.count_matches('.') == 3 {
+                if ip.chars().all(|c| c.is_digit(10) || c == '.') && ip.matches('.').count() == 3 {
                     hosts.push(ip.to_string());
                 }
             }

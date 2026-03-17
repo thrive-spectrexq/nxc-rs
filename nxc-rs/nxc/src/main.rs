@@ -4,6 +4,7 @@
 //! Usage: `nxc <protocol> <targets> [options]`
 
 mod output;
+mod telegram;
 
 use anyhow::Result;
 use clap::{Arg, ArgAction, Command};
@@ -586,6 +587,17 @@ fn build_cli() -> Command {
         .subcommand(adb_cmd)
         .subcommand(wifi_cmd)
         .subcommand(http_cmd)
+        .subcommand(
+            Command::new("telegram")
+                .about("Start the NetExec-RS Telegram bot server")
+                .arg(
+                    Arg::new("token")
+                        .long("token")
+                        .env("TELEGRAM_BOT_TOKEN")
+                        .help("Telegram bot token")
+                        .required(true),
+                ),
+        )
 }
 
 /// Build credentials from CLI arguments.
@@ -691,6 +703,9 @@ fn get_protocol_handler(
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Load .env file at the very beginning
+    let _ = dotenvy::dotenv();
+
     let app = build_cli();
     let matches = app.get_matches();
 
@@ -710,6 +725,15 @@ async fn main() -> Result<()> {
 
     // ── Get the protocol subcommand ──
     let (protocol_name, sub_matches) = match matches.subcommand() {
+        Some(("telegram", sub_m)) => {
+            // Set the token in env if provided via CLI override
+            if let Some(token) = sub_m.get_one::<String>("token") {
+                std::env::set_var("TELEGRAM_BOT_TOKEN", token);
+            }
+            
+            telegram::start_bot().await?;
+            return Ok(());
+        }
         Some((name, sub_m)) => (name, sub_m),
         None => {
             NxcGlobalOutput::banner();

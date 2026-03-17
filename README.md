@@ -15,6 +15,7 @@
 *   **Pure Rust**: Zero dependencies on Python, Impacket, or external binaries. Native implementation of NTLM, Kerberos, and SMB.
 *   **Stealthy & Robust**: Built-in lockout detection and jitter to bypass defensive monitoring.
 *   **Multi-Protocol**: Native support for **SMB, SSH, LDAP, WinRM, MSSQL, FTP, NFS, and ADB**.
+*   **Telegram Integration**: Integrated Telegram bot for remote command execution and real-time alerts.
 *   **Module System**: Extensible architecture supporting post-exploitation modules like `secretsdump`, `laps`, and more.
 
 ---
@@ -104,7 +105,26 @@ cargo run --package nxc -- nfs <target> --enum-shares
 cargo run --package nxc -- smb <target> -L
 ```
 
-### 4. Build for Production
+### 4. Telegram Bot Integration
+NetExec-RS includes a built-in Telegram bot for remote management.
+
+**Setup**:
+1. Create a bot via [@BotFather](https://t.me/botfather).
+2. Add your token to the `.env` file:
+   ```env
+   TELEGRAM_BOT_TOKEN="your_token_here"
+   ```
+
+**Start the Server**:
+```powershell
+cargo run --package nxc -- telegram
+```
+
+**Commands**:
+- `/help`: Show available commands.
+- `/run <protocol> <target> [options]`: Execute an NXC command (e.g., `/run smb 10.0.0.1 -u admin -p password`).
+
+### 5. Build for Production
 If you want to use the compiled binary directly without `cargo run`, you can build a release version:
 ```powershell
 cargo build --release --package nxc
@@ -123,18 +143,6 @@ NetExec-RS is designed with a layered approach for maximum maintainability:
 - **nxc-modules**: Post-exploitation module library.
 - **nxc-targets**: Advanced target parsing (CIDR, ranges, files).
 - **nxc-db**: Credential storage and workspace management (work in progress).
-
----
-
-## Contributing
-
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
 ---
 

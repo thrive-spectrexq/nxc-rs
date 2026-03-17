@@ -1,0 +1,42 @@
+name: Telegram Bot Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'How long to run the bot (in minutes, max 360)'
+        required: true
+        default: '60'
+
+jobs:
+  run-bot:
+    name: Run Telegram Bot
+    runs-on: ubuntu-latest
+    timeout-minutes: 360 # GitHub Action limit
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libssl-dev pkg-config libsasl2-dev libldap2-dev
+
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
+
+    - name: Build nxc
+      run: cargo build --release -p nxc
+
+    - name: Run Telegram Bot
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      run: |
+        echo "Starting NetExec-RS Telegram Bot..."
+        # We use a timeout to ensure the job doesn't hang indefinitely 
+        # (though GitHub will kill it after 6 hours anyway)
+        timeout ${{ github.event.inputs.duration }}m ./target/release/nxc telegram || true

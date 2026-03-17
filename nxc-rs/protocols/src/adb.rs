@@ -13,7 +13,7 @@ use tokio::net::TcpStream;
 use tracing::{debug, info, warn};
 
 // ─── ADB Packet Constants ───────────────────────────────────────
-const A_SYNC: u32 = 0x434e5953;
+const _A_SYNC: u32 = 0x434e5953;
 const A_CNXN: u32 = 0x4e584e43;
 const A_OPEN: u32 = 0x4e45504f;
 const A_OKAY: u32 = 0x59414b4f;

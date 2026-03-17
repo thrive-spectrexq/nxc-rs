@@ -161,4 +161,23 @@ impl Protocol {
             _ => None,
         }
     }
+
+    /// Return all supported protocols.
+    pub fn all() -> Vec<Self> {
+        vec![
+            Protocol::Smb,
+            Protocol::Ldap,
+            Protocol::WinRm,
+            Protocol::Wmi,
+            Protocol::Rdp,
+            Protocol::Mssql,
+            Protocol::Ssh,
+            Protocol::Ftp,
+            Protocol::Vnc,
+            Protocol::Nfs,
+            Protocol::Adb,
+            Protocol::Wifi,
+            Protocol::Http,
+        ]
+    }
 }
