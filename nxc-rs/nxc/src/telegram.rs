@@ -28,6 +28,7 @@ use teloxide::prelude::*;
 use teloxide::types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, UserId};
 use teloxide::utils::command::BotCommands;
 use teloxide::utils::markdown;
+use tokio::io::AsyncWriteExt;
 
 // --- 🌐 Configuration & Environment ---
 
@@ -231,6 +232,27 @@ pub async fn start_bot() -> anyhow::Result<()> {
 
     let token = std::env::var("TELEGRAM_BOT_TOKEN")
         .context("CRITICAL: TELEGRAM_BOT_TOKEN not found in environment")?;
+
+    // --- Render Health Check ---
+    let port = std::env::var("PORT")
+        .unwrap_or_else(|_| "10000".to_string())
+        .parse::<u16>()
+        .unwrap_or(10000);
+
+    tokio::spawn(async move {
+        if let Ok(listener) = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await {
+            println!("📡 Health check server listening on :{}", port);
+            loop {
+                if let Ok((mut socket, _)) = listener.accept().await {
+                    tokio::spawn(async move {
+                        let response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK";
+                        let _ = socket.write_all(response.as_bytes()).await;
+                        let _ = socket.flush().await;
+                    });
+                }
+            }
+        }
+    });
 
     let bot = Bot::new(token);
     println!("🔥 [SUPERNOVA-PRO] Master Class Engine Online.");

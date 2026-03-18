@@ -38,4 +38,5 @@ RUN useradd -ms /bin/bash nxcuser
 USER nxcuser
 
 # Use the telegram subcommand by default
+EXPOSE 10000
 ENTRYPOINT ["nxc", "telegram"]
