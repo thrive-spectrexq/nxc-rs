@@ -5,6 +5,8 @@
 
 mod output;
 mod telegram;
+mod relay;
+mod socks;
 
 use anyhow::Result;
 use clap::{Arg, ArgAction, Command};

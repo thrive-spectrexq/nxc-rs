@@ -109,6 +109,36 @@ impl NxcModule for MssqlEnum {
             Err(e) => output_lines.push(format!("    [!] Failed to enumerate databases: {}", e)),
         }
 
+        output_lines.push("".to_string());
+
+        // 3. Enumerate IMPERSONATE privileges
+        output_lines.push("[*] Enumerating IMPERSONATE Privileges:".to_string());
+        match protocol
+            .query_json(
+                mssql_session,
+                "SELECT grantor.name as Grantor, grantee.name as Grantee, permission_name \
+                 FROM sys.server_permissions \
+                 JOIN sys.server_principals as grantor ON grantor.principal_id = grantor_principal_id \
+                 JOIN sys.server_principals as grantee ON grantee.principal_id = grantee_principal_id \
+                 WHERE permission_name = 'IMPERSONATE'",
+            )
+            .await
+        {
+            Ok(perms) => {
+                let mut perm_list = Vec::new();
+                for perm in &perms {
+                    if let Some(obj) = perm.as_object() {
+                        let grantor = obj.get("Grantor").and_then(|v| v.as_str()).unwrap_or("?");
+                        let grantee = obj.get("Grantee").and_then(|v| v.as_str()).unwrap_or("?");
+                        output_lines.push(format!("    - {} can IMPERSONATE {}", grantee, grantor));
+                        perm_list.push(perm.clone());
+                    }
+                }
+                data.insert("impersonate_perms".to_string(), serde_json::Value::Array(perm_list));
+            }
+            Err(e) => output_lines.push(format!("    [!] Failed to check impersonate perms: {}", e)),
+        }
+
         Ok(ModuleResult {
             success: true,
             output: output_lines.join("\n"),

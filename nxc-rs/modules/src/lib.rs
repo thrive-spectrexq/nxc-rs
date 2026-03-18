@@ -4,16 +4,20 @@
 //! They are invoked per-protocol with `-M <module> [-o KEY=VALUE]` flags.
 
 pub mod gmsa;
+pub mod adcs;
+pub mod bloodhound;
+pub mod wmi_enum;
+pub mod psrp;
 pub mod adb_screenshot;
 pub mod asreproasting;
 pub mod enum_dns;
+pub mod secretsdump;
 pub mod enum_mssql;
 pub mod enum_shares;
 pub mod iot_cam;
 pub mod kerberoasting;
 pub mod laps;
 pub mod ls;
-pub mod secretsdump;
 pub mod shares;
 pub mod vnc_screenshot;
 pub mod whoami;
@@ -107,7 +111,7 @@ impl ModuleRegistry {
         let asreproasting: Box<dyn NxcModule> = Box::new(asreproasting::Asreproasting::new());
         modules.insert("asreproasting".into(), asreproasting);
 
-        let secretsdump: Box<dyn NxcModule> = Box::new(secretsdump::Secretsdump::new());
+        let secretsdump: Box<dyn NxcModule> = Box::new(secretsdump::SecretsDumpModule::new());
         modules.insert("secretsdump".into(), secretsdump);
 
         let mssql_enum: Box<dyn NxcModule> = Box::new(enum_mssql::MssqlEnum::new());
@@ -130,6 +134,18 @@ impl ModuleRegistry {
 
         let gmsa: Box<dyn NxcModule> = Box::new(gmsa::Gmsa::new());
         modules.insert("gmsa".into(), gmsa);
+
+        let adcs: Box<dyn NxcModule> = Box::new(adcs::AdcsModule::new());
+        modules.insert("adcs".into(), adcs);
+
+        let bloodhound: Box<dyn NxcModule> = Box::new(bloodhound::BloodhoundModule::new());
+        modules.insert("bloodhound".into(), bloodhound);
+
+        let wmi_enum: Box<dyn NxcModule> = Box::new(wmi_enum::WmiEnumModule::new());
+        modules.insert("wmi_enum".into(), wmi_enum);
+
+        let psrp: Box<dyn NxcModule> = Box::new(psrp::PsrpModule::new());
+        modules.insert("psrp".into(), psrp);
 
         let adb_screenshot: Box<dyn NxcModule> = Box::new(adb_screenshot::AdbScreenshot::new());
         modules.insert("adb_screenshot".into(), adb_screenshot);
