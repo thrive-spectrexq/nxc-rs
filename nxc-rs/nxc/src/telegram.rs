@@ -27,7 +27,6 @@ use std::time::{Duration, Instant};
 use teloxide::prelude::*;
 use teloxide::types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, UserId};
 use teloxide::utils::command::BotCommands;
-use teloxide::utils::markdown;
 use tokio::io::AsyncWriteExt;
 
 // --- 🌐 Configuration & Environment ---
@@ -215,6 +214,8 @@ enum TelegramBotCommand {
     History,
     #[command(description = "Flush current session state and memory")]
     Reset,
+    #[command(description = "Clear terminal space and reset session")]
+    Clear,
 
     // --- 🛡️ Administrative Controls (Admin Only) ---
     #[command(description = "Whitelist a user ID for bot access")]
@@ -289,8 +290,8 @@ async fn handle_command(
     let user_id = msg.from.as_ref().map(|u| u.id).unwrap_or(UserId(0));
 
     if !is_authorized(user_id) {
-        let _ = bot.send_message(msg.chat.id, "🚫 *UNAUTHORIZED ACCESS*\n\nYour signature is not recognized in the master whitelist\\. Please contact an administrator\\.")
-            .parse_mode(ParseMode::MarkdownV2).await;
+        bot.send_message(msg.chat.id, "🚫 <b>UNAUTHORIZED ACCESS</b>\n\nYour signature is not recognized in the master whitelist. Please contact an administrator.")
+            .parse_mode(ParseMode::Html).await?;
         return Ok(());
     }
 
@@ -407,6 +408,9 @@ async fn handle_command(
         TelegramBotCommand::Reset => {
             session_purge(bot, msg).await?;
         }
+        TelegramBotCommand::Clear => {
+            session_clear(bot, msg).await?;
+        }
 
         // Admin
         TelegramBotCommand::Whitelist(id) => {
@@ -422,13 +426,13 @@ async fn handle_command(
             let user_id = msg.from.as_ref().map(|u| u.id).unwrap_or(UserId(0));
             let s = get_session(user_id);
             if s.last_target.is_none() || s.last_protocol.is_none() {
-                let _ = bot.send_message(msg.chat.id, "❌ *SHELL ERROR*\nNo active target or protocol found in session history\\.").await;
+                bot.send_message(msg.chat.id, "❌ <b>SHELL ERROR</b>\nNo active target or protocol found in session history.").await?;
             } else {
                 update_session(user_id, |sess| sess._interactive_mode = true);
-                let text = format!("🐚 *SHELL MODE ACTIVATED*\n\nTarget: `{}`\nProtocol: `{}`\n\nType commands directly to execute\\. Type `exit` to return to mission control\\.", 
-                    markdown::escape(s.last_target.as_ref().unwrap()), 
-                    markdown::escape(s.last_protocol.as_ref().unwrap()));
-                let _ = bot.send_message(msg.chat.id, text).parse_mode(ParseMode::MarkdownV2).await;
+                let text = format!("🐚 <b>SHELL MODE ACTIVATED</b>\n\nTarget: <code>{}</code>\nProtocol: <code>{}</code>\n\nType commands directly to execute. Type <code>exit</code> to return to mission control.", 
+                    html_escape::encode_safe(s.last_target.as_ref().unwrap()), 
+                    html_escape::encode_safe(s.last_protocol.as_ref().unwrap()));
+                bot.send_message(msg.chat.id, text).parse_mode(ParseMode::Html).await?;
             }
         }
     }
@@ -444,29 +448,29 @@ async fn handle_generic_stream(bot: Bot, msg: Message) -> Result<(), teloxide::R
                 .as_ref()
                 .map(|u| u.first_name.clone())
                 .unwrap_or_else(|| "Operator".to_string());
-            let _ = bot.send_message(msg.chat.id, format!("👋 Welcome back, *{}*\\.\n\n`NetExec\\-RS Master Suite` is armed and ready\\.\n\nType /help to enter the control portal\\.", markdown::escape(&sender)))
-                .parse_mode(ParseMode::MarkdownV2)
+            bot.send_message(msg.chat.id, format!("👋 Welcome back, <b>{}</b>.\n\n<code>NetExec-RS Master Suite</code> is armed and ready.\n\nType /help to enter the control portal.", html_escape::encode_safe(&sender)))
+                .parse_mode(ParseMode::Html)
                 .reply_markup(main_dashboard_markup())
-                .await;
+                .await?;
         } else {
             let user_id = msg.from.as_ref().map(|u| u.id).unwrap_or(UserId(0));
             let s = get_session(user_id);
             if s._interactive_mode {
                 if text.to_lowercase() == "exit" {
                     update_session(user_id, |sess| sess._interactive_mode = false);
-                    let _ = bot.send_message(msg.chat.id, "🚪 *SHELL DEACTIVATED*\nReturning to standard command mode\\.").parse_mode(ParseMode::MarkdownV2).await;
+                    bot.send_message(msg.chat.id, "🚪 <b>SHELL DEACTIVATED</b>\nReturning to standard command mode.")
+                        .parse_mode(ParseMode::Html).await?;
                 } else {
                     let cmd = format!("{} {} -x \"{}\"", s.last_protocol.as_ref().unwrap(), s.last_target.as_ref().unwrap(), text);
                     engine_execute_raw(bot, msg, cmd).await?;
                 }
             } else {
-                let _ = bot
-                    .send_message(
+                bot.send_message(
                         msg.chat.id,
-                        "🛰️ _Awaiting valid command structure\\.\\.\\._",
+                        "🛰️ <i>Awaiting valid command structure...</i>",
                     )
-                    .parse_mode(ParseMode::MarkdownV2)
-                    .await;
+                    .parse_mode(ParseMode::Html)
+                    .await?;
             }
         }
     }
@@ -502,8 +506,8 @@ async fn handle_interactive_callbacks(
                 engine_list_protocols(bot.clone(), msg).await?;
             }
             "btn_recon" => {
-                let _ = bot.send_message(user_id, "🔧 *Recon Toolkit:* Use /ping, /portscan, /dns, /geo, or /reverse to map the landscape\\.")
-                    .parse_mode(ParseMode::MarkdownV2).await;
+                bot.send_message(user_id, "🔧 <b>Recon Toolkit:</b> Use /ping, /portscan, /dns, /geo, or /reverse to map the landscape.")
+                    .parse_mode(ParseMode::Html).await?;
             }
             "btn_status" => {
                 session_show_status(bot.clone(), msg).await?;
@@ -523,102 +527,97 @@ async fn handle_interactive_callbacks(
 // --- 🎨 UI & Presentation Logic ---
 
 async fn ui_send_dashboard(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
-    let text = "🛸 *NETEXEC-RS: SUPERNOVA MISSION CONTROL*\n\n\
-        *Operational Command Matrix:*\n\n\
-        🚀 *Deployment:* /run /smb /ssh /ldap /winrm /mssql\n\
-        🐚 *Interactive:* /shell \\(persistent access\\)\n\
-        🔍 *Intelligence:* /search /modules /protocols\n\
-        📡 *Reconnaissance:* /ping /portscan /dns /geo\n\
-        📋 *Rapid Shortcuts:* /shares /users /groups\n\
-        👤 *Operator:* /whoami /history /reset\n\
-        ⚙️ *Infrastructure:* /status /guide /cheat /about\n\n\
-        ◈ _Status: Tactical Dominance Achieved_ ◈\n\
-        ◈ _Node: [REDACTED]_ ◈".to_string();
-    let _ = bot
-        .send_message(msg.chat.id, &text)
-        .parse_mode(ParseMode::MarkdownV2)
+    let text = "🛸 <b>NETEXEC-RS: SUPERNOVA MISSION CONTROL</b>\n\n\
+        <b>Operational Command Matrix:</b>\n\n\
+        🚀 <b>Deployment:</b> /run /smb /ssh /ldap /winrm /mssql\n\
+        🐚 <b>Interactive:</b> /shell (persistent access)\n\
+        🔍 <b>Intelligence:</b> /search /modules /protocols\n\
+        📡 <b>Reconnaissance:</b> /ping /portscan /dns /geo\n\
+        📋 <b>Rapid Shortcuts:</b> /shares /users /groups\n\
+        👤 <b>Operator:</b> /whoami /history /reset /clear\n\
+        ⚙️ <b>Infrastructure:</b> /status /guide /cheat /about\n\n\
+        ◈ <i>Status: Tactical Dominance Achieved</i> ◈\n\
+        ◈ <i>Node: [REDACTED]</i> ◈";
+    bot.send_message(msg.chat.id, text)
+        .parse_mode(ParseMode::Html)
         .reply_markup(main_dashboard_markup())
-        .await;
+        .await?;
     Ok(())
 }
 
 async fn ui_send_protocol_console(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
-    let mut text = String::from("🌩️ *Protocol Intelligence Console*\n\nAvailable protocols for exploitation and scanning:\n\n");
+    let mut text = String::from("🌩️ <b>Protocol Intelligence Console</b>\n\nAvailable protocols for exploitation and scanning:\n\n");
     for p in Protocol::all() {
         text.push_str(&format!(
-            "◈ *{}* \\(Port {}\\)\n",
-            markdown::escape(&p.name().to_uppercase()),
+            "◈ <b>{}</b> (Port {})\n",
+            p.name().to_uppercase(),
             p.default_port()
         ));
     }
     text.push_str(
-        "\n_Tip: Use /modules <proto> to find specialized payloads for these protocols\\._",
+        "\n<i>Tip: Use /modules &lt;proto&gt; to find specialized payloads for these protocols.</i>",
     );
-    let _ = bot
-        .send_message(msg.chat.id, &text)
-        .parse_mode(ParseMode::MarkdownV2)
-        .await;
+    bot.send_message(msg.chat.id, text)
+        .parse_mode(ParseMode::Html)
+        .await?;
     Ok(())
 }
 
 async fn ui_send_handbook(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
-    let text = "📖 *NETEXEC MASTER CLASS: OPERATOR'S HANDBOOK*\n\n\
-        *1. Unified Targeting Intelligence*\n\
-        • Single Target: `10.0.0.1` or `target.pro`\n\
-        • CIDR Networks: `192.168.1.0/24`\n\
-        • Range Scanning: `10.0.0.1-10.0.0.50`\n\
-        • File Discovery: `/run smb targets.txt`\n\n\
-        *2. Authentication Matrix*\n\
-        • Standard: `-u admin -p Pass123`\n\
-        • Pass-the-Hash: `-u admin -H <nt_hash>`\n\
-        • Kerberos Forge: `-k --aes-key <key> --kdc-host <dc>`\n\
-        • Credential Spray: `-u users.txt -p pass.txt` \\(Brute-force mode\\)\n\n\
-        *3. Protocol & Module Deployment*\n\
-        Execute tasks with `/run <proto> <target> [options]`\n\
-        Attach offensive payloads with `-M <module_name>`\n\n\
-        *4. Strategic Options*\n\
-        • Speed: `--threads 500` \\(Max concurrency\\)\n\
-        • Stealth: `--jitter 1500` \\(Avoid detection\\)\n\
-        • Persistence: `--continue-on-success` \\(Keep trying\\)\n\n\
-        _Use /cheat for a tactical reference of all handlers_ ◈".to_string();
-    let _ = bot
-        .send_message(msg.chat.id, text)
-        .parse_mode(ParseMode::MarkdownV2)
-        .await;
+    let text = "📖 <b>NETEXEC MASTER CLASS: OPERATOR'S HANDBOOK</b>\n\n\
+        <b>1. Unified Targeting Intelligence</b>\n\
+        • Single Target: <code>10.0.0.1</code> or <code>target.pro</code>\n\
+        • CIDR Networks: <code>192.168.1.0/24</code>\n\
+        • Range Scanning: <code>10.0.0.1-10.0.0.50</code>\n\
+        • File Discovery: <code>/run smb targets.txt</code>\n\n\
+        <b>2. Authentication Matrix</b>\n\
+        • Standard: <code>-u admin -p Pass123</code>\n\
+        • Pass-the-Hash: <code>-u admin -H &lt;nt_hash&gt;</code>\n\
+        • Kerberos Forge: <code>-k --aes-key &lt;key&gt; --kdc-host &lt;dc&gt;</code>\n\
+        • Credential Spray: <code>-u users.txt -p pass.txt</code> (Brute-force mode)\n\n\
+        <b>3. Protocol &amp; Module Deployment</b>\n\
+        Execute tasks with <code>/run &lt;proto&gt; &lt;target&gt; [options]</code>\n\
+        Attach offensive payloads with <code>-M &lt;module_name&gt;</code>\n\n\
+        <b>4. Strategic Options</b>\n\
+        • Speed: <code>--threads 500</code> (Max concurrency)\n\
+        • Stealth: <code>--jitter 1500</code> (Avoid detection)\n\
+        • Persistence: <code>--continue-on-success</code> (Keep trying)\n\n\
+        <i>Use /cheat for a tactical reference of all handlers</i> ◈";
+    bot.send_message(msg.chat.id, text)
+        .parse_mode(ParseMode::Html)
+        .await?;
     Ok(())
 }
 
 async fn ui_send_about(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
     let text = format!(
-        "🛰️ *NETEXEC-RS MASTER CLASS SUITE: SUPERNOVA EDITION*\n\n\
-        *Core Engine:* `Pure Rust v0.1.0-RustReaper`\n\
-        *Interface:* `Telegram Professional v{}`\n\
-        *Signifier:* `{}`\n\n\
+        "🛰️ <b>NETEXEC-RS MASTER CLASS SUITE: SUPERNOVA EDITION</b>\n\n\
+        <b>Core Engine:</b> <code>Pure Rust v0.1.0-RustReaper</code>\n\
+        <b>Interface:</b> <code>Telegram Professional v{}</code>\n\
+        <b>Signifier:</b> <code>{}</code>\n\n\
         This platform represents the pinnacle of autonomous security research tools, providing a single, unified interface for cross-protocol exploitation, reconnaissance, and post-exploitation orchestration. Built without compromise using high-concurrency systems for the modern operator.",
-        markdown::escape(BOT_VERSION), markdown::escape(MASTER_CODENAME)
+        BOT_VERSION, MASTER_CODENAME
     );
-    let _ = bot
-        .send_message(msg.chat.id, text)
-        .parse_mode(ParseMode::MarkdownV2)
-        .await;
+    bot.send_message(msg.chat.id, text)
+        .parse_mode(ParseMode::Html)
+        .await?;
     Ok(())
 }
 
 // --- 🧠 Engine & Intelligence Logic ---
 
 async fn engine_list_protocols(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
-    let mut text = String::from("🧬 *Active Engine Protocol Matrix:*\n\n");
+    let mut text = String::from("🧬 <b>Active Engine Protocol Matrix:</b>\n\n");
     for proto in Protocol::all() {
         text.push_str(&format!(
-            "◈ *{}* \\- Handler Port: `{}`\n",
-            markdown::escape(&proto.name().to_uppercase()),
+            "◈ <b>{}</b> — Handler Port: <code>{}</code>\n",
+            html_escape::encode_safe(&proto.name().to_uppercase()),
             proto.default_port()
         ));
     }
-    let _ = bot
-        .send_message(msg.chat.id, text)
-        .parse_mode(ParseMode::MarkdownV2)
-        .await;
+    bot.send_message(msg.chat.id, text)
+        .parse_mode(ParseMode::Html)
+        .await?;
     Ok(())
 }
 
@@ -629,9 +628,8 @@ async fn engine_execute_search(
 ) -> Result<(), teloxide::RequestError> {
     let query = q.trim().to_lowercase();
     if query.is_empty() {
-        let _ = bot
-            .send_message(msg.chat.id, "💡 Usage hint: `/search mimikatz`")
-            .await;
+        bot.send_message(msg.chat.id, "💡 Usage hint: <code>/search mimikatz</code>")
+           .parse_mode(ParseMode::Html).await?;
         return Ok(());
     }
 
@@ -641,8 +639,8 @@ async fn engine_execute_search(
     for p in Protocol::all() {
         if p.name().to_lowercase().contains(&query) {
             results.push(format!(
-                "🛡️ Protocol: *{}*",
-                markdown::escape(&p.name().to_uppercase())
+                "🛡️ Protocol: <b>{}</b>",
+                html_escape::encode_safe(&p.name().to_uppercase())
             ));
         }
     }
@@ -653,30 +651,29 @@ async fn engine_execute_search(
         {
             let protos = m.supported_protocols().join("|");
             results.push(format!(
-                "🧩 Module: `{}` \\[`{}`\\]\n   _{}_",
-                markdown::escape(m.name()),
-                markdown::escape(&protos),
-                markdown::escape(m.description())
+                "🧩 Module: <code>{}</code> [<code>{}</code>]\n   <i>{}</i>",
+                html_escape::encode_safe(m.name()),
+                html_escape::encode_safe(&protos),
+                html_escape::encode_safe(m.description())
             ));
         }
     }
 
     if results.is_empty() {
-        let _ = bot
-            .send_message(
+        bot.send_message(
                 msg.chat.id,
                 format!(
-                    "❌ Zero reconnaissance results for `{}`",
-                    markdown::escape(&q)
+                    "❌ Zero reconnaissance results for <code>{}</code>",
+                    html_escape::encode_safe(&q)
                 ),
             )
-            .parse_mode(ParseMode::MarkdownV2)
-            .await;
+            .parse_mode(ParseMode::Html)
+            .await?;
     } else {
         let total = results.len();
         let header = format!(
-            "🔎 *Intelligence results for* `{}` \\({} found\\):\n\n",
-            markdown::escape(&query),
+            "🔎 <b>Intelligence results for <code>{}</code></b> ({} found):\n\n",
+            html_escape::encode_safe(&query),
             total
         );
         send_long_msg_batched(&bot, msg.chat.id, header, results).await?;
@@ -691,9 +688,8 @@ async fn engine_list_modules(
 ) -> Result<(), teloxide::RequestError> {
     let p_name = proto.trim();
     if p_name.is_empty() {
-        let _ = bot
-            .send_message(msg.chat.id, "💡 Usage hint: `/modules smb`")
-            .await;
+        bot.send_message(msg.chat.id, "💡 Usage hint: <code>/modules smb</code>")
+           .parse_mode(ParseMode::Html).await?;
         return Ok(());
     }
 
@@ -701,26 +697,25 @@ async fn engine_list_modules(
     let list = registry.list(Some(p_name));
 
     if list.is_empty() {
-        let _ = bot
-            .send_message(
+        bot.send_message(
                 msg.chat.id,
                 format!(
-                    "❌ No payload modules found for protocol `{}`",
-                    markdown::escape(p_name)
+                    "❌ No payload modules found for protocol <code>{}</code>",
+                    html_escape::encode_safe(p_name)
                 ),
             )
-            .parse_mode(ParseMode::MarkdownV2)
-            .await;
+            .parse_mode(ParseMode::Html)
+            .await?;
     } else {
         let mut text = format!(
-            "🧩 *Offensive Payloads for {}*:\n\n",
-            markdown::escape(&p_name.to_uppercase())
+            "🧩 <b>Offensive Payloads for {}</b>:\n\n",
+            html_escape::encode_safe(&p_name.to_uppercase())
         );
         for m in list {
             text.push_str(&format!(
-                "• *{}*\n  _{}_\n\n",
-                markdown::escape(m.name()),
-                markdown::escape(m.description())
+                "• <b>{}</b>\n  <i>{}</i>\n\n",
+                html_escape::encode_safe(m.name()),
+                html_escape::encode_safe(m.description())
             ));
         }
         send_long_msg_batched(&bot, msg.chat.id, text, vec![]).await?;
@@ -743,11 +738,11 @@ async fn engine_execute_help(
 
     match engine_perform_task(argv.into_iter().skip(1).collect()).await {
         Ok(help_text) => {
-            let _ = bot.send_message(msg.chat.id, format!("```\n{}\n```", help_text))
-                .parse_mode(ParseMode::MarkdownV2).await;
+            bot.send_message(msg.chat.id, format!("<pre>{}</pre>", html_escape::encode_safe(&help_text)))
+                .parse_mode(ParseMode::Html).await?;
         }
         Err(e) => {
-            let _ = bot.send_message(msg.chat.id, format!("❌ Help search error: {}", e)).await;
+            bot.send_message(msg.chat.id, format!("❌ Help search error: {}", e)).await?;
         }
     }
     Ok(())
@@ -767,22 +762,20 @@ async fn engine_execute_guide(
 async fn recon_ping(bot: Bot, msg: Message, target: String) -> Result<(), teloxide::RequestError> {
     let target = target.trim();
     if target.is_empty() {
-        let _ = bot
-            .send_message(msg.chat.id, "💡 Usage: `/ping 8.8.8.8`")
-            .await;
+        bot.send_message(msg.chat.id, "💡 Usage: <code>/ping 8.8.8.8</code>")
+           .parse_mode(ParseMode::Html).await?;
         return Ok(());
     }
 
-    let _ = bot
-        .send_message(
+    bot.send_message(
             msg.chat.id,
             format!(
-                "📡 _Pinging {} in progress \\.\\.\\._",
-                markdown::escape(target)
+                "📡 <i>Pinging {} in progress ...</i>",
+                html_escape::encode_safe(target)
             ),
         )
-        .parse_mode(ParseMode::MarkdownV2)
-        .await;
+        .parse_mode(ParseMode::Html)
+        .await?;
 
     let output = if cfg!(windows) {
         std::process::Command::new("ping")
@@ -804,28 +797,26 @@ async fn recon_ping(bot: Bot, msg: Message, target: String) -> Result<(), teloxi
 
     match output {
         Ok(out) if out.status.success() => {
-            let _ = bot
-                .send_message(
+            bot.send_message(
                     msg.chat.id,
                     format!(
-                        "✅ Node `{}` is *Online* and active\\.",
-                        markdown::escape(target)
+                        "✅ Node <code>{}</code> is <b>Online</b> and active.",
+                        html_escape::encode_safe(target)
                     ),
                 )
-                .parse_mode(ParseMode::MarkdownV2)
-                .await;
+                .parse_mode(ParseMode::Html)
+                .await?;
         }
         _ => {
-            let _ = bot
-                .send_message(
+            bot.send_message(
                     msg.chat.id,
                     format!(
-                        "❌ Node `{}` is *Offline* or unreachable\\.",
-                        markdown::escape(target)
+                        "❌ Node <code>{}</code> is <b>Offline</b> or unreachable.",
+                        html_escape::encode_safe(target)
                     ),
                 )
-                .parse_mode(ParseMode::MarkdownV2)
-                .await;
+                .parse_mode(ParseMode::Html)
+                .await?;
         }
     }
     Ok(())
@@ -838,9 +829,8 @@ async fn recon_portscan(
 ) -> Result<(), teloxide::RequestError> {
     let parts: Vec<&str> = args.split_whitespace().collect();
     if parts.is_empty() {
-        let _ = bot
-            .send_message(msg.chat.id, "💡 Usage: `/portscan 10.0.0.1 [22,445,3389]`")
-            .await;
+        bot.send_message(msg.chat.id, "💡 Usage: <code>/portscan 10.0.0.1 [22,445,3389]</code>")
+           .parse_mode(ParseMode::Html).await?;
         return Ok(());
     }
 
@@ -854,17 +844,16 @@ async fn recon_portscan(
         ]
     };
 
-    let _ = bot
-        .send_message(
+    bot.send_message(
             msg.chat.id,
             format!(
-                "🔍 _Scanning {} for {} critical ports \\.\\.\\._",
-                markdown::escape(target),
+                "🔍 <i>Scanning {} for {} critical ports ...</i>",
+                html_escape::encode_safe(target),
                 ports.len()
             ),
         )
-        .parse_mode(ParseMode::MarkdownV2)
-        .await;
+        .parse_mode(ParseMode::Html)
+        .await?;
 
     let mut open = Vec::new();
     for port in ports {
@@ -879,17 +868,16 @@ async fn recon_portscan(
     }
 
     if open.is_empty() {
-        let _ = bot
-            .send_message(
+        bot.send_message(
                 msg.chat.id,
-                format!("⚠️ No open ports found on `{}`", markdown::escape(target)),
+                format!("⚠️ No open ports found on <code>{}</code>", html_escape::encode_safe(target)),
             )
-            .parse_mode(ParseMode::MarkdownV2)
-            .await;
+            .parse_mode(ParseMode::Html)
+            .await?;
     } else {
         let mut text = format!(
-            "🗺️ *Port Recon Result for `{}`*:\n\n",
-            markdown::escape(target)
+            "🗺️ <b>Port Recon Result for <code>{}</code></b>:\n\n",
+            html_escape::encode_safe(target)
         );
         for p in open {
             let svc = match p {
@@ -909,12 +897,11 @@ async fn recon_portscan(
                 5900 => "VNC",
                 _ => "UNK",
             };
-            text.push_str(&format!("• Port `{:<5}` → *{}*\n", p, svc));
+            text.push_str(&format!("• Port <code>{:<5}</code> → <b>{}</b>\n", p, svc));
         }
-        let _ = bot
-            .send_message(msg.chat.id, text)
-            .parse_mode(ParseMode::MarkdownV2)
-            .await;
+        bot.send_message(msg.chat.id, text)
+            .parse_mode(ParseMode::Html)
+            .await?;
     }
     Ok(())
 }
@@ -922,48 +909,44 @@ async fn recon_portscan(
 async fn recon_dns(bot: Bot, msg: Message, domain: String) -> Result<(), teloxide::RequestError> {
     let domain = domain.trim();
     if domain.is_empty() {
-        let _ = bot
-            .send_message(msg.chat.id, "💡 Usage: `/dns target.pro`")
-            .await;
+        bot.send_message(msg.chat.id, "💡 Usage: <code>/dns target.pro</code>")
+           .parse_mode(ParseMode::Html).await?;
         return Ok(());
     }
 
-    let _ = bot
-        .send_message(
+    bot.send_message(
             msg.chat.id,
             format!(
-                "📖 _Querying records for {} \\.\\.\\._",
-                markdown::escape(domain)
+                "📖 <i>Querying records for {} ...</i>",
+                html_escape::encode_safe(domain)
             ),
         )
-        .parse_mode(ParseMode::MarkdownV2)
-        .await;
+        .parse_mode(ParseMode::Html)
+        .await?;
 
     match (domain, 0).to_socket_addrs() {
         Ok(addrs) => {
             let mut text = format!(
-                "📖 *DNS Resolution result for `{}`*:\n\n",
-                markdown::escape(domain)
+                "📖 <b>DNS Resolution result for <code>{}</code></b>:\n\n",
+                html_escape::encode_safe(domain)
             );
             for a in addrs {
-                text.push_str(&format!("◈ `{}`\n", markdown::escape(&a.ip().to_string())));
+                text.push_str(&format!("◈ <code>{}</code>\n", html_escape::encode_safe(&a.ip().to_string())));
             }
-            let _ = bot
-                .send_message(msg.chat.id, text)
-                .parse_mode(ParseMode::MarkdownV2)
-                .await;
+            bot.send_message(msg.chat.id, text)
+                .parse_mode(ParseMode::Html)
+                .await?;
         }
         Err(e) => {
-            let _ = bot
-                .send_message(
+            bot.send_message(
                     msg.chat.id,
                     format!(
-                        "❌ RESOLUTION ERROR: `{}`",
-                        markdown::escape(&e.to_string())
+                        "❌ RESOLUTION ERROR: <code>{}</code>",
+                        html_escape::encode_safe(&e.to_string())
                     ),
                 )
-                .parse_mode(ParseMode::MarkdownV2)
-                .await;
+                .parse_mode(ParseMode::Html)
+                .await?;
         }
     }
     Ok(())
@@ -976,43 +959,40 @@ async fn recon_reverse_dns(
 ) -> Result<(), teloxide::RequestError> {
     let ip = ip.trim();
     if ip.is_empty() {
-        let _ = bot
-            .send_message(msg.chat.id, "💡 Usage: `/reverse 8.8.8.8`")
-            .await;
+        bot.send_message(msg.chat.id, "💡 Usage: <code>/reverse 8.8.8.8</code>")
+           .parse_mode(ParseMode::Html).await?;
         return Ok(());
     }
 
-    let _ = bot
-        .send_message(
+    bot.send_message(
             msg.chat.id,
             format!(
-                "🔄 _Performing Reverse Pointer lookup for {} \\.\\.\\._",
-                markdown::escape(ip)
+                "🔄 <i>Performing Reverse Pointer lookup for {} ...</i>",
+                html_escape::encode_safe(ip)
             ),
         )
-        .parse_mode(ParseMode::MarkdownV2)
-        .await;
+        .parse_mode(ParseMode::Html)
+        .await?;
 
     match (ip, 0).to_socket_addrs() {
         Ok(_) => {
-            let _ = bot.send_message(msg.chat.id, "💡 Reverse DNS would require specialized lookup crate or shell 'dig -x' command\\. I can implement this in next expansion series\\.")
-                .parse_mode(ParseMode::MarkdownV2).await;
+            bot.send_message(msg.chat.id, "💡 Reverse DNS would require specialized lookup crate or shell 'dig -x' command. I can implement this in next expansion series.")
+                .parse_mode(ParseMode::Html).await?;
         }
         Err(e) => {
-            let _ = bot
-                .send_message(
+            bot.send_message(
                     msg.chat.id,
-                    format!("❌ Lookup failed: `{}`", markdown::escape(&e.to_string())),
+                    format!("❌ Lookup failed: <code>{}</code>", html_escape::encode_safe(&e.to_string())),
                 )
-                .parse_mode(ParseMode::MarkdownV2)
-                .await;
+                .parse_mode(ParseMode::Html)
+                .await?;
         }
     }
     Ok(())
 }
 
 async fn recon_bot_identity(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
-    let mut text = String::from("🌩️ *Bot Instance Network Matrix*\n\n");
+    let mut text = String::from("🌩️ <b>Bot Instance Network Matrix</b>\n\n");
 
     let res = reqwest::get("https://api.ipify.org").await;
     let public_ip = match res {
@@ -1025,21 +1005,20 @@ async fn recon_bot_identity(bot: Bot, msg: Message) -> Result<(), teloxide::Requ
         .unwrap_or_else(|_| "node-unknown".to_string());
 
     text.push_str(&format!(
-        "• Global IP: `{}`\n",
-        markdown::escape(&public_ip)
+        "• Global IP: <code>{}</code>\n",
+        html_escape::encode_safe(&public_ip)
     ));
-    text.push_str(&format!("• Hostname: `{}`\n", markdown::escape(&node_name)));
+    text.push_str(&format!("• Hostname: <code>{}</code>\n", html_escape::encode_safe(&node_name)));
     text.push_str(&format!(
-        "• OS Layer: `{} {}`\n",
-        markdown::escape(std::env::consts::OS),
-        markdown::escape(std::env::consts::ARCH)
+        "• OS Layer: <code>{} {}</code>\n",
+        html_escape::encode_safe(std::env::consts::OS),
+        html_escape::encode_safe(std::env::consts::ARCH)
     ));
-    text.push_str("• Health: `OPTIMAL` ✅\n");
+    text.push_str("• Health: <code>OPTIMAL</code> ✅\n");
 
-    let _ = bot
-        .send_message(msg.chat.id, text)
-        .parse_mode(ParseMode::MarkdownV2)
-        .await;
+    bot.send_message(msg.chat.id, text)
+        .parse_mode(ParseMode::Html)
+        .await?;
     Ok(())
 }
 
@@ -1050,22 +1029,20 @@ async fn recon_geo_lookup(
 ) -> Result<(), teloxide::RequestError> {
     let ip = ip.trim();
     if ip.is_empty() {
-        let _ = bot
-            .send_message(msg.chat.id, "💡 Usage: `/geo 1.1.1.1`")
-            .await;
+        bot.send_message(msg.chat.id, "💡 Usage: <code>/geo 1.1.1.1</code>")
+           .parse_mode(ParseMode::Html).await?;
         return Ok(());
     }
 
-    let _ = bot
-        .send_message(
+    bot.send_message(
             msg.chat.id,
             format!(
-                "🌍 _Geolocating target IP {} \\.\\.\\._",
-                markdown::escape(ip)
+                "🌍 <i>Geolocating target IP {} ...</i>",
+                html_escape::encode_safe(ip)
             ),
         )
-        .parse_mode(ParseMode::MarkdownV2)
-        .await;
+        .parse_mode(ParseMode::Html)
+        .await?;
 
     let url = format!("http://ip-api.com/json/{}", ip);
     match reqwest::get(url).await {
@@ -1073,44 +1050,41 @@ async fn recon_geo_lookup(
             if let Ok(json) = res.json::<serde_json::Value>().await {
                 if json["status"] == "success" {
                     let mut text = format!(
-                        "🌍 *Geolocation Report for `{}`*:\n\n",
-                        markdown::escape(ip)
+                        "🌍 <b>Geolocation Report for <code>{}</code></b>:\n\n",
+                        html_escape::encode_safe(ip)
                     );
                     text.push_str(&format!(
-                        "• Country: *{}*\n",
-                        markdown::escape(json["country"].as_str().unwrap_or("N/A"))
+                        "• Country: <b>{}</b>\n",
+                        html_escape::encode_safe(json["country"].as_str().unwrap_or("N/A"))
                     ));
                     text.push_str(&format!(
-                        "• Region: *{}*\n",
-                        markdown::escape(json["regionName"].as_str().unwrap_or("N/A"))
+                        "• Region: <b>{}</b>\n",
+                        html_escape::encode_safe(json["regionName"].as_str().unwrap_or("N/A"))
                     ));
                     text.push_str(&format!(
-                        "• City: *{}*\n",
-                        markdown::escape(json["city"].as_str().unwrap_or("N/A"))
+                        "• City: <b>{}</b>\n",
+                        html_escape::encode_safe(json["city"].as_str().unwrap_or("N/A"))
                     ));
                     text.push_str(&format!(
-                        "• ISP: `{}`\n",
-                        markdown::escape(json["isp"].as_str().unwrap_or("N/A"))
+                        "• ISP: <code>{}</code>\n",
+                        html_escape::encode_safe(json["isp"].as_str().unwrap_or("N/A"))
                     ));
                     text.push_str(&format!(
-                        "• Coordinates: `{}, {}`\n",
+                        "• Coordinates: <code>{}, {}</code>\n",
                         json["lat"], json["lon"]
                     ));
-                    let _ = bot
-                        .send_message(msg.chat.id, text)
-                        .parse_mode(ParseMode::MarkdownV2)
-                        .await;
+                    bot.send_message(msg.chat.id, text)
+                        .parse_mode(ParseMode::Html)
+                        .await?;
                 } else {
-                    let _ = bot
-                        .send_message(msg.chat.id, "❌ Geographic data not found for this IP\\.")
-                        .await;
+                    bot.send_message(msg.chat.id, "❌ Geographic data not found for this IP.")
+                        .parse_mode(ParseMode::Html).await?;
                 }
             }
         }
         Err(_) => {
-            let _ = bot
-                .send_message(msg.chat.id, "❌ Failed to query GEOLOCATION API\\.")
-                .await;
+            bot.send_message(msg.chat.id, "❌ Failed to query GEOLOCATION API.")
+                .parse_mode(ParseMode::Html).await?;
         }
     }
     Ok(())
@@ -1146,9 +1120,8 @@ async fn engine_run_logic(
     let parts: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
 
     if parts.is_empty() {
-        let _ = bot
-            .send_message(chat_id, "💡 Control Hint: `/run smb 10.0.0.1 -u admin`")
-            .await;
+        bot.send_message(chat_id, "💡 Control Hint: <code>/run smb 10.0.0.1 -u admin</code>")
+           .parse_mode(ParseMode::Html).await?;
         return Ok(());
     }
 
@@ -1174,9 +1147,9 @@ async fn engine_run_logic(
     let status_msg = bot
         .send_message(
             chat_id,
-            "⚙️ _Initializing Professional Execution Handler \\.\\.\\._",
+            "⚙️ <i>Initializing Professional Execution Handler ...</i>",
         )
-        .parse_mode(ParseMode::MarkdownV2)
+        .parse_mode(ParseMode::Html)
         .await?;
 
     match engine_perform_task(parts).await {
@@ -1188,35 +1161,32 @@ async fn engine_run_logic(
                     .iter()
                     .enumerate()
                 {
-                    let mut text = format!("```\n{}\n```", chunk);
+                    let mut text = format!("<pre>{}</pre>", html_escape::encode_safe(chunk));
                     if i == 0 {
-                        text = format!("📦 *Large Output Batch \\({}\\)*\n\n{}", i + 1, text);
+                        text = format!("📦 <b>Large Output Batch ({})</b>\n\n{}", i + 1, text);
                     }
-                    let _ = bot
-                        .send_message(chat_id, text)
-                        .parse_mode(ParseMode::MarkdownV2)
-                        .await;
+                    bot.send_message(chat_id, text)
+                        .parse_mode(ParseMode::Html)
+                        .await?;
                 }
             } else {
-                let _ = bot
-                    .send_message(chat_id, format!("```\n{}\n```", log_text))
-                    .parse_mode(ParseMode::MarkdownV2)
-                    .await;
+                bot.send_message(chat_id, format!("<pre>{}</pre>", html_escape::encode_safe(&log_text)))
+                    .parse_mode(ParseMode::Html)
+                    .await?;
             }
         }
         Err(e) => {
             let err_msg = e.to_string();
-            let _ = bot
-                .edit_message_text(
+            bot.edit_message_text(
                     chat_id,
                     status_msg.id,
                     format!(
-                        "❌ *Critical Engine Fault:*\n`{}`",
-                        markdown::escape(&err_msg)
+                        "❌ <b>Critical Engine Fault:</b>\n<code>{}</code>",
+                        html_escape::encode_safe(&err_msg)
                     ),
                 )
-                .parse_mode(ParseMode::MarkdownV2)
-                .await;
+                .parse_mode(ParseMode::Html)
+                .await?;
         }
     }
     Ok(())
@@ -1336,36 +1306,35 @@ async fn session_show_profile(bot: Bot, msg: Message) -> Result<(), teloxide::Re
     let s = get_session(user.id);
 
     let text = format!(
-        "👤 *OPERATOR DOSSIER*\n\n\
-        • Master ID: `{}`\n\
-        • Permission Level: `{}`\n\
+        "👤 <b>OPERATOR DOSSIER</b>\n\n\
+        • Master ID: <code>{}</code>\n\
+        • Permission Level: <b>{}</b>\n\
         • Name: {}\n\
         • Handle: {}\n\n\
-        *Session Intelligence:*\n\
-        • Protocol: `{}`\n\
-        • Target: `{}`\n\
-        • Uptime: `{}`\n\n\
-        _Data is strictly tactical and ephemeral_ ◈",
+        <b>Session Intelligence:</b>\n\
+        • Protocol: <code>{}</code>\n\
+        • Target: <code>{}</code>\n\
+        • Uptime: <code>{}</code>\n\n\
+        <i>Data is strictly tactical and ephemeral</i> ◈",
         user.id,
         if is_admin(user.id) {
             "ADMINISTRATOR"
         } else {
             "AUTHORIZED"
         },
-        markdown::escape(&user.full_name()),
+        html_escape::encode_safe(&user.full_name()),
         user.username
             .as_ref()
-            .map(|u| format!("@{}", markdown::escape(u)))
+            .map(|u| format!("@{}", html_escape::encode_safe(u)))
             .unwrap_or_else(|| "none".to_string()),
-        markdown::escape(s.last_protocol.as_deref().unwrap_or("none")),
-        markdown::escape(s.last_target.as_deref().unwrap_or("none")),
-        markdown::escape(&format!("{:?}", s.last_activity.elapsed()))
+        html_escape::encode_safe(s.last_protocol.as_deref().unwrap_or("none")),
+        html_escape::encode_safe(s.last_target.as_deref().unwrap_or("none")),
+        html_escape::encode_safe(&format!("{:?}", s.last_activity.elapsed()))
     );
 
-    let _ = bot
-        .send_message(msg.chat.id, text)
-        .parse_mode(ParseMode::MarkdownV2)
-        .await;
+    bot.send_message(msg.chat.id, text)
+        .parse_mode(ParseMode::Html)
+        .await?;
     Ok(())
 }
 
@@ -1374,43 +1343,39 @@ async fn session_show_status(bot: Bot, msg: Message) -> Result<(), teloxide::Req
         .map(|h: OsString| h.to_string_lossy().to_string())
         .unwrap_or_else(|_| "unknown".to_string());
     let text = format!(
-        "🛰️ *SYSTEM STATUS REPORT*\n\n\
-        • Suite Version: `{}`\n\
-        • Build Signature: `{}`\n\
-        • Host Node: `{}`\n\
-        • Core Capacity: `{}` vCPUs\n\
-        • Memory Guard: `Healthy`\n\
-        • Connectivity: `Secure TLS` ✅\n\n\
-        🛡️ _Active Monitor Protocol enabled_",
-        markdown::escape(BOT_VERSION),
-        markdown::escape(MASTER_CODENAME),
-        markdown::escape(&h_name),
+        "🛰️ <b>SYSTEM STATUS REPORT</b>\n\n\
+        • Suite Version: <code>{}</code>\n\
+        • Build Signature: <code>{}</code>\n\
+        • Host Node: <code>{}</code>\n\
+        • Core Capacity: <code>{}</code> vCPUs\n\
+        • Memory Guard: <code>Healthy</code>\n\
+        • Connectivity: <code>Secure TLS</code> ✅\n\n\
+        🛡️ <i>Active Monitor Protocol enabled</i>",
+        BOT_VERSION,
+        MASTER_CODENAME,
+        html_escape::encode_safe(&h_name),
         std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(1)
     );
-    let _ = bot
-        .send_message(msg.chat.id, text)
-        .parse_mode(ParseMode::MarkdownV2)
-        .await;
+    bot.send_message(msg.chat.id, text)
+        .parse_mode(ParseMode::Html)
+        .await?;
     Ok(())
 }
 
 async fn session_show_history(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
     let s = get_session(msg.from.as_ref().unwrap().id);
     if s.history.is_empty() {
-        let _ = bot
-            .send_message(msg.chat.id, "📜 Operator history is currently clean\\.")
-            .await;
+        bot.send_message(msg.chat.id, "📜 Operator history is currently clean.").await?;
     } else {
-        let mut log = String::from("📜 *Target History Intelligence:*\n\n");
+        let mut log = String::from("📜 <b>Target History Intelligence:</b>\n\n");
         for (i, t) in s.history.iter().rev().enumerate() {
-            log.push_str(&format!("◈ `{:02}` : `{}`\n", i + 1, markdown::escape(t)));
+            log.push_str(&format!("◈ <code>{:02}</code> : <code>{}</code>\n", i + 1, html_escape::encode_safe(t)));
         }
-        let _ = bot
-            .send_message(msg.chat.id, log)
-            .parse_mode(ParseMode::MarkdownV2)
-            .await;
+        bot.send_message(msg.chat.id, log)
+            .parse_mode(ParseMode::Html)
+            .await?;
     }
     Ok(())
 }
@@ -1419,30 +1384,40 @@ async fn session_purge(bot: Bot, msg: Message) -> Result<(), teloxide::RequestEr
     update_session(msg.from.as_ref().unwrap().id, |s| {
         *s = UserSession::default()
     });
-    let _ = bot.send_message(msg.chat.id, "🧹 *TACTICAL PURGE COMPLETE*\nAll session memory and history logs have been destroyed\\.").parse_mode(ParseMode::MarkdownV2).await;
+    bot.send_message(msg.chat.id, "🧹 <b>TACTICAL PURGE COMPLETE</b>\nAll session memory and history logs have been destroyed.")
+        .parse_mode(ParseMode::Html).await?;
+    Ok(())
+}
+
+async fn session_clear(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
+    update_session(msg.from.as_ref().unwrap().id, |s| {
+        *s = UserSession::default()
+    });
+    // Send a "blank" message or just a clear notification
+    bot.send_message(msg.chat.id, "✨ <b>TERMINAL CLEARED</b>\nSession reset. Node ready for new tasking.")
+        .parse_mode(ParseMode::Html).await?;
     Ok(())
 }
 
 async fn session_show_cheat(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
-    let text = "📑 *TACTICAL OPERATOR CHEAT SHEET*\n\n\
-        ◈ *SMB Exploration*\n\
-        `/run smb 10.0.0.0/24 -u guest -p \"\" --shares`\n\
-        `/run smb target.local -u admin -H <hash> --users`\n\n\
-        ◈ *LDAP Reconnaissance*\n\
-        `/run ldap dc01.pro -u \"\" -p \"\" --gmsa`\n\
-        `/run ldap dc01.pro -u k.admin -p p --asreproasting`\n\n\
-        ◈ *SSH & WinRM Command Loops*\n\
-        `/run ssh node-01 -u root -p pass -x \"id\"`\n\
-        `/run winrm dc02 -u svc_adm -p pass -X \"Get-Process\"`\n\n\
-        ◈ *Database & App Attacks*\n\
-        `/run mssql sql01 -u sa -p pass -x \"whoami\"`\n\
-        `/run adb 192.168.1.50 --screenshot`\n\n\
-        ◈ *Master Control Pivot*\n\
-        Use `/shell` to enter interactive mode for your last target\\.".to_string();
-    let _ = bot
-        .send_message(msg.chat.id, text)
-        .parse_mode(ParseMode::MarkdownV2)
-        .await;
+    let text = "📑 <b>TACTICAL OPERATOR CHEAT SHEET</b>\n\n\
+        ◈ <b>SMB Exploration</b>\n\
+        <code>/run smb 10.0.0.0/24 -u guest -p \"\" --shares</code>\n\
+        <code>/run smb target.local -u admin -H &lt;hash&gt; --users</code>\n\n\
+        ◈ <b>LDAP Reconnaissance</b>\n\
+        <code>/run ldap dc01.pro -u \"\" -p \"\" --gmsa</code>\n\
+        <code>/run ldap dc01.pro -u k.admin -p p --asreproasting</code>\n\n\
+        ◈ <b>SSH &amp; WinRM Command Loops</b>\n\
+        <code>/run ssh node-01 -u root -p pass -x \"id\"</code>\n\
+        <code>/run winrm dc02 -u svc_adm -p pass -X \"Get-Process\"</code>\n\n\
+        ◈ <b>Database &amp; App Attacks</b>\n\
+        <code>/run mssql sql01 -u sa -p pass -x \"whoami\"</code>\n\
+        <code>/run adb 192.168.1.50 --screenshot</code>\n\n\
+        ◈ <b>Master Control Pivot</b>\n\
+        Use <code>/shell</code> to enter interactive mode for your last target.";
+    bot.send_message(msg.chat.id, text)
+        .parse_mode(ParseMode::Html)
+        .await?;
     Ok(())
 }
 
@@ -1455,12 +1430,11 @@ async fn admin_whitelist(
 ) -> Result<(), teloxide::RequestError> {
     let admin_id = msg.from.as_ref().map(|u| u.id).unwrap_or(UserId(0));
     if !is_admin(admin_id) {
-        let _ = bot
-            .send_message(
+        bot.send_message(
                 msg.chat.id,
-                "❌ *ACCESS RESTRICTED*\nAdmin credentials required\\.",
+                "❌ <b>ACCESS RESTRICTED</b>\nAdmin credentials required.",
             )
-            .await;
+            .parse_mode(ParseMode::Html).await?;
         return Ok(());
     }
 
@@ -1469,16 +1443,14 @@ async fn admin_whitelist(
             let allowed = ALLOWED_USERS.get_or_init(|| Mutex::new(HashSet::new()));
             allowed.lock().unwrap().insert(id_val);
         }
-        let _ = bot
-            .send_message(
+        bot.send_message(
                 msg.chat.id,
-                format!("✅ Operator `{}` successfully whitelisted\\.", id_val),
+                format!("✅ Operator <code>{}</code> successfully whitelisted.", id_val),
             )
-            .await;
+            .parse_mode(ParseMode::Html).await?;
     } else {
-        let _ = bot
-            .send_message(msg.chat.id, "💡 Usage: `/whitelist <user_id>`")
-            .await;
+        bot.send_message(msg.chat.id, "💡 Usage: <code>/whitelist &lt;user_id&gt;</code>")
+            .parse_mode(ParseMode::Html).await?;
     }
     Ok(())
 }
@@ -1499,18 +1471,17 @@ async fn admin_broadcast(
         map.keys().copied().collect()
     };
 
-    let b_msg = format!("📢 *GLOBAL BROADCAST*\n\n{}", markdown::escape(&text));
+    let b_msg = format!("📢 <b>GLOBAL BROADCAST</b>\n\n{}", html_escape::encode_safe(&text));
 
     for uid in uids {
         let _ = bot
             .send_message(ChatId(uid as i64), &b_msg)
-            .parse_mode(ParseMode::MarkdownV2)
+            .parse_mode(ParseMode::Html)
             .await;
     }
 
-    let _ = bot
-        .send_message(msg.chat.id, "✅ Broadcast message dispatched\\.")
-        .await;
+    bot.send_message(msg.chat.id, "✅ Broadcast message dispatched.")
+       .parse_mode(ParseMode::Html).await?;
     Ok(())
 }
 
@@ -1563,25 +1534,22 @@ async fn send_long_msg_batched(
     if items.is_empty() {
         if header.len() > MAX_MESSAGE_LENGTH {
             for chunk in chunk_string(&header, 4000) {
-                let _ = bot
-                    .send_message(chat_id, chunk)
-                    .parse_mode(ParseMode::MarkdownV2)
-                    .await;
+                bot.send_message(chat_id, chunk)
+                   .parse_mode(ParseMode::Html)
+                   .await?;
             }
         } else {
-            let _ = bot
-                .send_message(chat_id, header)
-                .parse_mode(ParseMode::MarkdownV2)
-                .await;
+            bot.send_message(chat_id, header)
+               .parse_mode(ParseMode::Html)
+               .await?;
         }
     } else {
         let mut text = header;
         for i in items {
             if text.len() + i.len() > 3800 {
-                let _ = bot
-                    .send_message(chat_id, text)
-                    .parse_mode(ParseMode::MarkdownV2)
-                    .await;
+                bot.send_message(chat_id, text)
+                   .parse_mode(ParseMode::Html)
+                   .await?;
                 text = String::from("◈ ");
                 text.push_str(&i);
                 text.push('\n');
@@ -1592,10 +1560,9 @@ async fn send_long_msg_batched(
             }
         }
         if !text.is_empty() {
-            let _ = bot
-                .send_message(chat_id, text)
-                .parse_mode(ParseMode::MarkdownV2)
-                .await;
+            bot.send_message(chat_id, text)
+               .parse_mode(ParseMode::Html)
+               .await?;
         }
     }
     Ok(())

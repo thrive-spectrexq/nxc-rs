@@ -27,3 +27,4 @@ teloxide = { workspace = true }
 dotenvy = { workspace = true }
 hostname = { workspace = true }
 reqwest = { workspace = true }
+html-escape = "0.2"
