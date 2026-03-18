@@ -25,3 +25,5 @@ serde_json = { workspace = true }
 chrono = { workspace = true }
 teloxide = { workspace = true }
 dotenvy = { workspace = true }
+hostname = { workspace = true }
+reqwest = { workspace = true }

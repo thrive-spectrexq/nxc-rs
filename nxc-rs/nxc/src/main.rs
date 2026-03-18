@@ -20,7 +20,7 @@ use std::time::Duration;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const CODENAME: &str = "Rusty-Reaper";
 
-fn build_cli() -> Command {
+pub(crate) fn build_cli() -> Command {
     let banner = format!(
         r#"
      .   .
@@ -601,7 +601,7 @@ fn build_cli() -> Command {
 }
 
 /// Build credentials from CLI arguments.
-fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
+pub(crate) fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
     let mut creds = Vec::new();
 
     let usernames: Vec<&str> = matches
@@ -663,7 +663,7 @@ fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
 }
 
 /// Resolve the protocol handler from the subcommand name.
-fn get_protocol_handler(
+pub(crate) fn get_protocol_handler(
     protocol_name: &str,
     sub_matches: &clap::ArgMatches,
 ) -> Option<Arc<dyn nxc_protocols::NxcProtocol>> {
