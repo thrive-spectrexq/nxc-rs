@@ -65,7 +65,7 @@ impl WifiProtocol {
     /// Perform a WiFi scan using `netsh wlan show networks mode=bssid` (Windows)
     async fn scan_networks(&self) -> Result<String> {
         let output = tokio::process::Command::new("netsh")
-            .args(&["wlan", "show", "networks", "mode=bssid"])
+            .args(["wlan", "show", "networks", "mode=bssid"])
             .output()
             .await?;
 
@@ -83,7 +83,7 @@ impl WifiProtocol {
     /// Connect to a specific SSID using `netsh wlan connect name="..."`
     async fn connect_ssid(&self, ssid: &str) -> Result<String> {
         let output = tokio::process::Command::new("netsh")
-            .args(&["wlan", "connect", &format!("name={}", ssid)])
+            .args(["wlan", "connect", &format!("name={}", ssid)])
             .output()
             .await?;
 
@@ -101,7 +101,7 @@ impl WifiProtocol {
     /// Perform a device sweep using `arp -a`
     async fn sweep_devices(&self) -> Result<String> {
         let output = tokio::process::Command::new("arp")
-            .args(&["-a"])
+            .args(["-a"])
             .output()
             .await?;
 
@@ -119,7 +119,7 @@ impl WifiProtocol {
     /// List saved WiFi profiles
     async fn list_profiles(&self) -> Result<String> {
         let output = tokio::process::Command::new("netsh")
-            .args(&["wlan", "show", "profiles"])
+            .args(["wlan", "show", "profiles"])
             .output()
             .await?;
 
@@ -152,7 +152,7 @@ impl WifiProtocol {
 
                     // Dump this specific profile
                     let output = tokio::process::Command::new("netsh")
-                        .args(&[
+                        .args([
                             "wlan",
                             "show",
                             "profile",

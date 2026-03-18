@@ -466,8 +466,7 @@ async fn handle_interactive_callbacks(
 // --- 🎨 UI & Presentation Logic ---
 
 async fn ui_send_dashboard(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
-    let text = format!(
-        "🛡️ *NETEXEC\\-RS PROFESSIONAL CONTROL CENTER*\n\n\
+    let text = "🛡️ *NETEXEC\\-RS PROFESSIONAL CONTROL CENTER*\n\n\
         *Strategic Operations Commands:*\n\n\
         🚀 *Deploy:* /run /smb /ssh /ldap /winrm\n\
         🔍 *Intelligence:* /search /modules /protocols\n\
@@ -475,8 +474,7 @@ async fn ui_send_dashboard(bot: Bot, msg: Message) -> Result<(), teloxide::Reque
         📋 *Shortcuts:* /shares /users /groups\n\
         👤 *Identity:* /whoami /history /reset\n\
         ⚙️ *System:* /status /guide /cheat /about\n\n\
-        _Rank: master\\-operator_ ◈ _Node: rusty\\-reaper_"
-    );
+        _Rank: master\\-operator_ ◈ _Node: rusty\\-reaper_".to_string();
     let _ = bot
         .send_message(msg.chat.id, &text)
         .parse_mode(ParseMode::MarkdownV2)
@@ -505,8 +503,7 @@ async fn ui_send_protocol_console(bot: Bot, msg: Message) -> Result<(), teloxide
 }
 
 async fn ui_send_handbook(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
-    let text = format!(
-        "📜 *MASTER OPERATOR'S HANDBOOK*\n\n\
+    let text = "📜 *MASTER OPERATOR'S HANDBOOK*\n\n\
         *1. Targeting Intelligence*\n\
         • Individual: `10.0.0.1`\n\
         • CIDR Range: `192.168.1.0/24`\n\
@@ -519,8 +516,7 @@ async fn ui_send_handbook(bot: Bot, msg: Message) -> Result<(), teloxide::Reques
         Attach scripts with `-M module_name`\\.\n\
         Example: `/smb 192.168.1.5 -M mimikatz`\n\n\
         *4. Advanced Optimization*\n\
-        Tune performance with `--threads 500` or `--timeout 120`\\."
-    );
+        Tune performance with `--threads 500` or `--timeout 120`\\.".to_string();
     let _ = bot
         .send_message(msg.chat.id, text)
         .parse_mode(ParseMode::MarkdownV2)
@@ -984,19 +980,19 @@ async fn recon_geo_lookup(
                     );
                     text.push_str(&format!(
                         "• Country: *{}*\n",
-                        markdown::escape(&json["country"].as_str().unwrap_or("N/A"))
+                        markdown::escape(json["country"].as_str().unwrap_or("N/A"))
                     ));
                     text.push_str(&format!(
                         "• Region: *{}*\n",
-                        markdown::escape(&json["regionName"].as_str().unwrap_or("N/A"))
+                        markdown::escape(json["regionName"].as_str().unwrap_or("N/A"))
                     ));
                     text.push_str(&format!(
                         "• City: *{}*\n",
-                        markdown::escape(&json["city"].as_str().unwrap_or("N/A"))
+                        markdown::escape(json["city"].as_str().unwrap_or("N/A"))
                     ));
                     text.push_str(&format!(
                         "• ISP: `{}`\n",
-                        markdown::escape(&json["isp"].as_str().unwrap_or("N/A"))
+                        markdown::escape(json["isp"].as_str().unwrap_or("N/A"))
                     ));
                     text.push_str(&format!(
                         "• Coordinates: `{}, {}`\n",
@@ -1301,8 +1297,7 @@ async fn session_purge(bot: Bot, msg: Message) -> Result<(), teloxide::RequestEr
 }
 
 async fn session_show_cheat(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
-    let text = format!(
-        "📑 *NXC OPERATOR CHEAT SHEET*\n\n\
+    let text = "📑 *NXC OPERATOR CHEAT SHEET*\n\n\
         ◈ *SMB Enumeration*\n\
         `/run smb 10.0.0.0/24 -u guest -p \"\" --shares`\n\n\
         ◈ *SSH Command Loop*\n\
@@ -1310,8 +1305,7 @@ async fn session_show_cheat(bot: Bot, msg: Message) -> Result<(), teloxide::Requ
         ◈ *WinRM Admin Check*\n\
         `/winrm 192.168.1.1 -u admin -H <nt_hash>`\n\n\
         ◈ *LDAP User Extraction*\n\
-        `/ldap dc01 -u \"\" -p \"\" --users`"
-    );
+        `/ldap dc01 -u \"\" -p \"\" --users`".to_string();
     let _ = bot
         .send_message(msg.chat.id, text)
         .parse_mode(ParseMode::MarkdownV2)
@@ -1461,11 +1455,11 @@ async fn send_long_msg_batched(
                     .await;
                 text = String::from("◈ ");
                 text.push_str(&i);
-                text.push_str("\n");
+                text.push('\n');
             } else {
                 text.push_str("◈ ");
                 text.push_str(&i);
-                text.push_str("\n");
+                text.push('\n');
             }
         }
         if !text.is_empty() {

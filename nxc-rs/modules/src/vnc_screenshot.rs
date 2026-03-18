@@ -12,6 +12,12 @@ impl VncScreenshot {
     }
 }
 
+impl Default for VncScreenshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl NxcModule for VncScreenshot {
     fn name(&self) -> &'static str {
