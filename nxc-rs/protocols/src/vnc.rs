@@ -37,6 +37,9 @@ impl NxcSession for VncSession {
     fn is_admin(&self) -> bool {
         self.admin
     }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
@@ -230,7 +233,7 @@ impl VncProtocol {
             None => return Err(anyhow!("VNC stream not open")),
         };
 
-        // FramebufferUpdateRequest
+        // 1. Send FramebufferUpdateRequest
         let mut req = vec![3, 0]; // MsgType=3, Incremental=0
         req.extend_from_slice(&0u16.to_be_bytes()); // X
         req.extend_from_slice(&0u16.to_be_bytes()); // Y
@@ -239,21 +242,51 @@ impl VncProtocol {
 
         stream.write_all(&req).await?;
 
-        // In a real implementation, we'd read the pixels here.
-        // For the offensive MVP, we just prove we can trigger the update.
-        debug!("VNC: Screenshot requested for {}x{} display", width, height);
+        // 2. Read FramebufferUpdate
+        // MsgType (1) + Padding (1) + Number of Rectangles (2)
+        let mut msg_header = [0u8; 4];
+        stream.read_exact(&mut msg_header).await?;
+        
+        if msg_header[0] != 0 {
+            return Err(anyhow!("Expected FramebufferUpdate (0), got {}", msg_header[0]));
+        }
 
-        let path = format!(
-            "screenshots/vnc_{}_{}.bin",
-            vnc_sess.target,
-            std::time::SystemTime::now()
-                .duration_since(std::time::SystemTime::UNIX_EPOCH)?
-                .as_secs()
-        );
-        // Mock save
+        let n_rects = u16::from_be_bytes([msg_header[2], msg_header[3]]);
+        debug!("VNC: Receiving {} rectangles for {}x{} screenshot", n_rects, width, height);
+
+        let mut fb_data = Vec::new();
+        for _ in 0..n_rects {
+            // Rectangle Header: X(2), Y(2), W(2), H(2), Encoding(4)
+            let mut rect_header = [0u8; 12];
+            stream.read_exact(&mut rect_header).await?;
+            
+            let w = u16::from_be_bytes([rect_header[4], rect_header[5]]);
+            let h = u16::from_be_bytes([rect_header[6], rect_header[7]]);
+            let encoding = i32::from_be_bytes([rect_header[8], rect_header[9], rect_header[10], rect_header[11]]);
+
+            if encoding == 0 { // Raw encoding
+                let pixel_data_len = (w as usize) * (h as usize) * 4; // Assuming 32-bit (common)
+                let mut pixels = vec![0u8; pixel_data_len];
+                stream.read_exact(&mut pixels).await?;
+                fb_data.extend_from_slice(&pixels);
+            } else {
+                debug!("VNC: Unsupported encoding {}, skipping rect", encoding);
+            }
+        }
+
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)?
+            .as_secs();
+        let path = format!("screenshots/vnc_{}_{}.bin", vnc_sess.target, timestamp);
+        
         std::fs::create_dir_all("screenshots")?;
-        std::fs::write(&path, b"VNC Raw Frame Buffer Data Placeholder")?;
+        if fb_data.is_empty() {
+             std::fs::write(&path, b"VNC Update Received (No raw data captured/unsupported encoding)")?;
+        } else {
+             std::fs::write(&path, &fb_data)?;
+        }
 
+        info!("VNC: Screenshot saved to {}", path);
         Ok(path)
     }
 }

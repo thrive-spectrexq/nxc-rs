@@ -71,6 +71,9 @@ impl NxcSession for AdbSession {
         self.admin
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
@@ -283,5 +286,31 @@ impl NxcProtocol for AdbProtocol {
             stderr: String::new(), // ADB merges stdio
             exit_code: Some(0),    // Not natively reported via ADB `WRTE` in basic implementations
         })
+    }
+}
+
+impl AdbProtocol {
+    /// Capture a screenshot from the Android device using `screencap -p`.
+    pub async fn capture_screenshot(&self, session: &dyn NxcSession) -> Result<String> {
+        let target = session.target().to_string();
+        info!("ADB: Capturing screenshot from {}", target);
+
+        // Execute `screencap -p` to get binary PNG data
+        let output = self.execute(session, "screencap -p").await?;
+        
+        if output.stdout.is_empty() {
+            return Err(anyhow!("ADB: screencap returned no data. Is the device screen off?"));
+        }
+
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)?
+            .as_secs();
+        let path = format!("screenshots/adb_{}_{}.png", target, timestamp);
+        
+        std::fs::create_dir_all("screenshots")?;
+        std::fs::write(&path, output.stdout.as_bytes())?;
+
+        info!("ADB: Screenshot saved to {}", path);
+        Ok(path)
     }
 }

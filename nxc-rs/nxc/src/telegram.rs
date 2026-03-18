@@ -144,11 +144,11 @@ where
 enum TelegramBotCommand {
     // --- 🌍 Navigation & Basics ---
     #[command(description = "Main dashboard and help portal")]
-    Help,
+    Help(String),
     #[command(description = "Interactive protocol selection console")]
     Menu,
     #[command(description = "Advanced operator's handbook and guide")]
-    Guide,
+    Guide(String),
     #[command(description = "Show detailed project about information")]
     About,
 
@@ -294,14 +294,22 @@ async fn handle_command(
 
     match cmd {
         // Essentials
-        TelegramBotCommand::Help => {
-            ui_send_dashboard(bot, msg).await?;
+        TelegramBotCommand::Help(args) => {
+            if !args.is_empty() {
+                engine_execute_help(bot, msg, args).await?;
+            } else {
+                ui_send_dashboard(bot, msg).await?;
+            }
         }
         TelegramBotCommand::Menu => {
             ui_send_protocol_console(bot, msg).await?;
         }
-        TelegramBotCommand::Guide => {
-            ui_send_handbook(bot, msg).await?;
+        TelegramBotCommand::Guide(args) => {
+            if !args.is_empty() {
+                engine_execute_guide(bot, msg, args).await?;
+            } else {
+                ui_send_handbook(bot, msg).await?;
+            }
         }
         TelegramBotCommand::About => {
             ui_send_about(bot, msg).await?;
@@ -687,6 +695,40 @@ async fn engine_list_modules(
 }
 
 // --- 🕵️ Reconnaissance Intelligence Suite ---
+
+async fn engine_execute_help(
+    bot: Bot,
+    msg: Message,
+    args: String,
+) -> Result<(), teloxide::RequestError> {
+    let mut argv = vec!["nxc".to_string()];
+    argv.extend(args.split_whitespace().map(|s| s.to_string()));
+    if !argv.iter().any(|s| s == "--help") {
+        argv.push("--help".to_string());
+    }
+
+    match engine_perform_task(argv.into_iter().skip(1).collect()).await {
+        Ok(help_text) => {
+            let _ = bot.send_message(msg.chat.id, format!("```\n{}\n```", help_text))
+                .parse_mode(ParseMode::MarkdownV2).await;
+        }
+        Err(e) => {
+            let _ = bot.send_message(msg.chat.id, format!("❌ Help search error: {}", e)).await;
+        }
+    }
+    Ok(())
+}
+
+async fn engine_execute_guide(
+    bot: Bot,
+    msg: Message,
+    topic: String,
+) -> Result<(), teloxide::RequestError> {
+    // Current handbook is static, in future we can add topic-specific filtering
+    ui_send_handbook(bot, msg).await?;
+    let _ = topic;
+    Ok(())
+}
 
 async fn recon_ping(bot: Bot, msg: Message, target: String) -> Result<(), teloxide::RequestError> {
     let target = target.trim();
@@ -1076,6 +1118,11 @@ async fn engine_run_logic(
         return Ok(());
     }
 
+    // If only protocol is provided, show help for it
+    if parts.len() == 1 && !["ping", "portscan", "dns", "geo", "reverse", "whoami", "status", "cheat", "history"].contains(&parts[0].as_str()) {
+        return engine_execute_help(bot, msg, parts[0].clone()).await;
+    }
+
     update_session(user_id, |s| {
         if parts.len() > 1 {
             let target = parts[1].clone();
@@ -1146,9 +1193,17 @@ async fn engine_perform_task(args: Vec<String>) -> anyhow::Result<String> {
     argv.extend(args);
 
     let cli = crate::build_cli();
-    let matches = cli
-        .try_get_matches_from(argv)
-        .map_err(|e| anyhow::anyhow!("Instruction Validation Failure:\n{}", e))?;
+    let matches = match cli.try_get_matches_from(argv) {
+        Ok(m) => m,
+        Err(e) => {
+            match e.kind() {
+                clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion => {
+                    return Ok(e.render().to_string());
+                }
+                _ => return Err(anyhow::anyhow!("Instruction Validation Failure:\n{}", e)),
+            }
+        }
+    };
 
     let (p_name, sub_m) = matches
         .subcommand()
@@ -1189,6 +1244,8 @@ async fn engine_perform_task(args: Vec<String>) -> anyhow::Result<String> {
         jitter_ms: matches.get_one::<u64>("jitter").copied(),
         continue_on_success: sub_m.get_flag("continue-on-success"),
         no_bruteforce: sub_m.get_flag("no-bruteforce"),
+        modules: Vec::new(),
+        module_opts: std::collections::HashMap::new(),
     };
 
     let engine = ExecutionEngine::new(opts);
@@ -1428,10 +1485,6 @@ fn main_dashboard_markup() -> InlineKeyboardMarkup {
             InlineKeyboardButton::callback("📡 Recon", "btn_recon"),
             InlineKeyboardButton::callback("💓 Pulse", "btn_status"),
         ],
-        vec![InlineKeyboardButton::url(
-            "🔗 Repo",
-            "https://github.com/openpista/nxc-rs".parse().unwrap(),
-        )],
     ])
 }
 

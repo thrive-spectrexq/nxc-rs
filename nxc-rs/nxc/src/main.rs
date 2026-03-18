@@ -454,6 +454,12 @@ pub(crate) fn build_cli() -> Command {
                 .short('x')
                 .long("exec-command")
                 .help("Execute command on Android target"),
+        )
+        .arg(
+            Arg::new("screenshot")
+                .long("screenshot")
+                .help("Take screenshot of the Android device")
+                .action(ArgAction::SetTrue),
         );
 
     let http_cmd = Command::new("http")
@@ -818,12 +824,44 @@ async fn main() -> Result<()> {
     let continue_on_success = sub_matches.get_flag("continue-on-success");
     let no_bruteforce = sub_matches.get_flag("no-bruteforce");
 
+    // ── Build module list ──
+    let mut modules: Vec<String> = sub_matches
+        .get_many::<String>("module")
+        .map(|vals| vals.map(|s| s.clone()).collect())
+        .unwrap_or_default();
+
+    // Map protocol-specific flags to modules
+    if sub_matches.get_flag("screenshot") {
+        match protocol_name {
+            "vnc" => { if !modules.contains(&"screenshot".to_string()) { modules.push("screenshot".to_string()); } },
+            "adb" => { if !modules.contains(&"adb_screenshot".to_string()) { modules.push("adb_screenshot".to_string()); } },
+            "rdp" => { /* rdp screenshot module pending */ },
+            _ => {}
+        }
+    }
+    if sub_matches.get_flag("gmsa") && protocol_name == "ldap" {
+        if !modules.contains(&"gmsa".to_string()) {
+            modules.push("gmsa".to_string());
+        }
+    }
+
+    let mut module_opts = std::collections::HashMap::new();
+    if let Some(opts) = sub_matches.get_many::<String>("module-options") {
+        for opt in opts {
+            if let Some((k, v)) = opt.split_once('=') {
+                module_opts.insert(k.to_string(), v.to_string());
+            }
+        }
+    }
+
     let exec_opts = ExecutionOpts {
         threads,
         timeout: Duration::from_secs(timeout),
         jitter_ms: jitter,
         continue_on_success,
         no_bruteforce,
+        modules,
+        module_opts,
     };
 
     // ── Print banner ──

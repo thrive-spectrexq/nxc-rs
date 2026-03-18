@@ -167,6 +167,8 @@ pub struct ExecutionOpts {
     pub jitter_ms: Option<u64>,
     pub continue_on_success: bool,
     pub no_bruteforce: bool,
+    pub modules: Vec<String>,
+    pub module_opts: std::collections::HashMap<String, String>,
 }
 
 impl Default for ExecutionOpts {
@@ -177,6 +179,8 @@ impl Default for ExecutionOpts {
             jitter_ms: None,
             continue_on_success: false,
             no_bruteforce: false,
+            modules: Vec::new(),
+            module_opts: std::collections::HashMap::new(),
         }
     }
 }
@@ -227,6 +231,8 @@ impl ExecutionEngine {
                 let target_clone = target.clone();
                 let cred_clone = cred.clone();
                 let timeout_duration = self.opts.timeout;
+                let modules = self.opts.modules.clone();
+                let module_opts = self.opts.module_opts.clone();
 
                 let handle = tokio::spawn(async move {
                     let start_time = std::time::Instant::now();
@@ -258,16 +264,38 @@ impl ExecutionEngine {
                             .await
                         {
                             Ok(auth_res) => {
+                                let mut final_message = auth_res.message.clone();
+                                
                                 // Execute modules if requested
-                                // (Implementation pending for multi-module execution,
-                                // currently just handling the core auth flow in the engine)
+                                if auth_res.success && !modules.is_empty() {
+                                    let registry = nxc_modules::ModuleRegistry::new();
+                                    for module_name in &modules {
+                                        if let Some(module) = registry.get(module_name) {
+                                            match module.run(session.as_mut(), &module_opts).await {
+                                                Ok(mod_res) => {
+                                                    if mod_res.success {
+                                                        final_message.push_str(&format!(" | Module {}: {}", module_name, mod_res.output));
+                                                    } else {
+                                                        final_message.push_str(&format!(" | Module {} Failed: {}", module_name, mod_res.output));
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    final_message.push_str(&format!(" | Module {} Error: {}", module_name, e));
+                                                }
+                                            }
+                                        } else {
+                                            final_message.push_str(&format!(" | Module {} not found", module_name));
+                                        }
+                                    }
+                                }
+
                                 ExecutionResult {
                                     target: target_str.clone(),
                                     protocol: protocol_clone.name().to_string(),
                                     username: cred_clone.username.clone(),
                                     success: auth_res.success,
                                     admin: auth_res.admin,
-                                    message: auth_res.message,
+                                    message: final_message,
                                     duration_ms: start_time.elapsed().as_millis() as u64,
                                 }
                             }
@@ -369,6 +397,9 @@ mod tests {
             fn is_admin(&self) -> bool {
                 true
             }
+            fn as_any(&self) -> &dyn std::any::Any {
+                self
+            }
             fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
                 self
             }
@@ -426,6 +457,8 @@ mod tests {
             jitter_ms: None,
             continue_on_success: false,
             no_bruteforce: false,
+            modules: Vec::new(),
+            module_opts: std::collections::HashMap::new(),
         };
 
         let engine = ExecutionEngine::new(opts);

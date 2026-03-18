@@ -33,11 +33,17 @@ pub trait NxcSession: Send + Sync + 'static {
     fn target(&self) -> &str;
     /// Whether the session has admin privileges.
     fn is_admin(&self) -> bool;
+    fn as_any(&self) -> &dyn std::any::Any;
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 }
 
 impl dyn NxcSession {
-    /// Downcast a trait object to a specific type.
+    /// Downcast a trait object to a specific type (immutable).
+    pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
+        self.as_any().downcast_ref::<T>()
+    }
+
+    /// Downcast a trait object to a specific type (mutable).
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.as_any_mut().downcast_mut::<T>()
     }

@@ -3,6 +3,8 @@
 //! Modules are Rust structs implementing `NxcModule`, compiled into the binary.
 //! They are invoked per-protocol with `-M <module> [-o KEY=VALUE]` flags.
 
+pub mod gmsa;
+pub mod adb_screenshot;
 pub mod asreproasting;
 pub mod enum_dns;
 pub mod enum_mssql;
@@ -125,6 +127,12 @@ impl ModuleRegistry {
 
         let wifi_recon: Box<dyn NxcModule> = Box::new(wifi_recon::WifiRecon::new());
         modules.insert("wifi_recon".into(), wifi_recon);
+
+        let gmsa: Box<dyn NxcModule> = Box::new(gmsa::Gmsa::new());
+        modules.insert("gmsa".into(), gmsa);
+
+        let adb_screenshot: Box<dyn NxcModule> = Box::new(adb_screenshot::AdbScreenshot::new());
+        modules.insert("adb_screenshot".into(), adb_screenshot);
 
         Self { modules }
     }
