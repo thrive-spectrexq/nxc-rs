@@ -11,12 +11,11 @@
 
 ## Key Features
 
-*   **Blazing Fast**: Powered by Tokio's async runtime for massive concurrency.
-*   **Pure Rust**: Zero dependencies on Python, Impacket, or external binaries. Native implementation of NTLM, Kerberos, and SMB.
-*   **Stealthy & Robust**: Built-in lockout detection and jitter to bypass defensive monitoring.
-*   **Multi-Protocol**: Native support for **SMB, SSH, LDAP, WinRM, MSSQL, FTP, NFS, and ADB**.
-*   **Telegram Integration**: Integrated Telegram bot for remote command execution and real-time alerts.
-*   **Module System**: Extensible architecture supporting post-exploitation modules like `secretsdump`, `laps`, and more.
+*   **Blazing Fast**: Powered by Tokio's async runtime for massive high-concurrency operations.
+*   **Pure Rust**: Zero dependencies on Python or Impacket. Native implementation of NTLM SSP, Kerberos, and SMB.
+*   **Stealthy & Robust**: Built-in lockout detection, jitter, and secure TLS communication.
+*   **Professional Telegram Bot**: Remote mission control with **Interactive Shell**, full module support, and tactical guides.
+*   **Advanced Recon**: Integrated AD CS, BloodHound, and WMI reconnaissance modules.
 
 ---
 
@@ -24,17 +23,17 @@
 
 | Protocol | Status | Capabilities |
 | :--- | :--- | :--- |
-| **SMB** | ✅ Active | Auth, Share Enum, Disk Enum, Session Enum, Command Exec (WMI/SMBExec), `secretsdump` |
-| **LDAP** | ✅ Active | User/Group Enum, Kerberoasting, ASREProasting, gMSA password dumping |
-| **SSH** | ✅ Active | Password & Key Auth, Command Exec, Sudo Check, **macOS/iOS/Android Fingerprinting** |
-| **WinRM** | ✅ Active | NTLM/Kerberos Auth, Command Execution (PowerShell/CMD) |
-| **MSSQL** | ✅ Active | SQL Query execution, `xp_cmdshell` execution |
-| **FTP** | ✅ Active | Real authentication, Directory listing (`ls`) |
-| **NFS** | ✅ Active | Export/Share enumeration via MOUNT RPC |
-| **ADB** | ✅ Active | Handshake, Open Android Debug Bridge shell execution |
+| **SMB** | ✅ Active | **NTLM SSP**, Share/Disk Enum, **smbexec (SVCCTL)**, `secretsdump` skeleton |
+| **LDAP** | ✅ Active | User/Group Enum, **AD CS Enum**, **BloodHound Export**, Roasting, gMSA |
+| **SSH** | ✅ Active | Password & Key Auth, Command Exec, Sudo Check, Fingerprinting |
+| **WinRM** | ✅ Active | NTLM/Kerberos Auth, **PSRP Object handling**, Command Exec (PS/CMD) |
+| **MSSQL** | ✅ Active | SQL Query, `xp_cmdshell`, **IMPERSONATE privilege checks** |
+| **WMI** | ✅ Active | Direct execution, **Process/Service/Patch Enumeration** |
+| **ADB** | ✅ Active | Handshake, Shell execution, Screenshotting |
 | **RDP** | ✅ Active | NLA authentication, Screenshotting |
-| **WMI** | ✅ Active | Direct WMI execution |
-| **VNC** | ✅ Active | Screenshotting |
+| **VNC** | ✅ Active | Authentication, Screenshotting |
+| **FTP/NFS**| ✅ Active | Directory listing, Export/Share enumeration |
+| **HTTP** | ✅ Active | Web reconnaissance, SSL/TLS validation |
 
 ---
 
@@ -121,8 +120,10 @@ cargo run --package nxc -- telegram
 ```
 
 **Commands**:
-- `/help`: Show available commands.
-- `/run <protocol> <target> [options]`: Execute an NXC command (e.g., `/run smb 10.0.0.1 -u admin -p password`).
+- `/help`, `/guide`, `/cheat`: Comprehensive operator's manuals and search tools.
+- `/run <protocol> <target> [options]`: Full CLI-style command execution (supports `-M` and `-o`).
+- `/shell`: Activate **Interactive Shell Mode** for the most recent target.
+- `/shares`, `/users`, `/groups`: Tactical reconnaissance shortcuts.
 
 ### 5. Build for Production
 If you want to use the compiled binary directly without `cargo run`, you can build a release version:
