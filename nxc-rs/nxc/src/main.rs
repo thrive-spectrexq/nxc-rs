@@ -730,7 +730,7 @@ async fn main() -> Result<()> {
             if let Some(token) = sub_m.get_one::<String>("token") {
                 std::env::set_var("TELEGRAM_BOT_TOKEN", token);
             }
-            
+
             telegram::start_bot().await?;
             return Ok(());
         }

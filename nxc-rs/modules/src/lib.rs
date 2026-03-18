@@ -7,14 +7,14 @@ pub mod asreproasting;
 pub mod enum_dns;
 pub mod enum_mssql;
 pub mod enum_shares;
+pub mod iot_cam;
 pub mod kerberoasting;
 pub mod laps;
 pub mod ls;
 pub mod secretsdump;
 pub mod shares;
-pub mod whoami;
 pub mod vnc_screenshot;
-pub mod iot_cam;
+pub mod whoami;
 pub mod wifi_recon;
 
 use anyhow::Result;
@@ -65,7 +65,8 @@ pub trait NxcModule: Send + Sync {
     }
 
     /// Execute the module against an authenticated session.
-    async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult>;
+    async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions)
+        -> Result<ModuleResult>;
 }
 
 // ─── Module Registry ────────────────────────────────────────────

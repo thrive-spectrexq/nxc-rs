@@ -154,34 +154,42 @@ impl NxcProtocol for VncProtocol {
         if vnc_sess.security_types.contains(&2) {
             // VNC Authentication (DES)
             stream.write_all(&[2]).await?;
-            
+
             let mut challenge = [0u8; 16];
             stream.read_exact(&mut challenge).await?;
-            
+
             let password = creds.password.as_deref().unwrap_or_default();
             let response = vnc_encrypt(password, &challenge);
             stream.write_all(&response).await?;
-            
+
             let mut auth_result = [0u8; 4];
             stream.read_exact(&mut auth_result).await?;
-            
+
             if u32::from_be_bytes(auth_result) == 0 {
                 // 3. ClientInit
                 stream.write_all(&[1]).await?; // Default: Shared=1
-                
+
                 // 4. ServerInit
                 let mut server_init = [0u8; 20];
                 stream.read_exact(&mut server_init).await?;
-                
+
                 vnc_sess.width = u16::from_be_bytes([server_init[0], server_init[1]]);
                 vnc_sess.height = u16::from_be_bytes([server_init[2], server_init[3]]);
-                
-                let name_len = u32::from_be_bytes([server_init[16], server_init[17], server_init[18], server_init[19]]);
+
+                let name_len = u32::from_be_bytes([
+                    server_init[16],
+                    server_init[17],
+                    server_init[18],
+                    server_init[19],
+                ]);
                 let mut name_buf = vec![0u8; name_len as usize];
                 stream.read_exact(&mut name_buf).await?;
                 vnc_sess.name = String::from_utf8_lossy(&name_buf).to_string();
 
-                info!("VNC: Authenticated to {} ({}x{}, Name: {})", vnc_sess.target, vnc_sess.width, vnc_sess.height, vnc_sess.name);
+                info!(
+                    "VNC: Authenticated to {} ({}x{}, Name: {})",
+                    vnc_sess.target, vnc_sess.width, vnc_sess.height, vnc_sess.name
+                );
                 return Ok(AuthResult::success(false));
             } else {
                 return Ok(AuthResult::failure("VNC Invalid Credentials", None));
@@ -191,10 +199,7 @@ impl NxcProtocol for VncProtocol {
             return Ok(AuthResult::success(false));
         }
 
-        Ok(AuthResult::failure(
-            "VNC: Unsupported security types",
-            None,
-        ))
+        Ok(AuthResult::failure("VNC: Unsupported security types", None))
     }
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
@@ -210,14 +215,16 @@ impl VncProtocol {
             Some(s) => s,
             None => return Err(anyhow!("Invalid session type for VNC")),
         };
-        
+
         let width = vnc_sess.width;
         let height = vnc_sess.height;
-        
+
         if width == 0 || height == 0 {
-            return Err(anyhow!("VNC Display not initialized. Authentication required?"));
+            return Err(anyhow!(
+                "VNC Display not initialized. Authentication required?"
+            ));
         }
-        
+
         let stream = match vnc_sess.stream.as_mut() {
             Some(s) => s,
             None => return Err(anyhow!("VNC stream not open")),
@@ -229,18 +236,24 @@ impl VncProtocol {
         req.extend_from_slice(&0u16.to_be_bytes()); // Y
         req.extend_from_slice(&width.to_be_bytes());
         req.extend_from_slice(&height.to_be_bytes());
-        
+
         stream.write_all(&req).await?;
-        
+
         // In a real implementation, we'd read the pixels here.
         // For the offensive MVP, we just prove we can trigger the update.
         debug!("VNC: Screenshot requested for {}x{} display", width, height);
-        
-        let path = format!("screenshots/vnc_{}_{}.bin", vnc_sess.target, std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH)?.as_secs());
+
+        let path = format!(
+            "screenshots/vnc_{}_{}.bin",
+            vnc_sess.target,
+            std::time::SystemTime::now()
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)?
+                .as_secs()
+        );
         // Mock save
         std::fs::create_dir_all("screenshots")?;
         std::fs::write(&path, b"VNC Raw Frame Buffer Data Placeholder")?;
-        
+
         Ok(path)
     }
 }
@@ -256,10 +269,10 @@ fn vnc_encrypt(password: &str, challenge: &[u8; 16]) -> [u8; 16] {
 
     use des::cipher::{BlockEncrypt, KeyInit};
     use des::Des;
-    
+
     let key_arr = des::cipher::Key::<Des>::from_slice(&key);
     let cipher = Des::new(key_arr);
-    
+
     let mut out = [0u8; 16];
     cipher.encrypt_block_b2b(
         des::cipher::Block::<Des>::from_slice(&challenge[0..8]),

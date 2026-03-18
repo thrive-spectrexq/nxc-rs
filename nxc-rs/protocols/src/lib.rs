@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod adb;
 pub mod ftp;
+pub mod http;
 pub mod ldap;
 pub mod mssql;
 pub mod nfs;
@@ -18,10 +19,9 @@ pub mod rpc;
 pub mod smb;
 pub mod ssh;
 pub mod vnc;
+pub mod wifi;
 pub mod winrm;
 pub mod wmi;
-pub mod wifi;
-pub mod http;
 
 // ─── Core Traits ────────────────────────────────────────────────
 

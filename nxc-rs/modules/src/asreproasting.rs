@@ -41,9 +41,15 @@ impl NxcModule for Asreproasting {
         vec![]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         let ldap_session = match session.protocol() {
-            "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap(),
+            "ldap" => session
+                .downcast_mut::<nxc_protocols::ldap::LdapSession>()
+                .unwrap(),
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 

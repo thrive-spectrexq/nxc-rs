@@ -259,7 +259,7 @@ impl ExecutionEngine {
                         {
                             Ok(auth_res) => {
                                 // Execute modules if requested
-                                // (Implementation pending for multi-module execution, 
+                                // (Implementation pending for multi-module execution,
                                 // currently just handling the core auth flow in the engine)
                                 ExecutionResult {
                                     target: target_str.clone(),
@@ -270,7 +270,7 @@ impl ExecutionEngine {
                                     message: auth_res.message,
                                     duration_ms: start_time.elapsed().as_millis() as u64,
                                 }
-                            },
+                            }
                             Err(e) => ExecutionResult {
                                 target: target_str,
                                 protocol: protocol_clone.name().to_string(),

@@ -4,11 +4,11 @@
 //! like the ones found in `rusty-secure` and generic unauthenticated snapshot URLs.
 //! Saves extracted images locally.
 
+use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_protocols::{http::HttpSession, NxcSession};
 use serde_json::json;
-use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct IotCam {}
@@ -43,7 +43,11 @@ impl NxcModule for IotCam {
         vec![]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         let http_sess = session
             .as_any_mut()
             .downcast_mut::<HttpSession>()
@@ -51,27 +55,30 @@ impl NxcModule for IotCam {
 
         let scheme = "http"; // In a full implementation, detect if parsing from port 443
         let base_url = format!("{}://{}:{}", scheme, http_sess.target, http_sess.port);
-        
-        println!("[*] (HTTP API) Probing {} for exposed camera endpoints...", base_url);
+
+        println!(
+            "[*] (HTTP API) Probing {} for exposed camera endpoints...",
+            base_url
+        );
 
         // Common image extraction targets for rusty-secure/esp32/generic IP cams
         let endpoints = vec![
-            "/capture", 
-            "/image", 
-            "/jpg", 
-            "/snapshot.cgi", 
+            "/capture",
+            "/image",
+            "/jpg",
+            "/snapshot.cgi",
             "/api/picture",
-            "/cam-hi.jpg"
+            "/cam-hi.jpg",
         ];
-        
+
         let mut hit_endpoint = None;
         let mut image_bytes = bytes::Bytes::new();
-        
+
         // Iterating through targets
         for ep in endpoints {
             let target_url = format!("{}{}", base_url, ep);
             let mut req = http_sess.client.get(&target_url);
-            
+
             // Bring along credentials if they were matched natively by the engine initially
             if let Some(creds) = &http_sess.credentials {
                 if let Some(password) = &creds.password {
@@ -88,7 +95,7 @@ impl NxcModule for IotCam {
                         .get("Content-Type")
                         .and_then(|v| v.to_str().ok())
                         .unwrap_or("");
-                        
+
                     // Make sure it's actually an image
                     if content_type.starts_with("image/") {
                         image_bytes = resp.bytes().await?;
@@ -98,7 +105,7 @@ impl NxcModule for IotCam {
                 }
             }
         }
-        
+
         let target_url = match hit_endpoint {
             Some(ep) => ep,
             None => {
@@ -113,10 +120,13 @@ impl NxcModule for IotCam {
         // We got an image. Save it to disk locally
         let epoch = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let file_name = format!("{}_{}_snapshot.jpg", http_sess.target, epoch);
-        
+
         std::fs::write(&file_name, &image_bytes)?;
-        
-        let success_msg = format!("Extracted snapshot from {} (Saved securely locally to: {})", target_url, file_name);
+
+        let success_msg = format!(
+            "Extracted snapshot from {} (Saved securely locally to: {})",
+            target_url, file_name
+        );
 
         Ok(ModuleResult {
             success: true,

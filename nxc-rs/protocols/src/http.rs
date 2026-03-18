@@ -62,7 +62,11 @@ impl NxcProtocol for HttpProtocol {
     }
 
     fn default_port(&self) -> u16 {
-        if self.use_ssl { 443 } else { 80 }
+        if self.use_ssl {
+            443
+        } else {
+            80
+        }
     }
 
     fn supports_exec(&self) -> bool {
@@ -79,7 +83,7 @@ impl NxcProtocol for HttpProtocol {
             .timeout(std::time::Duration::from_secs(10))
             .build()
             .context("Failed to build HTTP client")?;
-            
+
         Ok(Box::new(HttpSession {
             target: target.to_string(),
             port,
@@ -101,13 +105,13 @@ impl NxcProtocol for HttpProtocol {
 
         let scheme = if self.use_ssl { "https" } else { "http" };
         let url = format!("{}://{}:{}", scheme, http_sess.target, http_sess.port);
-        
+
         // Cache the credentials for post-auth modules
         http_sess.credentials = Some(creds.clone());
 
         // Perform HTTP GET with Basic Auth
         let mut req = http_sess.client.get(&url);
-        
+
         if let Some(password) = &creds.password {
             req = req.basic_auth(&creds.username, Some(password));
         } else {
@@ -125,12 +129,12 @@ impl NxcProtocol for HttpProtocol {
             .get("Server")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("Unknown Server");
-            
+
         let msg = format!("HTTP {} - Server: {}", status, server_header);
 
         if status.is_success() || status == StatusCode::NOT_FOUND {
             // Unauthenticated public servers might return 404 on the root, but it means
-            // we connected and the creds (if any) didn't cause a 401. 
+            // we connected and the creds (if any) didn't cause a 401.
             // Truly valid authentication to a protected route will typically return 200.
             Ok(AuthResult {
                 success: true,
@@ -143,11 +147,16 @@ impl NxcProtocol for HttpProtocol {
             Ok(AuthResult::failure(&msg, Some("HTTP_401")))
         } else {
             // Other errors (500, etc) usually mean we didn't firmly authenticate
-            Ok(AuthResult::failure(&msg, Some(&status.as_u16().to_string())))
+            Ok(AuthResult::failure(
+                &msg,
+                Some(&status.as_u16().to_string()),
+            ))
         }
     }
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
-         Err(anyhow::anyhow!("Command execution not supported on HTTP protocol natively."))
+        Err(anyhow::anyhow!(
+            "Command execution not supported on HTTP protocol natively."
+        ))
     }
 }

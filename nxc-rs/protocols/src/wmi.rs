@@ -124,30 +124,34 @@ impl NxcProtocol for WmiProtocol {
 
         // 1. Connect to EPM (port 135)
         let mut stream = TcpStream::connect(&addr).await?;
-        
+
         // 2. DCERPC Bind to EPM
         // UUID: E1AF8308-5D1F-11C9-91A4-08002B14A0FA (EPM)
-        use crate::rpc::{DcerpcHeader, DcerpcBind, PacketType};
+        use crate::rpc::{DcerpcBind, DcerpcHeader, PacketType};
         let uuid_epm: [u8; 16] = [
-            0x08, 0x83, 0xaf, 0xe1, 0x1f, 0x5d, 0xc9, 0x11, 0x91, 0xa4, 0x08, 0x00, 0x2b, 0x14, 0xa0, 0xfa
+            0x08, 0x83, 0xaf, 0xe1, 0x1f, 0x5d, 0xc9, 0x11, 0x91, 0xa4, 0x08, 0x00, 0x2b, 0x14,
+            0xa0, 0xfa,
         ];
-        
+
         let bind = DcerpcBind::new(uuid_epm, 3, 0);
         let bind_bytes = bind.to_bytes();
         let header = DcerpcHeader::new(PacketType::Bind, 1, (24 + bind_bytes.len()) as u16);
-        
+
         let mut pkt = header.to_bytes();
         pkt.extend_from_slice(&bind_bytes);
         stream.write_all(&pkt).await?;
-        
+
         // 3. Read BindAck
         let mut ack_hdr = [0u8; 24];
         stream.read_exact(&mut ack_hdr).await?;
-        
+
         // In a full implementation, we'd now call EptMap to get the WMI port.
         // For the offensive MVP, successful Bind to EPM proves RPC connectivity.
-        
-        info!("WMI: RPC Bind to EPM successful on {}. Proceeding with DCOM/NTLM logic...", addr);
+
+        info!(
+            "WMI: RPC Bind to EPM successful on {}. Proceeding with DCOM/NTLM logic...",
+            addr
+        );
 
         Ok(AuthResult::failure(
             "WMI NTLM authentication over DCOM pending full NTLMSSP integration",

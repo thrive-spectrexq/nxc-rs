@@ -8,10 +8,10 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use std::time::Duration;
+use suppaftp::tokio::AsyncFtpStream;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 use tracing::{debug, info};
-use suppaftp::tokio::AsyncFtpStream;
 
 pub struct FtpSession {
     pub target: String,
@@ -129,18 +129,22 @@ impl NxcProtocol for FtpProtocol {
         debug!("FTP: Authenticating {}@{}", username, addr);
 
         let mut ftp_stream = AsyncFtpStream::connect(&addr).await?;
-        
+
         match ftp_stream.login(&username, &password).await {
             Ok(_) => {
                 info!("FTP: Auth success for {}@{}", username, addr);
                 // Update session with successful credentials
-                let ftp_sess_mut = unsafe { &mut *(session as *mut dyn NxcSession as *mut FtpSession) };
+                let ftp_sess_mut =
+                    unsafe { &mut *(session as *mut dyn NxcSession as *mut FtpSession) };
                 ftp_sess_mut.credentials = creds.clone();
                 Ok(AuthResult::success(false)) // FTP doesn't really have "admin"
             }
             Err(e) => {
                 debug!("FTP: Auth failed for {}@{}: {}", username, addr, e);
-                Ok(AuthResult::failure(&format!("FTP Auth failed: {}", e), None))
+                Ok(AuthResult::failure(
+                    &format!("FTP Auth failed: {}", e),
+                    None,
+                ))
             }
         }
     }
@@ -152,15 +156,20 @@ impl NxcProtocol for FtpProtocol {
 
 impl FtpProtocol {
     /// Helper to list files in the current directory.
-    pub async fn list_files(&self, target: &str, port: u16, creds: &Credentials) -> Result<Vec<String>> {
+    pub async fn list_files(
+        &self,
+        target: &str,
+        port: u16,
+        creds: &Credentials,
+    ) -> Result<Vec<String>> {
         let addr = format!("{}:{}", target, port);
         let mut ftp_stream = AsyncFtpStream::connect(&addr).await?;
-        
+
         let username = creds.username.clone();
         let password = creds.password.clone().unwrap_or_default();
-        
+
         ftp_stream.login(&username, &password).await?;
-        
+
         let list = ftp_stream.list(None).await?;
         Ok(list)
     }

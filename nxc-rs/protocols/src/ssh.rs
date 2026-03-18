@@ -34,7 +34,8 @@ impl SshSession {
                 let uname = uname_out.trim();
                 if uname.contains("Darwin") {
                     self.shell_access = true;
-                    if uname.contains("iPhone") || uname.contains("iPad") || uname.contains("iPod") {
+                    if uname.contains("iPhone") || uname.contains("iPad") || uname.contains("iPod")
+                    {
                         self.server_os = "iOS".to_string();
                         debug!("iOS shell detected: {}", uname);
                     } else {
@@ -62,12 +63,20 @@ impl SshSession {
             if let Ok(output) = Self::exec_on_session(sess, "id") {
                 if !output.is_empty() {
                     self.shell_access = true;
-                    
+
                     // Check if it's Android
-                    if let Ok(getprop_out) = Self::exec_on_session(sess, "getprop ro.build.version.release") {
-                        if !getprop_out.trim().is_empty() && !getprop_out.contains("not found") && !getprop_out.contains("command not found") {
+                    if let Ok(getprop_out) =
+                        Self::exec_on_session(sess, "getprop ro.build.version.release")
+                    {
+                        if !getprop_out.trim().is_empty()
+                            && !getprop_out.contains("not found")
+                            && !getprop_out.contains("command not found")
+                        {
                             self.server_os = "Android".to_string();
-                            debug!("Android shell detected: Linux (Android {})", getprop_out.trim());
+                            debug!(
+                                "Android shell detected: Linux (Android {})",
+                                getprop_out.trim()
+                            );
                         } else {
                             self.server_os = "Linux".to_string();
                             debug!("Linux shell detected: {}", output.trim());

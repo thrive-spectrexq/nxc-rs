@@ -47,11 +47,17 @@ impl NxcModule for EnumDns {
         }]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         let domain_filter = opts.get("DOMAIN").map(|s| s.as_str());
 
         let ldap_session = match session.protocol() {
-            "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap(),
+            "ldap" => session
+                .downcast_mut::<nxc_protocols::ldap::LdapSession>()
+                .unwrap(),
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 

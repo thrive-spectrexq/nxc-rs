@@ -38,7 +38,11 @@ impl NxcModule for MssqlEnum {
         &["mssql"]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         let mssql_session = match session.protocol() {
             "mssql" => unsafe { &*(session as *const dyn NxcSession as *const MssqlSession) },
             _ => return Err(anyhow::anyhow!("Module only supports MSSQL")),

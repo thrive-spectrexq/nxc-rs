@@ -37,7 +37,11 @@ impl NxcModule for FtpLs {
         &["ftp"]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         let ftp_sess = match session.protocol() {
             "ftp" => unsafe {
                 &*(session as *const dyn NxcSession as *const nxc_protocols::ftp::FtpSession)
@@ -46,11 +50,17 @@ impl NxcModule for FtpLs {
         };
 
         let protocol = nxc_protocols::ftp::FtpProtocol::new();
-        
-        let mut output_lines = Vec::new();
-        output_lines.push(format!("Listing files on {}:{}", ftp_sess.target, ftp_sess.port));
 
-        match protocol.list_files(&ftp_sess.target, ftp_sess.port, &ftp_sess.credentials).await {
+        let mut output_lines = Vec::new();
+        output_lines.push(format!(
+            "Listing files on {}:{}",
+            ftp_sess.target, ftp_sess.port
+        ));
+
+        match protocol
+            .list_files(&ftp_sess.target, ftp_sess.port, &ftp_sess.credentials)
+            .await
+        {
             Ok(files) => {
                 for file in files {
                     output_lines.push(format!("  {}", file));
@@ -61,13 +71,11 @@ impl NxcModule for FtpLs {
                     data: serde_json::json!({ "files": output_lines[1..] }),
                 })
             }
-            Err(e) => {
-                Ok(ModuleResult {
-                    success: false,
-                    output: format!("Failed to list files: {}", e),
-                    data: serde_json::Value::Null,
-                })
-            }
+            Err(e) => Ok(ModuleResult {
+                success: false,
+                output: format!("Failed to list files: {}", e),
+                data: serde_json::Value::Null,
+            }),
         }
     }
 }

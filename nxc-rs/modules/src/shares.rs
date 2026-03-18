@@ -37,14 +37,18 @@ impl NxcModule for NfsShares {
         &["nfs"]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         let nfs_sess = match session.downcast_mut::<nxc_protocols::nfs::NfsSession>() {
             Some(s) => s,
             None => return Err(anyhow::anyhow!("Module only supports NFS")),
         };
 
         let protocol = nxc_protocols::nfs::NfsProtocol::new();
-        
+
         let mut output_lines = Vec::new();
         output_lines.push(format!("Enumerating NFS exports on {}", nfs_sess.target));
 
@@ -63,13 +67,11 @@ impl NxcModule for NfsShares {
                     data: serde_json::json!({ "shares": shares }),
                 })
             }
-            Err(e) => {
-                Ok(ModuleResult {
-                    success: false,
-                    output: format!("Failed to list NFS exports: {}", e),
-                    data: serde_json::Value::Null,
-                })
-            }
+            Err(e) => Ok(ModuleResult {
+                success: false,
+                output: format!("Failed to list NFS exports: {}", e),
+                data: serde_json::Value::Null,
+            }),
         }
     }
 }

@@ -17,15 +17,15 @@ impl NxcSession for WifiSession {
     fn protocol(&self) -> &'static str {
         "wifi"
     }
-    
+
     fn target(&self) -> &str {
         &self.target
     }
-    
+
     fn is_admin(&self) -> bool {
         self.admin
     }
-    
+
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
@@ -46,7 +46,13 @@ impl Default for WifiProtocol {
 }
 
 impl WifiProtocol {
-    pub fn new(scan: bool, connect: Option<String>, devices: bool, profiles: bool, dump: bool) -> Self {
+    pub fn new(
+        scan: bool,
+        connect: Option<String>,
+        devices: bool,
+        profiles: bool,
+        dump: bool,
+    ) -> Self {
         Self {
             scan,
             connect,
@@ -132,7 +138,7 @@ impl WifiProtocol {
     async fn dump_profiles(&self) -> Result<String> {
         // First get the profiles list to extract names
         let profiles_output = self.list_profiles().await?;
-        
+
         let mut dumped_credentials = String::new();
         dumped_credentials.push_str("[*] Extracting Cleartext WiFi Configurations...\n\n");
 
@@ -146,14 +152,20 @@ impl WifiProtocol {
 
                     // Dump this specific profile
                     let output = tokio::process::Command::new("netsh")
-                        .args(&["wlan", "show", "profile", &format!("name={}", profile_name), "key=clear"])
+                        .args(&[
+                            "wlan",
+                            "show",
+                            "profile",
+                            &format!("name={}", profile_name),
+                            "key=clear",
+                        ])
                         .output()
                         .await?;
 
                     if output.status.success() {
                         let profile_details = String::from_utf8_lossy(&output.stdout);
                         let mut password = "<None or Not Found>";
-                        
+
                         // Parse the key material
                         for detail_line in profile_details.lines() {
                             if detail_line.contains("Key Content") {
@@ -163,13 +175,14 @@ impl WifiProtocol {
                                 }
                             }
                         }
-                        
-                        dumped_credentials.push_str(&format!("{:<30} : {}\n", profile_name, password));
+
+                        dumped_credentials
+                            .push_str(&format!("{:<30} : {}\n", profile_name, password));
                     }
                 }
             }
         }
-        
+
         Ok(dumped_credentials.trim_end().to_string())
     }
 }
@@ -193,7 +206,7 @@ impl NxcProtocol for WifiProtocol {
     }
 
     async fn connect(&self, target: &str, _port: u16) -> Result<Box<dyn NxcSession>> {
-        // Since `wifi` actions generally interact with the host interface rather than 
+        // Since `wifi` actions generally interact with the host interface rather than
         // a remote TCP port, `connect` merely instantiates the session.
         Ok(Box::new(WifiSession {
             target: target.to_string(),
@@ -254,7 +267,7 @@ impl NxcProtocol for WifiProtocol {
             match self.dump_profiles().await {
                 Ok(out) => {
                     final_message.push_str(&format!("\n[WiFi Profile Dump]\n{}\n", out));
-                    // Because a dump is typically an administrative win context in offensive tooling, 
+                    // Because a dump is typically an administrative win context in offensive tooling,
                     // we'll flag it as admin if we successfully dumped any keys (though netsh wlan doesn't
                     // strictly require SYSTEM, just local user access for their own profiles)
                     admin_result = true;

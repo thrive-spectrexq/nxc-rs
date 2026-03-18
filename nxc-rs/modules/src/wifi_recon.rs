@@ -1,15 +1,15 @@
 //! # WiFi Recon Module
 //!
-//! Performs host discovery (via ARP) and service fingerprinting on the connected 
+//! Performs host discovery (via ARP) and service fingerprinting on the connected
 //! WiFi network.
 
+use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 use anyhow::Result;
 use async_trait::async_trait;
 use nxc_protocols::NxcSession;
 use serde_json::json;
-use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
-use tokio::net::TcpStream;
 use std::time::Duration;
+use tokio::net::TcpStream;
 
 pub struct WifiRecon {}
 
@@ -43,7 +43,11 @@ impl NxcModule for WifiRecon {
         vec![]
     }
 
-    async fn run(&self, _session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        _session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         println!("[*] Starting WiFi reconnaissance...");
 
         // 1. Host Discovery using ARP
@@ -74,7 +78,10 @@ impl NxcModule for WifiRecon {
             });
         }
 
-        println!("[+] Discovered {} potential hosts. Fingerprinting common services...", hosts.len());
+        println!(
+            "[+] Discovered {} potential hosts. Fingerprinting common services...",
+            hosts.len()
+        );
 
         // 2. Service Fingerprinting
         let ports = vec![
@@ -96,7 +103,7 @@ impl NxcModule for WifiRecon {
             for (port, name) in &ports {
                 let addr = format!("{}:{}", ip, port);
                 let timeout = Duration::from_millis(500); // Fast probe
-                
+
                 if let Ok(Ok(_)) = tokio::time::timeout(timeout, TcpStream::connect(&addr)).await {
                     host_services.push(json!({ "port": port, "service": name }));
                     output_summary.push_str(&format!("[+] {}:{} ({})\n", ip, port, name));

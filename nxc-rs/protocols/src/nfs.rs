@@ -195,25 +195,35 @@ impl NfsProtocol {
 
         while pos + 4 <= body.len() && body[pos + 3] == 1 {
             pos += 4;
-            if pos + 4 > body.len() { break; }
-            let len = u32::from_be_bytes(body[pos..pos+4].try_into().unwrap()) as usize;
+            if pos + 4 > body.len() {
+                break;
+            }
+            let len = u32::from_be_bytes(body[pos..pos + 4].try_into().unwrap()) as usize;
             pos += 4;
             let aligned_len = (len + 3) & !3;
-            if pos + aligned_len > body.len() { break; }
-            
-            let export = String::from_utf8_lossy(&body[pos..pos+len]).to_string();
+            if pos + aligned_len > body.len() {
+                break;
+            }
+
+            let export = String::from_utf8_lossy(&body[pos..pos + len]).to_string();
             exports.push(export);
             pos += aligned_len;
 
             // Skip the next segment (host list for this export)
-            if pos + 4 > body.len() { break; }
+            if pos + 4 > body.len() {
+                break;
+            }
             while pos + 4 <= body.len() && body[pos + 3] == 1 {
                 pos += 4;
-                if pos + 4 > body.len() { break; }
-                let h_len = u32::from_be_bytes(body[pos..pos+4].try_into().unwrap()) as usize;
+                if pos + 4 > body.len() {
+                    break;
+                }
+                let h_len = u32::from_be_bytes(body[pos..pos + 4].try_into().unwrap()) as usize;
                 pos += 4;
                 pos += (h_len + 3) & !3;
-                if pos + 4 > body.len() { break; }
+                if pos + 4 > body.len() {
+                    break;
+                }
             }
             pos += 4; // Skip the terminating 0 for this export's host list
         }
@@ -223,7 +233,7 @@ impl NfsProtocol {
 
     async fn get_rpc_port(&self, target: &str, program: u32, version: u32) -> Result<u16> {
         let mut stream = TcpStream::connect(format!("{}:111", target)).await?;
-        
+
         let mut rpc_bind = vec![
             0x80, 0x00, 0x00, 0x34, // Fragment header
             0x00, 0x00, 0x00, 0x01, // XID
@@ -237,17 +247,17 @@ impl NfsProtocol {
             0x00, 0x00, 0x00, 0x00, // Verifier Flavor (AUTH_NULL)
             0x00, 0x00, 0x00, 0x00, // Verifier Length (0)
         ];
-        
+
         rpc_bind.extend_from_slice(&program.to_be_bytes());
         rpc_bind.extend_from_slice(&version.to_be_bytes());
         rpc_bind.extend_from_slice(&6u32.to_be_bytes()); // Proto: TCP (6)
         rpc_bind.extend_from_slice(&0u32.to_be_bytes()); // Port: 0
-        
+
         stream.write_all(&rpc_bind).await?;
-        
+
         let mut resp = vec![0; 28];
         stream.read_exact(&mut resp).await?;
-        
+
         let port = u32::from_be_bytes(resp[24..28].try_into().unwrap()) as u16;
         Ok(port)
     }

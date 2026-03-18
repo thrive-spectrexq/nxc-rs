@@ -27,26 +27,26 @@ impl NxcModule for VncScreenshot {
     }
 
     fn options(&self) -> Vec<ModuleOption> {
-        vec![
-            ModuleOption {
-                name: "path".into(),
-                description: "Folder to save screenshots".into(),
-                required: false,
-                default: Some("./screenshots".into()),
-            },
-        ]
+        vec![ModuleOption {
+            name: "path".into(),
+            description: "Folder to save screenshots".into(),
+            required: false,
+            default: Some("./screenshots".into()),
+        }]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         let protocol = VncProtocol::new();
         match protocol.capture_screenshot(session).await {
-            Ok(path) => {
-                Ok(ModuleResult {
-                    success: true,
-                    output: format!("Screenshot saved to {}", path),
-                    data: serde_json::json!({ "path": path }),
-                })
-            }
+            Ok(path) => Ok(ModuleResult {
+                success: true,
+                output: format!("Screenshot saved to {}", path),
+                data: serde_json::json!({ "path": path }),
+            }),
             Err(e) => Ok(ModuleResult {
                 success: false,
                 output: format!("Failed to capture screenshot: {}", e),
