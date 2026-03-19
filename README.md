@@ -1,6 +1,5 @@
 # ◈ NetExec-RS (nxc-rs) ◈
 
-[![CI](https://github.com/thrive-spectrexq/nxc-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/thrive-spectrexq/nxc-rs/actions)
 [![Rust Version](https://img.shields.io/badge/rust-1.94.0%2B-blue.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Custom-orange.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/thrive-spectrexq/nxc-rs)](https://github.com/thrive-spectrexq/nxc-rs/releases)
@@ -124,6 +123,7 @@ cargo run --package nxc -- telegram
 - `/run <protocol> <target> [options]`: Full CLI-style command execution (supports `-M` and `-o`).
 - `/shell`: Activate **Interactive Shell Mode** for the most recent target.
 - `/shares`, `/users`, `/groups`: Tactical reconnaissance shortcuts.
+- `/clear`, `/reset`: Flush session memory and clear terminal space.
 
 ### 5. Build for Production
 If you want to use the compiled binary directly without `cargo run`, you can build a release version:

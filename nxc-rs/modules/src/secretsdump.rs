@@ -2,7 +2,7 @@ use crate::{ModuleResult, NxcModule, ModuleOptions};
 use nxc_protocols::NxcSession;
 use anyhow::Result;
 use async_trait::async_trait;
-use tracing::{info, debug};
+use tracing::info;
 
 pub struct SecretsDumpModule;
 
@@ -27,16 +27,31 @@ impl NxcModule for SecretsDumpModule {
     }
 
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
-        info!("SMB: Starting SecretsDump on {}", session.target());
+        info!("SMB: Starting SecretsDump execution on {}...", session.target());
 
         if let Some(smb_sess) = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>() {
-            debug!("SMB: Binding to SAMR pipe on {}...", smb_sess.target);
-            // RPC Logic would go here
+            let protocol = nxc_protocols::smb::SmbProtocol::new();
+            match protocol.secrets_dump(smb_sess).await {
+                Ok(output) => {
+                    return Ok(ModuleResult {
+                        success: true,
+                        output,
+                        data: serde_json::json!({}),
+                    });
+                }
+                Err(e) => {
+                    return Ok(ModuleResult {
+                        success: false,
+                        output: format!("SecretsDump Error: {}", e),
+                        data: serde_json::json!({}),
+                    });
+                }
+            }
         }
 
         Ok(ModuleResult {
-            success: true,
-            output: "Secrets extraction skeleton initialized. SAMR/DRSUAPI parsing pending.".to_string(),
+            success: false,
+            output: "Invalid session type for secretsdump".to_string(),
             data: serde_json::json!({}),
         })
     }

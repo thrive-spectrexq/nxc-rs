@@ -8,10 +8,12 @@ use nxc_auth::Credentials;
 use nxc_protocols::NxcProtocol;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
+use nxc_db::{NxcDb, HostInfo, Credential};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
+use chrono::Utc;
 
 // ─── Target Types ───────────────────────────────────────────────
 
@@ -203,11 +205,17 @@ pub struct ExecutionResult {
 /// with bounded concurrency via Tokio semaphore.
 pub struct ExecutionEngine {
     opts: ExecutionOpts,
+    db: Option<Arc<NxcDb>>,
 }
 
 impl ExecutionEngine {
     pub fn new(opts: ExecutionOpts) -> Self {
-        Self { opts }
+        Self { opts, db: None }
+    }
+
+    pub fn with_db(mut self, db: Arc<NxcDb>) -> Self {
+        self.db = Some(db);
+        self
     }
 
     pub fn opts(&self) -> &ExecutionOpts {
@@ -223,6 +231,7 @@ impl ExecutionEngine {
     ) -> Vec<ExecutionResult> {
         let semaphore = Arc::new(Semaphore::new(self.opts.threads));
         let mut join_handles: Vec<JoinHandle<ExecutionResult>> = Vec::new();
+        let db = self.db.clone();
 
         for target in targets {
             for cred in creds.iter() {
@@ -233,6 +242,8 @@ impl ExecutionEngine {
                 let timeout_duration = self.opts.timeout;
                 let modules = self.opts.modules.clone();
                 let module_opts = self.opts.module_opts.clone();
+
+                let db_clone = db.clone();
 
                 let handle = tokio::spawn(async move {
                     let start_time = std::time::Instant::now();
@@ -266,6 +277,42 @@ impl ExecutionEngine {
                             Ok(auth_res) => {
                                 let mut final_message = auth_res.message.clone();
                                 
+                                // Save to database if successful and DB available
+                                if let Some(ref db_instance) = db_clone {
+                                    let now = Utc::now().timestamp();
+                                    let host_id = db_instance.upsert_host(&HostInfo {
+                                        id: None,
+                                        workspace: db_instance.current_workspace().to_string(),
+                                        ip: target_clone.ip.to_string(),
+                                        hostname: target_clone.hostname.clone(),
+                                        domain: None, // Could be extracted from protocol sessions if they provide it
+                                        os: None,
+                                        os_version: None,
+                                        smb_signing: None,
+                                        signing_required: None,
+                                        is_dc: false,
+                                        first_seen: now,
+                                        last_seen: now,
+                                    }).ok();
+
+                                    if auth_res.success {
+                                        let _ = db_instance.add_credential(&Credential {
+                                            id: None,
+                                            workspace: db_instance.current_workspace().to_string(),
+                                            domain: None,
+                                            username: cred_clone.username.clone(),
+                                            password: cred_clone.password.clone(),
+                                            nt_hash: cred_clone.nt_hash.clone(),
+                                            lm_hash: None,
+                                            aes_128: None,
+                                            aes_256: None,
+                                            source: Some(protocol_clone.name().to_string()),
+                                            host_id,
+                                            created_at: now,
+                                        });
+                                    }
+                                }
+
                                 // Execute modules if requested
                                 if auth_res.success && !modules.is_empty() {
                                     let registry = nxc_modules::ModuleRegistry::new();
@@ -492,5 +539,69 @@ mod tests {
         // Assert admin auth logic passed correctly for others
         let admins = results.iter().filter(|r| r.success && r.admin).count();
         assert_eq!(admins, 3); // 1 admin win per successful host (10, 11, 12)
+    }
+
+    #[tokio::test]
+    async fn test_execution_engine_db_persistence() -> Result<()> {
+        use anyhow::Result;
+        use async_trait::async_trait;
+        use nxc_db::NxcDb;
+        use nxc_protocols::{NxcProtocol, NxcSession, CommandOutput};
+        use nxc_auth::{AuthResult, Credentials};
+        use std::sync::Arc;
+        use tempfile::tempdir;
+
+        let dir = tempdir()?;
+        let db_path = dir.path().join("test.db");
+        let db = Arc::new(NxcDb::new(&db_path, "test_ws")?);
+
+        let opts = ExecutionOpts::default();
+        let engine = ExecutionEngine::new(opts).with_db(db.clone());
+
+        // Simple mock protocol for test
+        struct MockProto;
+        #[async_trait]
+        impl NxcProtocol for MockProto {
+            fn name(&self) -> &'static str { "mock" }
+            fn default_port(&self) -> u16 { 0 }
+            fn supports_exec(&self) -> bool { false }
+            fn supported_modules(&self) -> &[&str] { &[] }
+            async fn connect(&self, target: &str, _port: u16) -> Result<Box<dyn NxcSession>> {
+                struct MockSess { t: String }
+                impl NxcSession for MockSess {
+                    fn protocol(&self) -> &'static str { "mock" }
+                    fn target(&self) -> &str { &self.t }
+                    fn is_admin(&self) -> bool { true }
+                    fn as_any(&self) -> &dyn std::any::Any { self }
+                    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+                }
+                Ok(Box::new(MockSess { t: target.to_string() }))
+            }
+            async fn authenticate(
+                &self,
+                _session: &mut dyn NxcSession,
+                _creds: &Credentials,
+            ) -> Result<AuthResult> {
+                Ok(AuthResult::success(true))
+            }
+            async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
+                Err(anyhow::anyhow!("mock"))
+            }
+        }
+
+        let targets = vec![Target::new("127.0.0.1".parse().unwrap())];
+        let creds = vec![Credentials::password("admin", "pass", None)];
+
+        engine.run(Arc::new(MockProto), targets, creds).await;
+
+        let hosts = db.list_hosts_in("test_ws")?;
+        assert_eq!(hosts.len(), 1);
+        assert_eq!(hosts[0].ip, "127.0.0.1");
+
+        let saved_creds = db.list_credentials_in("test_ws")?;
+        assert_eq!(saved_creds.len(), 1);
+        assert_eq!(saved_creds[0].username, "admin");
+
+        Ok(())
     }
 }

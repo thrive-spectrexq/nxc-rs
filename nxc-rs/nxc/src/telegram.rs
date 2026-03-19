@@ -16,6 +16,8 @@
 
 use crate::{build_credentials, get_protocol_handler};
 use anyhow::Context;
+use std::sync::Arc;
+use nxc_db::{NxcDb, HostInfo, Credential};
 use nxc_modules::ModuleRegistry;
 use nxc_protocols::Protocol;
 use nxc_targets::{parse_targets, ExecutionEngine, ExecutionOpts};
@@ -95,6 +97,7 @@ struct UserSession {
     last_protocol: Option<String>,
     history: Vec<String>,
     last_activity: Instant,
+    workspace: String,
     _preferred_threads: usize,
     _auto_pwn: bool,
     _interactive_mode: bool,
@@ -107,6 +110,7 @@ impl Default for UserSession {
             last_protocol: None,
             history: Vec::new(),
             last_activity: Instant::now(),
+            workspace: "default".to_string(),
             _preferred_threads: 256,
             _auto_pwn: false,
             _interactive_mode: false,
@@ -226,6 +230,18 @@ enum TelegramBotCommand {
     Logs,
     #[command(description = "Enter interactive shell mode for the last target")]
     Shell,
+
+    // --- 🗄️ Database & Workspace Management ---
+    #[command(description = "List all discovered hosts in current workspace")]
+    Hosts,
+    #[command(description = "Show all captured credentials")]
+    Creds,
+    #[command(description = "List available workspaces")]
+    Workspaces,
+    #[command(description = "Set the active workspace: /setworkspace <name>")]
+    SetWorkspace(String),
+    #[command(description = "Show summary statistics for the current workspace")]
+    Stats,
 }
 
 // --- 🛸 Main Dispatch Engine ---
@@ -434,6 +450,23 @@ async fn handle_command(
                     html_escape::encode_safe(s.last_protocol.as_ref().unwrap()));
                 bot.send_message(msg.chat.id, text).parse_mode(ParseMode::Html).await?;
             }
+        }
+
+        // Database
+        TelegramBotCommand::Hosts => {
+            database_list_hosts(bot, msg).await?;
+        }
+        TelegramBotCommand::Creds => {
+            database_list_creds(bot, msg).await?;
+        }
+        TelegramBotCommand::Workspaces => {
+            database_list_workspaces(bot, msg).await?;
+        }
+        TelegramBotCommand::SetWorkspace(name) => {
+            database_set_workspace(bot, msg, name).await?;
+        }
+        TelegramBotCommand::Stats => {
+            database_show_stats(bot, msg).await?;
         }
     }
     Ok(())
@@ -836,7 +869,7 @@ async fn recon_portscan(
 
     let target = parts[0];
     let ports: Vec<u16> = if parts.len() > 1 {
-        parts[1].split(',').filter_map(|p| p.parse().ok()).collect()
+        parts[1].split(',').filter_map(|p| p.parse::<u16>().ok()).collect()
     } else {
         vec![
             21, 22, 23, 25, 53, 80, 110, 135, 137, 139, 443, 445, 1433, 3306, 3389, 5432, 5900,
@@ -1192,11 +1225,19 @@ async fn engine_run_logic(
     Ok(())
 }
 
-async fn engine_perform_task(args: Vec<String>) -> anyhow::Result<String> {
-    let mut argv = vec!["nxc".to_string()];
-    argv.extend(args);
-
+async fn engine_perform_task(argv: Vec<String>) -> anyhow::Result<String> {
+    // ── Setup Database & Global DB check ──
     let cli = crate::build_cli();
+    
+    // We need to find the workspace from argv before parsing everything if we want to pass it to NxcDb
+    let workspace = argv.iter().position(|r| r == "--workspace" || r == "-w")
+        .and_then(|idx| argv.get(idx + 1))
+        .map(|s| s.as_str())
+        .unwrap_or("default");
+
+    let db_path = std::path::PathBuf::from("nxc.db");
+    let db = NxcDb::new(&db_path, workspace).ok().map(Arc::new);
+
     let matches = match cli.try_get_matches_from(argv) {
         Ok(m) => m,
         Err(e) => {
@@ -1266,7 +1307,10 @@ async fn engine_perform_task(args: Vec<String>) -> anyhow::Result<String> {
         module_opts,
     };
 
-    let engine = ExecutionEngine::new(opts);
+    let mut engine = ExecutionEngine::new(opts);
+    if let Some(ref d) = db {
+        engine = engine.with_db(d.clone());
+    }
     let raw_results = engine.run(proto_handler, resolved, creds).await;
 
     let mut report = format!("⚡ NETEXEC REPORT: {} INTERFACE\n", p_name.to_uppercase());
@@ -1396,6 +1440,188 @@ async fn session_clear(bot: Bot, msg: Message) -> Result<(), teloxide::RequestEr
     // Send a "blank" message or just a clear notification
     bot.send_message(msg.chat.id, "✨ <b>TERMINAL CLEARED</b>\nSession reset. Node ready for new tasking.")
         .parse_mode(ParseMode::Html).await?;
+    Ok(())
+}
+
+// --- 🗄️ Database Implementation ---
+
+static GLOBAL_DB: OnceLock<Arc<NxcDb>> = OnceLock::new();
+
+fn get_db(workspace: &str) -> Option<Arc<NxcDb>> {
+    if let Some(db) = GLOBAL_DB.get() {
+        // NxcDb manager handles workspace switching internally if we call set_workspace
+        // But for multi-user bot, we might need a better way if users use different workspaces
+        // For now, let's assume a single global NxcDb and we switch workspace per call or use a pool
+        Some(db.clone())
+    } else {
+        match NxcDb::new(std::path::Path::new("nxc.db"), workspace) {
+            Ok(db) => {
+                let arc = Arc::new(db);
+                let _ = GLOBAL_DB.set(arc.clone());
+                Some(arc)
+            }
+            Err(_) => None,
+        }
+    }
+}
+
+async fn database_list_hosts(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
+    let user_id = msg.from.as_ref().map(|u| u.id).unwrap_or(UserId(0));
+    let s = get_session(user_id);
+    let db = match get_db(&s.workspace) {
+        Some(d) => d,
+        None => {
+            bot.send_message(msg.chat.id, "❌ <b>DB ERROR</b>\nFailed to connect to database.").await?;
+            return Ok(());
+        }
+    };
+
+    // Temporarily switch DB context to user's workspace
+    // Note: This is not thread-safe for multiple concurrent users with different workspaces 
+    // if using a single global NxcDb. Ideally NxcDb methods should take workspace as arg.
+    // For now, let's just list from user's workspace.
+    
+    match db.list_hosts_in(&s.workspace) {
+        Ok(hosts) => {
+            let hosts: Vec<HostInfo> = hosts;
+            if hosts.is_empty() {
+                bot.send_message(msg.chat.id, format!("📭 No hosts found in workspace [<code>{}</code>]", s.workspace))
+                    .parse_mode(ParseMode::Html).await?;
+            } else {
+                let header = format!("🖥️ <b>Discovered Hosts [<code>{}</code>]</b>\n\n\
+                             <code>{:<15} | {}</code>\n\
+                             ─────────────────────────\n", 
+                             s.workspace, "IP Address", "Hostname");
+                
+                let mut items = Vec::new();
+                for h in hosts {
+                    items.push(format!("<code>{:<15}</code> | <code>{}</code>", 
+                        h.ip, 
+                        html_escape::encode_safe(h.hostname.as_deref().unwrap_or("unknown"))));
+                }
+                
+                send_long_msg_batched(&bot, msg.chat.id, header, items).await?;
+            }
+        }
+        Err(e) => {
+            bot.send_message(msg.chat.id, format!("❌ <b>QUERY ERROR</b>\n{}", e)).await?;
+        }
+    }
+    Ok(())
+}
+
+async fn database_list_creds(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
+    let user_id = msg.from.as_ref().map(|u| u.id).unwrap_or(UserId(0));
+    let s = get_session(user_id);
+    let db = match get_db(&s.workspace) {
+        Some(d) => d,
+        None => {
+            bot.send_message(msg.chat.id, "❌ <b>DB ERROR</b>\nFailed to connect to database.").await?;
+            return Ok(());
+        }
+    };
+
+    match db.list_credentials_in(&s.workspace) {
+        Ok(creds) => {
+            let creds: Vec<Credential> = creds;
+            if creds.is_empty() {
+                bot.send_message(msg.chat.id, format!("📭 No credentials found in workspace [<code>{}</code>]", s.workspace))
+                    .parse_mode(ParseMode::Html).await?;
+            } else {
+                let header = format!("🔑 <b>Captured Credentials [<code>{}</code>]</b>\n\n\
+                             <code>{:<15} : {}</code>\n\
+                             ─────────────────────────\n", 
+                             s.workspace, "Username", "Secret/Hash");
+                
+                let mut items = Vec::new();
+                for c in creds {
+                    let secret = c.password.or(c.nt_hash).unwrap_or_else(|| "none".to_string());
+                    items.push(format!("<code>{:<15}</code> : <code>{}</code>", 
+                        c.username, 
+                        html_escape::encode_safe(&secret)));
+                }
+                
+                send_long_msg_batched(&bot, msg.chat.id, header, items).await?;
+            }
+        }
+        Err(e) => {
+            bot.send_message(msg.chat.id, format!("❌ <b>QUERY ERROR</b>\n{}", e)).await?;
+        }
+    }
+    Ok(())
+}
+
+async fn database_list_workspaces(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
+    let db = match get_db("default") {
+        Some(d) => d,
+        None => {
+            bot.send_message(msg.chat.id, "❌ <b>DB ERROR</b>\nFailed to connect to database.").await?;
+            return Ok(());
+        }
+    };
+
+    match db.list_workspaces() {
+        Ok(ws) => {
+            let mut report = String::from("📂 <b>Available Workspaces:</b>\n\n");
+            for w in ws {
+                report.push_str(&format!("• <code>{}</code>\n", w));
+            }
+            bot.send_message(msg.chat.id, report).parse_mode(ParseMode::Html).await?;
+        }
+        Err(e) => {
+            bot.send_message(msg.chat.id, format!("❌ <b>QUERY ERROR</b>\n{}", e)).await?;
+        }
+    }
+    Ok(())
+}
+
+async fn database_set_workspace(bot: Bot, msg: Message, name: String) -> Result<(), teloxide::RequestError> {
+    let name = name.trim();
+    if name.is_empty() {
+        bot.send_message(msg.chat.id, "💡 Usage: <code>/setworkspace demo</code>").parse_mode(ParseMode::Html).await?;
+        return Ok(());
+    }
+
+    let user_id = msg.from.as_ref().map(|u| u.id).unwrap_or(UserId(0));
+    update_session(user_id, |s| s.workspace = name.to_string());
+    
+    bot.send_message(msg.chat.id, format!("✅ <b>WORKSPACE UPDATED</b>\nNow operating in: <code>{}</code>", name))
+        .parse_mode(ParseMode::Html).await?;
+    Ok(())
+}
+
+async fn database_show_stats(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
+    let user_id = msg.from.as_ref().map(|u| u.id).unwrap_or(UserId(0));
+    let s = get_session(user_id);
+    let db = match get_db(&s.workspace) {
+        Some(d) => d,
+        None => {
+            bot.send_message(msg.chat.id, "❌ <b>DB ERROR</b>\nFailed to connect to database.").await?;
+            return Ok(());
+        }
+    };
+
+    match db.get_stats_in(&s.workspace) {
+        Ok(stats) => {
+            let text = format!("📊 <b>WORKSPACE INTELLIGENCE [<code>{}</code>]</b>\n\n\
+                        • 🖥️ Discovered Hosts: <code>{}</code>\n\
+                        • 🔑 Captured Credentials: <code>{}</code>\n\
+                        • 🏰 Domain Controllers: <code>{}</code>\n\
+                        • 🛡️ Administrative Pwns: <code>{}</code>\n\n\
+                        <i>Tactical overview of current operations.</i>",
+                        stats.workspace,
+                        stats.host_count,
+                        stats.cred_count,
+                        stats.dc_count,
+                        stats.admin_access_count);
+            
+            bot.send_message(msg.chat.id, text)
+               .parse_mode(ParseMode::Html).await?;
+        }
+        Err(e) => {
+            bot.send_message(msg.chat.id, format!("❌ <b>QUERY ERROR</b>\n{}", e)).await?;
+        }
+    }
     Ok(())
 }
 

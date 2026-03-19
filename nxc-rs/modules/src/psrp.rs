@@ -6,7 +6,7 @@ use crate::{ModuleResult, NxcModule, ModuleOptions};
 use nxc_protocols::NxcSession;
 use anyhow::Result;
 use async_trait::async_trait;
-use tracing::{info, debug};
+use tracing::info;
 
 pub struct PsrpModule;
 

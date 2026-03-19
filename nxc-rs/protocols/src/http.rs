@@ -77,7 +77,7 @@ impl NxcProtocol for HttpProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["iot_cam"] // Allows the IoT cam module to hook in
+        &["iot_cam", "http_paths"] // Allows the IoT cam and path discovery modules to hook in
     }
 
     async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
@@ -161,5 +161,23 @@ impl NxcProtocol for HttpProtocol {
         Err(anyhow::anyhow!(
             "Command execution not supported on HTTP protocol natively."
         ))
+    }
+}
+
+impl HttpProtocol {
+    /// Enumerate a list of common paths on the target.
+    pub async fn enumerate_paths(&self, session: &HttpSession, paths: &[&str]) -> Result<Vec<(String, StatusCode)>> {
+        let mut results = Vec::new();
+        let scheme = if self.use_ssl { "https" } else { "http" };
+
+        for path in paths {
+            let url = format!("{}://{}:{}/{}", scheme, session.target, session.port, path.trim_start_matches('/'));
+            let resp = session.client.get(&url).send().await;
+
+            if let Ok(r) = resp {
+                results.push((path.to_string(), r.status()));
+            }
+        }
+        Ok(results)
     }
 }

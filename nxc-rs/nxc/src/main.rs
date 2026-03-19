@@ -14,10 +14,12 @@ use colored::Colorize;
 use nxc_auth::Credentials;
 use nxc_modules::ModuleRegistry;
 use nxc_protocols::Protocol;
+use nxc_db::NxcDb;
 use nxc_targets::{parse_targets, ExecutionEngine, ExecutionOpts};
 use output::{NxcGlobalOutput, NxcOutput};
 use std::sync::Arc;
 use std::time::Duration;
+use std::path::PathBuf;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const CODENAME: &str = "Rusty-Reaper";
@@ -582,6 +584,14 @@ pub(crate) fn build_cli() -> Command {
                 .help("Export results to a custom file")
                 .global(true),
         )
+        .arg(
+            Arg::new("workspace")
+                .short('w')
+                .long("workspace")
+                .help("Workspace to use")
+                .default_value("default")
+                .global(true),
+        )
         .subcommand(smb_cmd)
         .subcommand(ssh_cmd)
         .subcommand(ldap_cmd)
@@ -866,9 +876,25 @@ async fn main() -> Result<()> {
         module_opts,
     };
 
+    // ── Setup Database ──
+    let workspace = matches.get_one::<String>("workspace").map(|s| s.as_str()).unwrap_or("default");
+    
+    // Ensure .nxc directory exists in home or current dir
+    let db_path = PathBuf::from("nxc.db");
+    let db = match NxcDb::new(&db_path, workspace) {
+        Ok(d) => Some(Arc::new(d)),
+        Err(e) => {
+            NxcGlobalOutput::warn(&format!("Failed to initialize database: {}", e));
+            None
+        }
+    };
+
     // ── Print banner ──
     NxcGlobalOutput::banner();
     NxcGlobalOutput::info(&format!("NetExec-RS v{} — {}", VERSION, CODENAME));
+    if let Some(ref d) = db {
+        NxcGlobalOutput::info(&format!("Workspace: {}", d.current_workspace().bold().cyan()));
+    }
     NxcGlobalOutput::info(&format!(
         "Protocol: {} | Targets: {} | Credentials: {} | Threads: {}",
         protocol_name.to_uppercase().bold(),
@@ -878,7 +904,10 @@ async fn main() -> Result<()> {
     ));
 
     // ── Run the execution engine ──
-    let engine = ExecutionEngine::new(exec_opts);
+    let mut engine = ExecutionEngine::new(exec_opts);
+    if let Some(d) = db {
+        engine = engine.with_db(d);
+    }
     let results = engine.run(protocol, all_targets, creds).await;
 
     // ── Display results ──

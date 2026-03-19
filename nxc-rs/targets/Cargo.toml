@@ -13,7 +13,11 @@ nxc-db = { path = "../db" }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
+chrono = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 indicatif = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.10"

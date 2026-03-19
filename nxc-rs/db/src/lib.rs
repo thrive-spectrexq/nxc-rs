@@ -105,6 +105,15 @@ pub struct ShareInfo {
     pub write_access: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceStats {
+    pub workspace: String,
+    pub host_count: i64,
+    pub cred_count: i64,
+    pub dc_count: i64,
+    pub admin_access_count: i64,
+}
+
 // ─── NxcDb Manager ──────────────────────────────────────────────
 
 /// Credential workspace database manager.
@@ -154,12 +163,16 @@ impl NxcDb {
     }
 
     pub fn list_hosts(&self) -> Result<Vec<HostInfo>> {
+        self.list_hosts_in(&self.workspace)
+    }
+
+    pub fn list_hosts_in(&self, workspace: &str) -> Result<Vec<HostInfo>> {
         let conn = self.pool.get()?;
         let mut stmt = conn.prepare(
             "SELECT id, workspace, ip, hostname, domain, os, os_version, smb_signing, signing_req, dc, first_seen, last_seen
              FROM nxc_hosts WHERE workspace = ?1"
         )?;
-        let rows = stmt.query_map(rusqlite::params![self.workspace], |row| {
+        let rows = stmt.query_map(rusqlite::params![workspace], |row| {
             Ok(HostInfo {
                 id: Some(row.get(0)?),
                 workspace: row.get(1)?,
@@ -196,12 +209,16 @@ impl NxcDb {
     }
 
     pub fn list_credentials(&self) -> Result<Vec<Credential>> {
+        self.list_credentials_in(&self.workspace)
+    }
+
+    pub fn list_credentials_in(&self, workspace: &str) -> Result<Vec<Credential>> {
         let conn = self.pool.get()?;
         let mut stmt = conn.prepare(
             "SELECT id, workspace, domain, username, password, nt_hash, lm_hash, aes_128, aes_256, source, host_id, created_at
              FROM nxc_credentials WHERE workspace = ?1"
         )?;
-        let rows = stmt.query_map(rusqlite::params![self.workspace], |row| {
+        let rows = stmt.query_map(rusqlite::params![workspace], |row| {
             Ok(Credential {
                 id: Some(row.get(0)?),
                 workspace: row.get(1)?,
@@ -237,5 +254,44 @@ impl NxcDb {
         let rows = stmt.query_map([], |row| row.get(0))?;
         rows.collect::<std::result::Result<Vec<_>, _>>()
             .map_err(Into::into)
+    }
+
+    pub fn get_stats_in(&self, workspace: &str) -> Result<WorkspaceStats> {
+        let conn = self.pool.get()?;
+        
+        let host_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM nxc_hosts WHERE workspace = ?1",
+            rusqlite::params![workspace],
+            |row| row.get(0),
+        )?;
+
+        let cred_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM nxc_credentials WHERE workspace = ?1",
+            rusqlite::params![workspace],
+            |row| row.get(0),
+        )?;
+
+        let dc_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM nxc_hosts WHERE workspace = ?1 AND dc = 1",
+            rusqlite::params![workspace],
+            |row| row.get(0),
+        )?;
+
+        // Admin access is tracked in auth_results
+        let admin_access_count: i64 = conn.query_row(
+            "SELECT COUNT(DISTINCT host_id) FROM nxc_auth_results 
+             JOIN nxc_hosts ON nxc_auth_results.host_id = nxc_hosts.id
+             WHERE nxc_hosts.workspace = ?1 AND nxc_auth_results.admin = 1",
+            rusqlite::params![workspace],
+            |row| row.get(0),
+        )?;
+
+        Ok(WorkspaceStats {
+            workspace: workspace.to_string(),
+            host_count,
+            cred_count,
+            dc_count,
+            admin_access_count,
+        })
     }
 }

@@ -22,6 +22,7 @@ pub mod shares;
 pub mod vnc_screenshot;
 pub mod whoami;
 pub mod wifi_recon;
+pub mod http_paths;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -149,6 +150,9 @@ impl ModuleRegistry {
 
         let adb_screenshot: Box<dyn NxcModule> = Box::new(adb_screenshot::AdbScreenshot::new());
         modules.insert("adb_screenshot".into(), adb_screenshot);
+
+        let http_paths: Box<dyn NxcModule> = Box::new(http_paths::HttpPathsModule::new());
+        modules.insert("http_paths".into(), http_paths);
 
         Self { modules }
     }

@@ -111,6 +111,10 @@ impl NxcGlobalOutput {
         println!("{} {}", "[+]".bold().green(), msg);
     }
 
+    pub fn warn(msg: &str) {
+        println!("{} {}", "[!]".bold().yellow(), msg.yellow());
+    }
+
     pub fn error(msg: &str) {
         eprintln!("{} {}", "[!]".bold().red(), msg.red());
     }
