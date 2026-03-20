@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y \
     libsasl2-dev \
     libldap2-dev \
     libkrb5-dev \
+    clang \
+    libclang-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
