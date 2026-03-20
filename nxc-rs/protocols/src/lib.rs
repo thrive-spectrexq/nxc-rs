@@ -9,17 +9,23 @@ use nxc_auth::{AuthResult, Credentials};
 use serde::{Deserialize, Serialize};
 
 pub mod adb;
+pub mod docker;
 pub mod ftp;
 pub mod http;
 pub mod ldap;
 pub mod mssql;
+pub mod mysql;
 pub mod nfs;
+pub mod obfuscation;
+pub mod postgresql;
 pub mod rdp;
+pub mod redis;
 pub mod rpc;
 pub mod smb;
+pub mod snmp;
 pub mod ssh;
 pub mod vnc;
-pub mod wifi;
+pub mod network;
 pub mod winrm;
 pub mod wmi;
 
@@ -106,8 +112,13 @@ pub enum Protocol {
     Vnc,
     Nfs,
     Adb,
-    Wifi,
+    Network,
     Http,
+    Redis,
+    Postgres,
+    Mysql,
+    Snmp,
+    Docker,
 }
 
 impl Protocol {
@@ -124,8 +135,13 @@ impl Protocol {
             Protocol::Vnc => "vnc",
             Protocol::Nfs => "nfs",
             Protocol::Adb => "adb",
-            Protocol::Wifi => "wifi",
+            Protocol::Network => "network",
             Protocol::Http => "http",
+            Protocol::Redis => "redis",
+            Protocol::Postgres => "postgres",
+            Protocol::Mysql => "mysql",
+            Protocol::Snmp => "snmp",
+            Protocol::Docker => "docker",
         }
     }
 
@@ -142,8 +158,13 @@ impl Protocol {
             Protocol::Vnc => 5900,
             Protocol::Nfs => 2049,
             Protocol::Adb => 5555,
-            Protocol::Wifi => 0,
+            Protocol::Network => 0,
             Protocol::Http => 80,
+            Protocol::Redis => 6379,
+            Protocol::Postgres => 5432,
+            Protocol::Mysql => 3306,
+            Protocol::Snmp => 161,
+            Protocol::Docker => 2375,
         }
     }
 
@@ -162,8 +183,13 @@ impl Protocol {
             "vnc" => Some(Protocol::Vnc),
             "nfs" => Some(Protocol::Nfs),
             "adb" => Some(Protocol::Adb),
-            "wifi" => Some(Protocol::Wifi),
+            "network" | "net" | "wifi" => Some(Protocol::Network),
             "http" => Some(Protocol::Http),
+            "redis" => Some(Protocol::Redis),
+            "postgres" | "postgresql" => Some(Protocol::Postgres),
+            "mysql" => Some(Protocol::Mysql),
+            "snmp" => Some(Protocol::Snmp),
+            "docker" => Some(Protocol::Docker),
             _ => None,
         }
     }
@@ -182,8 +208,13 @@ impl Protocol {
             Protocol::Vnc,
             Protocol::Nfs,
             Protocol::Adb,
-            Protocol::Wifi,
+            Protocol::Network,
             Protocol::Http,
+            Protocol::Redis,
+            Protocol::Postgres,
+            Protocol::Mysql,
+            Protocol::Snmp,
+            Protocol::Docker,
         ]
     }
 }

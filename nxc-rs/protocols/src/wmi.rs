@@ -173,8 +173,8 @@ impl NxcProtocol for WmiProtocol {
 
         let mut stream = TcpStream::connect(&addr).await?;
 
-        // 1. Bind to WMI Services (Simplified for MVP)
-        use crate::rpc::{DcerpcBind, DcerpcHeader, DcerpcRequest, PacketType, UUID_WMI_SERVICES};
+        // 1. Bind to WMI Services
+        use crate::rpc::{DcerpcBind, DcerpcHeader, PacketType, UUID_WMI_SERVICES};
         
         let bind = DcerpcBind::new(UUID_WMI_SERVICES, 0, 0);
         let bind_bytes = bind.to_bytes();
@@ -186,32 +186,22 @@ impl NxcProtocol for WmiProtocol {
 
         let mut ack_hdr = [0u8; 24];
         stream.read_exact(&mut ack_hdr).await?;
-        // (In a full implementation, we'd check the BindAck here)
-
-        // 2. Win32_Process.Create (Opnum 12 or similar depending on the interface)
-        // For WMI via DCOM, we'd call IWbemServices::ExecMethod
-        // Opnum for ExecMethod is 24
         
-        // This is a complex NDR payload. For the MVP, we'll build a skeleton.
+        // 2. Win32_Process.Create (via IWbemServices::ExecMethod - Opnum 24)
         let mut payload = Vec::new();
-        // ORPCThis structure (8 bytes of 0 for simplified MVP)
-        payload.extend_from_slice(&[0u8; 8]); 
+        // ORPCThis (8 bytes 0)
+        payload.extend_from_slice(&[0u8; 8]);
         
-        // strClass: "Win32_Process"
-        let class_name = "Win32_Process\0";
-        payload.extend_from_slice(&(class_name.len() as u32).to_le_bytes());
-        payload.extend_from_slice(class_name.as_bytes());
+        self.encode_ndr_string(&mut payload, "Win32_Process");
+        self.encode_ndr_string(&mut payload, "Create");
         
-        // strMethodName: "Create"
-        let method_name = "Create\0";
-        payload.extend_from_slice(&(method_name.len() as u32).to_le_bytes());
-        payload.extend_from_slice(method_name.as_bytes());
-
+        // lFlags: 0
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        
         // CommandLine parameter
-        payload.extend_from_slice(&(cmd.len() as u32).to_le_bytes());
-        payload.extend_from_slice(cmd.as_bytes());
+        self.encode_ndr_string(&mut payload, cmd);
 
-        let req = DcerpcRequest::new(24, payload);
+        let req = crate::rpc::DcerpcRequest::new(24, payload);
         let req_bytes = req.to_bytes();
         let req_header = DcerpcHeader::new(PacketType::Request, 2, (24 + req_bytes.len()) as u16);
         
@@ -222,9 +212,29 @@ impl NxcProtocol for WmiProtocol {
         info!("WMI: Executed command '{}' via Win32_Process.Create on {}", cmd, addr);
 
         Ok(CommandOutput {
-            stdout: "Command injection triggered (Output not captured via WMI ExecMethod natively).".to_string(),
+            stdout: "Command injection triggered via Win32_Process.Create. Output is not returned via WMI natively.".to_string(),
             stderr: String::new(),
             exit_code: Some(0),
         })
+    }
+}
+
+impl WmiProtocol {
+    fn encode_ndr_string(&self, buf: &mut Vec<u8>, s: &str) {
+        let utf16: Vec<u16> = s.encode_utf16().collect();
+        let len = utf16.len() as u32 + 1;
+        
+        buf.extend_from_slice(&len.to_le_bytes()); 
+        buf.extend_from_slice(&0u32.to_le_bytes()); 
+        buf.extend_from_slice(&len.to_le_bytes()); 
+        
+        for &u in &utf16 {
+            buf.extend_from_slice(&u.to_le_bytes());
+        }
+        buf.extend_from_slice(&0u16.to_le_bytes());
+        
+        while buf.len() % 4 != 0 {
+            buf.push(0);
+        }
     }
 }

@@ -77,26 +77,22 @@ impl LdapProtocol {
             .as_ref()
             .ok_or_else(|| anyhow!("Session skipped authentication"))?;
 
-        let username = creds.username.clone();
-        let password = creds.password.clone().unwrap_or_default();
-
         let (conn, mut ldap) = tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::new(&url))
             .await
             .map_err(|_| anyhow!("LDAP connection timeout"))??;
 
         ldap3::drive!(conn);
 
-        let res = ldap.simple_bind(&username, &password).await?;
-        if res.rc != 0 {
-            return Err(anyhow!("LDAP bind failed for search: {}", res.text));
-        }
+        // Simple Bind for the search connection (NTLM support pending stable ldap3 v0.12)
+        let user = creds.username.clone();
+        let pass = creds.password.clone().unwrap_or_default();
+        ldap.simple_bind(&user, &pass).await?;
 
         let rs = ldap.search(base_dn, scope, filter, attrs).await?;
         let mut entries = Vec::new();
 
         for entry in rs.0 {
-            let search_entry = ldap3::SearchEntry::construct(entry);
-            entries.push(search_entry);
+            entries.push(ldap3::SearchEntry::construct(entry));
         }
 
         let _ = ldap.unbind().await;
@@ -105,27 +101,26 @@ impl LdapProtocol {
 
     /// Resolve naming contexts to find the base DN if not provided.
     pub async fn get_base_dn(&self, session: &LdapSession) -> Result<String> {
-        let entries = self
-            .search(
-                session,
-                "",
-                ldap3::Scope::Base,
-                "(objectClass=*)",
-                vec!["defaultNamingContext"],
-            )
-            .await?;
+        let url = self.build_url(&session.target, session.port);
+        let (conn, mut ldap) = tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::new(&url))
+            .await
+            .map_err(|_| anyhow!("LDAP connection timeout"))??;
 
-        if let Some(entry) = entries.first() {
-            if let Some(dn) = entry
-                .attrs
-                .get("defaultNamingContext")
-                .and_then(|v| v.first())
-            {
-                return Ok(dn.clone());
+        ldap3::drive!(conn);
+
+        // Anonymous RootDSE query
+        let rs = ldap.search("", ldap3::Scope::Base, "(objectClass=*)", vec!["defaultNamingContext"]).await?;
+        if let Some(entry) = rs.0.first() {
+            let search_entry = ldap3::SearchEntry::construct(entry.clone());
+            if let Some(dn) = search_entry.attrs.get("defaultNamingContext").and_then(|v| v.first()) {
+                let res = dn.clone();
+                let _ = ldap.unbind().await;
+                return Ok(res);
             }
         }
 
-        Err(anyhow!("Could not resolve defaultNamingContext"))
+        let _ = ldap.unbind().await;
+        Err(anyhow!("Could not resolve defaultNamingContext from RootDSE"))
     }
 }
 

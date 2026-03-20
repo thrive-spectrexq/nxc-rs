@@ -184,6 +184,8 @@ enum TelegramBotCommand {
     Nfs(String),
     #[command(description = "HTTP web reconnaissance")]
     Http(String),
+    #[command(description = "Network discovery & scanning")]
+    Network(String),
 
     // --- 📊 Specialized Enumeration Shortcuts ---
     #[command(description = "Quickly list SMB shares on a target")]
@@ -376,6 +378,9 @@ async fn handle_command(
         TelegramBotCommand::Http(a) => {
             engine_execute_shortcut(bot, msg, "http", a).await?;
         }
+        TelegramBotCommand::Network(a) => {
+            engine_execute_shortcut(bot, msg, "network", a).await?;
+        }
 
         // Enumeration Shortcuts
         TelegramBotCommand::Shares(t) => {
@@ -562,7 +567,7 @@ async fn handle_interactive_callbacks(
 async fn ui_send_dashboard(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
     let text = "🛸 <b>NETEXEC-RS: SUPERNOVA MISSION CONTROL</b>\n\n\
         <b>Operational Command Matrix:</b>\n\n\
-        🚀 <b>Deployment:</b> /run /smb /ssh /ldap /winrm /mssql\n\
+        🚀 <b>Deployment:</b> /run /smb /ssh /ldap /winrm /mssql /network\n\
         🐚 <b>Interactive:</b> /shell (persistent access)\n\
         🔍 <b>Intelligence:</b> /search /modules /protocols\n\
         📡 <b>Reconnaissance:</b> /ping /portscan /dns /geo\n\
@@ -1639,6 +1644,8 @@ async fn session_show_cheat(bot: Bot, msg: Message) -> Result<(), teloxide::Requ
         ◈ <b>Database &amp; App Attacks</b>\n\
         <code>/run mssql sql01 -u sa -p pass -x \"whoami\"</code>\n\
         <code>/run adb 192.168.1.50 --screenshot</code>\n\n\
+        ◈ <b>Network Discovery</b>\n\
+        <code>/network 192.168.1.0/24 -M net_discovery</code>\n\n\
         ◈ <b>Master Control Pivot</b>\n\
         Use <code>/shell</code> to enter interactive mode for your last target.";
     bot.send_message(msg.chat.id, text)

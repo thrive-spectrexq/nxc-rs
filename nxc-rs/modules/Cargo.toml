@@ -16,4 +16,6 @@ tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 ldap3 = { workspace = true }
+chrono = { workspace = true }
+hex = { workspace = true }
 bytes = "1.11.1"

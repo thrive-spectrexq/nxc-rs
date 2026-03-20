@@ -7,6 +7,9 @@ description = "NetExec-RS protocol handlers — SMB, LDAP, WinRM, RDP, MSSQL, SS
 [dependencies]
 ldap3 = "0.11"
 
+base64 = "0.22"
+tokio-rustls = "0.26"
+rustls-pki-types = "1.0"
 nxc-auth = { path = "../auth" }
 async-trait = { workspace = true }
 tokio = { workspace = true }
@@ -23,3 +26,8 @@ uuid = { workspace = true, features = ["v4"] }
 bytes = "1.11.1"
 des = { workspace = true }
 suppaftp = { workspace = true }
+rand = { workspace = true }
+redis = { version = "0.27", features = ["tokio-comp"] }
+mysql_async = "0.34"
+tokio-postgres = "0.7"
+snmp = "0.2"

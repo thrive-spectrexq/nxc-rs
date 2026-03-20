@@ -143,7 +143,7 @@ NetExec-RS is designed with a layered approach for maximum maintainability:
 - **nxc-auth**: Shared authentication engines (NTLM, Kerberos, Cryptography).
 - **nxc-modules**: Post-exploitation module library.
 - **nxc-targets**: Advanced target parsing (CIDR, ranges, files).
-- **nxc-db**: Credential storage and workspace management (work in progress).
+- **nxc-db**: Credential storage and workspace management.
 
 ---
 

@@ -35,6 +35,7 @@ pub mod svcctl {
     pub const CREATE_SERVICE: u16 = 12;
     pub const START_SERVICE: u16 = 19;
     pub const DELETE_SERVICE: u16 = 2;
+    pub const QUERY_SERVICE_STATUS: u16 = 6;
     pub const CLOSE_SERVICE_HANDLE: u16 = 0;
 }
 

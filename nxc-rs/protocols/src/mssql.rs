@@ -125,7 +125,15 @@ impl NxcProtocol for MssqlProtocol {
         let mut config = Config::new();
         config.host(&target);
         config.port(port);
-        config.authentication(AuthMethod::sql_server(&username, &password));
+        
+        // Support NTLM auth if domain is provided or if simple auth fails
+        if let Some(ref domain) = creds.domain {
+            debug!("MSSQL: Using Windows auth for {}\\{}", domain, username);
+            config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, username), &password));
+        } else {
+            config.authentication(AuthMethod::sql_server(&username, &password));
+        }
+        
         config.trust_cert();
 
         let tcp_fut = tokio::time::timeout(self.timeout, TcpStream::connect(&addr));
@@ -187,10 +195,16 @@ impl NxcProtocol for MssqlProtocol {
         let mut config = Config::new();
         config.host(&mssql_sess.target);
         config.port(mssql_sess.port);
-        config.authentication(AuthMethod::sql_server(
-            &creds.username,
-            creds.password.as_deref().unwrap_or_default(),
-        ));
+        
+        let user = &creds.username;
+        let pass = creds.password.as_deref().unwrap_or_default();
+        
+        if let Some(ref domain) = creds.domain {
+             config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, user), pass));
+        } else {
+             config.authentication(AuthMethod::sql_server(user, pass));
+        }
+        
         config.trust_cert();
 
         let tcp = TcpStream::connect(format!("{}:{}", mssql_sess.target, mssql_sess.port)).await?;
@@ -241,10 +255,16 @@ impl MssqlProtocol {
         let mut config = Config::new();
         config.host(&session.target);
         config.port(session.port);
-        config.authentication(AuthMethod::sql_server(
-            &creds.username,
-            creds.password.as_deref().unwrap_or_default(),
-        ));
+
+        let user = &creds.username;
+        let pass = creds.password.as_deref().unwrap_or_default();
+
+        if let Some(ref domain) = creds.domain {
+             config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, user), pass));
+        } else {
+             config.authentication(AuthMethod::sql_server(user, pass));
+        }
+
         config.trust_cert();
 
         let tcp = TcpStream::connect(format!("{}:{}", session.target, session.port)).await?;

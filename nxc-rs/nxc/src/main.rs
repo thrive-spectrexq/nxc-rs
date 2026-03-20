@@ -489,8 +489,10 @@ pub(crate) fn build_cli() -> Command {
                 .action(ArgAction::SetTrue),
         );
 
-    let wifi_cmd = Command::new("wifi")
-        .about("WiFi protocol (Network Discovery, Scanning, and Connection)")
+    let network_cmd = Command::new("network")
+        .alias("net")
+        .alias("wifi")
+        .about("Network protocol (Discovery, Scanning, and Connection)")
         .args(&auth_args)
         .args(&module_args)
         .arg(
@@ -502,7 +504,7 @@ pub(crate) fn build_cli() -> Command {
         .arg(
             Arg::new("scan")
                 .long("scan")
-                .help("Scan for nearby WiFi networks")
+                .help("Scan for nearby wireless networks")
                 .action(ArgAction::SetTrue),
         )
         .arg(
@@ -520,13 +522,118 @@ pub(crate) fn build_cli() -> Command {
         .arg(
             Arg::new("profiles")
                 .long("profiles")
-                .help("List saved WiFi profiles")
+                .help("List saved wireless profiles")
                 .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("dump")
                 .long("dump")
-                .help("Dump cleartext passwords for all saved WiFi profiles")
+                .help("Dump cleartext passwords for all saved wireless profiles")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("mdns")
+                .long("mdns")
+                .help("Perform mDNS service discovery")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("llmnr")
+                .long("llmnr")
+                .help("Perform LLMNR host discovery")
+                .action(ArgAction::SetTrue),
+        );
+    
+    let redis_cmd = Command::new("redis")
+        .about("Redis protocol (port 6379)")
+        .args(&auth_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("6379")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("info")
+                .long("info")
+                .help("Enumerate Redis server information")
+                .action(ArgAction::SetTrue),
+        );
+
+    let postgres_cmd = Command::new("postgres")
+        .alias("postgresql")
+        .about("PostgreSQL protocol (port 5432)")
+        .args(&auth_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("5432")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("dbs")
+                .long("dbs")
+                .help("List databases")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("exec-command")
+                .short('x')
+                .long("exec-command")
+                .help("Execute command via COPY FROM PROGRAM (requires superuser)"),
+        );
+
+    let mysql_cmd = Command::new("mysql")
+        .about("MySQL protocol (port 3306)")
+        .args(&auth_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("3306")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("dbs")
+                .long("dbs")
+                .help("List databases")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("query")
+                .short('q')
+                .long("query")
+                .help("Execute SQL query"),
+        );
+
+    let snmp_cmd = Command::new("snmp")
+        .about("SNMP protocol (port 161/udp)")
+        .args(&auth_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("161")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("enum")
+                .long("enum")
+                .help("Enumerate system information")
+                .action(ArgAction::SetTrue),
+        );
+
+    let docker_cmd = Command::new("docker")
+        .about("Docker API & Registry protocol (port 2375/5000)")
+        .args(&auth_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("2375")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("enum")
+                .long("enum")
+                .help("Enumerate containers or repositories")
                 .action(ArgAction::SetTrue),
         );
 
@@ -603,8 +710,13 @@ pub(crate) fn build_cli() -> Command {
         .subcommand(wmi_cmd)
         .subcommand(nfs_cmd)
         .subcommand(adb_cmd)
-        .subcommand(wifi_cmd)
+        .subcommand(network_cmd)
         .subcommand(http_cmd)
+        .subcommand(redis_cmd)
+        .subcommand(postgres_cmd)
+        .subcommand(mysql_cmd)
+        .subcommand(snmp_cmd)
+        .subcommand(docker_cmd)
         .subcommand(
             Command::new("telegram")
                 .about("Start the NetExec-RS Telegram bot server")
@@ -697,14 +809,16 @@ pub(crate) fn get_protocol_handler(
         "vnc" => Some(Arc::new(nxc_protocols::vnc::VncProtocol::new())),
         "nfs" => Some(Arc::new(nxc_protocols::nfs::NfsProtocol::new())),
         "adb" => Some(Arc::new(nxc_protocols::adb::AdbProtocol::new())),
-        "wifi" => {
+        "network" | "net" | "wifi" => {
             let scan = sub_matches.get_flag("scan");
             let connect = sub_matches.get_one::<String>("connect").cloned();
             let devices = sub_matches.get_flag("devices");
             let profiles = sub_matches.get_flag("profiles");
             let dump = sub_matches.get_flag("dump");
-            Some(Arc::new(nxc_protocols::wifi::WifiProtocol::new(
-                scan, connect, devices, profiles, dump,
+            let mdns = sub_matches.get_flag("mdns");
+            let llmnr = sub_matches.get_flag("llmnr");
+            Some(Arc::new(nxc_protocols::network::NetworkProtocol::new(
+                scan, connect, devices, profiles, dump, mdns, llmnr,
             )))
         }
         "http" => {
@@ -714,6 +828,11 @@ pub(crate) fn get_protocol_handler(
                 ssl, verify_ssl,
             )))
         }
+        "redis" => Some(Arc::new(nxc_protocols::redis::RedisProtocol::new())),
+        "postgres" | "postgresql" => Some(Arc::new(nxc_protocols::postgresql::PostgresProtocol::new())),
+        "mysql" => Some(Arc::new(nxc_protocols::mysql::MysqlProtocol::new())),
+        "snmp" => Some(Arc::new(nxc_protocols::snmp::SnmpProtocol::new())),
+        "docker" => Some(Arc::new(nxc_protocols::docker::DockerProtocol::new())),
         // Future protocols will be added here:
         _ => None,
     }
@@ -758,7 +877,7 @@ async fn main() -> Result<()> {
             NxcGlobalOutput::info(&format!("NetExec-RS v{} — {}", VERSION, CODENAME));
             NxcGlobalOutput::info("Use 'nxc <protocol> --help' for protocol-specific options");
             NxcGlobalOutput::info(
-                "Available protocols: smb, ssh, ldap, winrm, mssql, rdp, ftp, vnc, wmi, nfs, adb",
+                "Available protocols: smb, ssh, ldap, winrm, mssql, rdp, ftp, vnc, wmi, nfs, adb, network",
             );
             return Ok(());
         }
@@ -854,6 +973,31 @@ async fn main() -> Result<()> {
     if sub_matches.get_flag("gmsa") && protocol_name == "ldap" {
         if !modules.contains(&"gmsa".to_string()) {
             modules.push("gmsa".to_string());
+        }
+    }
+    
+    // Redis flags
+    if sub_matches.get_flag("info") && protocol_name == "redis" {
+        if !modules.contains(&"redis_info".to_string()) {
+            modules.push("redis_info".to_string());
+        }
+    }
+
+    // Postgres / MySQL flags
+    if sub_matches.get_flag("dbs") {
+        match protocol_name {
+            "postgres" | "postgresql" => { if !modules.contains(&"pg_enum".to_string()) { modules.push("pg_enum".to_string()); } },
+            "mysql" => { if !modules.contains(&"mysql_enum".to_string()) { modules.push("mysql_enum".to_string()); } },
+            _ => {}
+        }
+    }
+
+    // SNMP / Docker flags
+    if sub_matches.get_flag("enum") {
+        match protocol_name {
+            "snmp" => { if !modules.contains(&"snmp_enum".to_string()) { modules.push("snmp_enum".to_string()); } },
+            "docker" => { if !modules.contains(&"docker_enum".to_string()) { modules.push("docker_enum".to_string()); } },
+            _ => {}
         }
     }
 

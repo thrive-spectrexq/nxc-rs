@@ -20,3 +20,6 @@ rc4 = { workspace = true }
 aes = { workspace = true }
 des = { workspace = true }
 hostname = { workspace = true }
+chrono = { workspace = true }
+rand = { workspace = true }
+hex = { workspace = true }

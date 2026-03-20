@@ -70,7 +70,7 @@ impl NxcModule for Laps {
             base_dn
         );
 
-        // Filter for computers with LAPS passwords (supporting both legacy ms-MCS-AdmPwd and new msLAPS-Password)
+        // Filter for computers with any LAPS attributes
         let filter = format!(
             "(&(objectCategory=computer)(|(ms-MCS-AdmPwd=*)(msLAPS-Password=*)(msLAPS-EncryptedPassword=*))(name={}))",
             computer_filter
@@ -82,6 +82,7 @@ impl NxcModule for Laps {
             "ms-MCS-AdmPwd",
             "msLAPS-Password",
             "msLAPS-EncryptedPassword",
+            "msLAPS-PasswordExpirationTime",
         ];
 
         let entries = protocol
@@ -97,7 +98,7 @@ impl NxcModule for Laps {
         let mut output_lines = Vec::new();
         let mut laps_results = Vec::new();
 
-        output_lines.push("Retrieving LAPS Passwords...".to_string());
+        output_lines.push("🛸 <b>LAPS Intelligence Extraction</b>\n".to_string());
 
         if entries.is_empty() {
             output_lines.push(format!(
@@ -106,51 +107,48 @@ impl NxcModule for Laps {
             ));
         } else {
             for entry in &entries {
-                let name = entry
-                    .attrs
-                    .get("name")
-                    .and_then(|v| v.first())
-                    .cloned()
-                    .unwrap_or_default();
-                let sam = entry
-                    .attrs
-                    .get("sAMAccountName")
-                    .and_then(|v| v.first())
-                    .cloned()
-                    .unwrap_or_default();
+                let name = entry.attrs.get("name").and_then(|v| v.first()).cloned().unwrap_or_default();
+                let sam = entry.attrs.get("sAMAccountName").and_then(|v| v.first()).cloned().unwrap_or_default();
+                
+                let mut expiration = "Never".to_string();
+                if let Some(exp_str) = entry.attrs.get("msLAPS-PasswordExpirationTime").and_then(|v| v.first()) {
+                    if let Ok(exp_val) = exp_str.parse::<i64>() {
+                        // Windows FileTime is 100ns intervals since 1601-01-01
+                        let secs = (exp_val / 10_000_000) - 11_644_473_600;
+                        if let Some(dt) = chrono::DateTime::from_timestamp(secs, 0) {
+                            expiration = dt.format("%Y-%m-%d %H:%M:%S").to_string();
+                        }
+                    }
+                }
 
-                // Try legacy LAPS
-                let password = if let Some(p) =
-                    entry.attrs.get("ms-MCS-AdmPwd").and_then(|v| v.first())
-                {
-                    p.clone()
+                let (version, password) = if let Some(p) = entry.attrs.get("ms-MCS-AdmPwd").and_then(|v| v.first()) {
+                    ("Legacy", p.clone())
                 } else if let Some(p) = entry.attrs.get("msLAPS-Password").and_then(|v| v.first()) {
-                    // New LAPS (cleartext if configured, though often encrypted)
-                    p.clone()
-                } else if entry.attrs.contains_key("msLAPS-EncryptedPassword") {
-                    "[Encrypted - Decryption pending implementation]".to_string()
+                    ("New-Clear", p.clone())
+                } else if let Some(p_bin) = entry.bin_attrs.get("msLAPS-EncryptedPassword").and_then(|v| v.first()) {
+                    ("New-Encrypted", format!("[Encrypted Blob: {}...]", hex::encode(&p_bin[..16.min(p_bin.len())])))
                 } else {
                     continue;
                 };
 
-                output_lines.push(format!(
-                    "Computer: {:<15} User: Administrator  Password: {}",
-                    name, password
-                ));
+                let line = format!(
+                    "{:<15} | {:<12} | Exp: {:<19} | Pwd: {}",
+                    name, version, expiration, password
+                );
+                output_lines.push(line);
 
                 laps_results.push(serde_json::json!({
                     "computer": name,
                     "sAMAccountName": sam,
+                    "version": version,
+                    "expiration": expiration,
                     "password": password
                 }));
             }
         }
 
         if laps_results.is_empty() && !entries.is_empty() {
-            output_lines.push(
-                "Matched computers but could not read LAPS attributes (permission denied?)"
-                    .to_string(),
-            );
+            output_lines.push("Matched computers but could not read LAPS attributes (permission denied?)".to_string());
         }
 
         Ok(ModuleResult {

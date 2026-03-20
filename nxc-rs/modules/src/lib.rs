@@ -9,6 +9,7 @@ pub mod bloodhound;
 pub mod wmi_enum;
 pub mod psrp;
 pub mod adb_screenshot;
+pub mod adb_shell;
 pub mod asreproasting;
 pub mod enum_dns;
 pub mod secretsdump;
@@ -21,8 +22,13 @@ pub mod ls;
 pub mod shares;
 pub mod vnc_screenshot;
 pub mod whoami;
-pub mod wifi_recon;
+pub mod net_discovery;
 pub mod http_paths;
+pub mod redis_info;
+pub mod pg_enum;
+pub mod mysql_enum;
+pub mod snmp_enum;
+pub mod docker_enum;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -130,8 +136,8 @@ impl ModuleRegistry {
         let iot_cam: Box<dyn NxcModule> = Box::new(iot_cam::IotCam::new());
         modules.insert("iot_cam".into(), iot_cam);
 
-        let wifi_recon: Box<dyn NxcModule> = Box::new(wifi_recon::WifiRecon::new());
-        modules.insert("wifi_recon".into(), wifi_recon);
+        let net_discovery: Box<dyn NxcModule> = Box::new(net_discovery::NetDiscovery::new());
+        modules.insert("net_discovery".into(), net_discovery);
 
         let gmsa: Box<dyn NxcModule> = Box::new(gmsa::Gmsa::new());
         modules.insert("gmsa".into(), gmsa);
@@ -151,8 +157,26 @@ impl ModuleRegistry {
         let adb_screenshot: Box<dyn NxcModule> = Box::new(adb_screenshot::AdbScreenshot::new());
         modules.insert("adb_screenshot".into(), adb_screenshot);
 
+        let adb_shell: Box<dyn NxcModule> = Box::new(adb_shell::AdbShell::new());
+        modules.insert("adb_shell".into(), adb_shell);
+
         let http_paths: Box<dyn NxcModule> = Box::new(http_paths::HttpPathsModule::new());
         modules.insert("http_paths".into(), http_paths);
+
+        let redis_info: Box<dyn NxcModule> = Box::new(redis_info::RedisInfo::new());
+        modules.insert("redis_info".into(), redis_info);
+
+        let pg_enum: Box<dyn NxcModule> = Box::new(pg_enum::PostgresEnum::new());
+        modules.insert("pg_enum".into(), pg_enum);
+
+        let mysql_enum: Box<dyn NxcModule> = Box::new(mysql_enum::MysqlEnum::new());
+        modules.insert("mysql_enum".into(), mysql_enum);
+
+        let snmp_enum: Box<dyn NxcModule> = Box::new(snmp_enum::SnmpEnum::new());
+        modules.insert("snmp_enum".into(), snmp_enum);
+
+        let docker_enum: Box<dyn NxcModule> = Box::new(docker_enum::DockerEnum::new());
+        modules.insert("docker_enum".into(), docker_enum);
 
         Self { modules }
     }
