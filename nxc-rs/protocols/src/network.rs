@@ -206,7 +206,7 @@ impl NetworkProtocol {
         socket.set_broadcast(true)?;
         
         // DNS Service Discovery (PTR record for _services._dns-sd._udp.local)
-        let mut query = vec![
+        let query = vec![
             0x00, 0x00, // Transaction ID
             0x00, 0x00, // Flags
             0x00, 0x01, // Questions
@@ -253,7 +253,7 @@ impl NetworkProtocol {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         
         // LLMNR Query for "*" (any)
-        let mut query = vec![
+        let query = vec![
             0xda, 0xda, // Transaction ID
             0x00, 0x00, // Flags
             0x00, 0x01, // Questions

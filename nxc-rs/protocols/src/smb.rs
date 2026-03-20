@@ -143,8 +143,6 @@ pub struct ShareInfo {
 
 impl std::fmt::Display for ShareInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let read = if self.read_access { "READ" } else { "" };
-        let write = if self.write_access { "WRITE" } else { "" };
         let access = match (self.read_access, self.write_access) {
             (true, true) => "READ, WRITE",
             (true, false) => "READ",
