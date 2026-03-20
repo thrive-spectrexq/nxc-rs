@@ -129,7 +129,10 @@ impl NxcProtocol for MssqlProtocol {
         // Support NTLM auth if domain is provided or if simple auth fails
         if let Some(ref domain) = creds.domain {
             debug!("MSSQL: Using Windows auth for {}\\{}", domain, username);
+            #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
             config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, username), &password));
+            #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
+            config.authentication(AuthMethod::sql_server(&format!("{}\\{}", domain, username), &password));
         } else {
             config.authentication(AuthMethod::sql_server(&username, &password));
         }
@@ -200,7 +203,10 @@ impl NxcProtocol for MssqlProtocol {
         let pass = creds.password.as_deref().unwrap_or_default();
         
         if let Some(ref domain) = creds.domain {
-             config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, user), pass));
+            #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
+            config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, user), pass));
+            #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
+            config.authentication(AuthMethod::sql_server(&format!("{}\\{}", domain, user), pass));
         } else {
              config.authentication(AuthMethod::sql_server(user, pass));
         }
@@ -260,7 +266,10 @@ impl MssqlProtocol {
         let pass = creds.password.as_deref().unwrap_or_default();
 
         if let Some(ref domain) = creds.domain {
+             #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
              config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, user), pass));
+             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
+             config.authentication(AuthMethod::sql_server(&format!("{}\\{}", domain, user), pass));
         } else {
              config.authentication(AuthMethod::sql_server(user, pass));
         }
