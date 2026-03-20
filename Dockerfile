@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libsasl2-dev \
     libldap2-dev \
+    libkrb5-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -25,6 +26,7 @@ RUN apt-get update && apt-get install -y \
     libssl3 \
     libldap-2.5-0 \
     libsasl2-2 \
+    libgssapi-krb5-2 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

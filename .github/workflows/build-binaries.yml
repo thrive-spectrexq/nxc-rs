@@ -40,6 +40,12 @@ jobs:
     - name: Rust Cache
       uses: Swatinem/rust-cache@v2
 
+    - name: Install dependencies (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libkrb5-dev
+
     - name: Build Release Binary
       run: cargo build --release --workspace
 
