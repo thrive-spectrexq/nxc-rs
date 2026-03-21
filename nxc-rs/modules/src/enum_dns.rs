@@ -183,13 +183,13 @@ fn parse_dns_record(blob: &[u8]) -> Option<ParsedDnsRecord> {
 
     let (rtype, value) = match rtype_code {
         0x0001 => ("A", parse_ip_address(&blob[24..])),
-        0x0002 => ("NS", parse_dns_name(&blob[24..], blob)),
-        0x0005 => ("CNAME", parse_dns_name(&blob[24..], blob)),
+        0x0002 => ("NS", parse_dns_name(&blob[24..])),
+        0x0005 => ("CNAME", parse_dns_name(&blob[24..])),
         0x0006 => ("SOA", "SOA Record".to_string()),
-        0x000c => ("PTR", parse_dns_name(&blob[24..], blob)),
-        0x000f => ("MX", "MX Record".to_string()),
+        0x000c => ("PTR", parse_dns_name(&blob[24..])),
+        0x000f => ("MX", parse_mx_record(&blob[24..])),
         0x001c => ("AAAA", parse_ipv6_address(&blob[24..])),
-        0x0021 => ("SRV", "SRV Record".to_string()),
+        0x0021 => ("SRV", parse_srv_record(&blob[24..])),
         _ => return None,
     };
 
@@ -220,9 +220,31 @@ fn parse_ipv6_address(data: &[u8]) -> String {
     parts.join(":")
 }
 
+/// Parses an MX record: Priority (2 bytes) + Name
+fn parse_mx_record(data: &[u8]) -> String {
+    if data.len() < 2 {
+        return "invalid".to_string();
+    }
+    let priority = u16::from_le_bytes([data[0], data[1]]);
+    let name = parse_dns_name(&data[2..]);
+    format!("priority={} exchange={}", priority, name)
+}
+
+/// Parses an SRV record: Priority (2 bytes) + Weight (2 bytes) + Port (2 bytes) + Target
+fn parse_srv_record(data: &[u8]) -> String {
+    if data.len() < 6 {
+        return "invalid".to_string();
+    }
+    let priority = u16::from_le_bytes([data[0], data[1]]);
+    let weight = u16::from_le_bytes([data[2], data[3]]);
+    let port = u16::from_le_bytes([data[4], data[5]]);
+    let target = parse_dns_name(&data[6..]);
+    format!("priority={} weight={} port={} target={}", priority, weight, port, target)
+}
+
 /// AD DNS names are often compressed or encoded in a specific way.
 /// This is a simplified version that tries to extract plain strings.
-fn parse_dns_name(data: &[u8], _full_blob: &[u8]) -> String {
+fn parse_dns_name(data: &[u8]) -> String {
     let mut name = String::new();
     let mut i = 0;
     while i < data.len() {
@@ -230,6 +252,14 @@ fn parse_dns_name(data: &[u8], _full_blob: &[u8]) -> String {
         if len == 0 {
             break;
         }
+        
+        // Handle potential compression markers (simplified)
+        if (len & 0xc0) == 0xc0 {
+            // This is a pointer, but we don't have the full context here easily
+            // In truncated blobs, we just stop
+            break;
+        }
+
         i += 1;
         if i + len > data.len() {
             break;
@@ -240,7 +270,11 @@ fn parse_dns_name(data: &[u8], _full_blob: &[u8]) -> String {
         name.push_str(&String::from_utf8_lossy(&data[i..i + len]));
         i += len;
     }
-    name
+    if name.is_empty() {
+        ".".to_string()
+    } else {
+        name
+    }
 }
 
 #[cfg(test)]
@@ -252,5 +286,26 @@ mod tests {
         let module = EnumDns::new();
         assert_eq!(module.name(), "enum_dns");
         assert!(module.supported_protocols().contains(&"ldap"));
+    }
+
+    #[test]
+    fn test_parse_mx() {
+        // MX: Priority 10, Name: mail.example.com
+        // 0a 00 (Priority 10)
+        // 04 6d 61 69 6c (mail)
+        // 07 65 78 61 6d 70 6c 65 (example)
+        // 03 63 6f 6d (com)
+        // 00 (null)
+        let data = vec![0x0a, 0x00, 0x04, b'm', b'a', b'i', b'l', 0x07, b'e', b'x', b'a', b'm', b'p', b'l', b'e', 0x03, b'c', b'o', b'm', 0x00];
+        let result = parse_mx_record(&data);
+        assert_eq!(result, "priority=10 exchange=mail.example.com");
+    }
+
+    #[test]
+    fn test_parse_srv() {
+        // SRV: Priority 1, Weight 2, Port 389, Target: dc1.example.com
+        let data = vec![0x01, 0x00, 0x02, 0x00, 0x85, 0x01, 0x03, b'd', b'c', b'1', 0x07, b'e', b'x', b'a', b'm', b'p', b'l', b'e', 0x03, b'c', b'o', b'm', 0x00];
+        let result = parse_srv_record(&data);
+        assert_eq!(result, "priority=1 weight=2 port=389 target=dc1.example.com");
     }
 }

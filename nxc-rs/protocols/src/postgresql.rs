@@ -78,7 +78,7 @@ impl NxcProtocol for PostgresProtocol {
         &["pg_enum", "pg_databases"]
     }
 
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
+    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         debug!("Postgres: Connecting to {}", addr);
 

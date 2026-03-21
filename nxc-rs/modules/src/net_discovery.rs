@@ -56,9 +56,9 @@ impl NxcModule for NetDiscovery {
     ) -> Result<ModuleResult> {
         info!("Network: Starting discovery...");
         
-        let network_session = match session.protocol() {
+        let _network_session = match session.protocol() {
             "network" => session.downcast_mut::<nxc_protocols::network::NetworkSession>().unwrap(),
-            _ => return Err(anyhow::anyhow!("Module only supports Network protocol")),
+            _ => return Err(anyhow::anyhow!("Module only supports network")),
         };
 
         // We can't easily get the protocol instance here without a factory or passing it,

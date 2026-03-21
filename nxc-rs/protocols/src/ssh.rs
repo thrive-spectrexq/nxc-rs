@@ -8,7 +8,7 @@ use crate::{CommandOutput, NxcProtocol, NxcSession};
 use anyhow::Result;
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
 use tracing::{debug, info};
@@ -202,21 +202,26 @@ impl NxcProtocol for SshProtocol {
         &[]
     }
 
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
+    async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         let target_owned = target.to_string();
         let timeout = self.timeout;
+        let proxy_owned = proxy.map(|s| s.to_string());
 
         // SSH connection is blocking, so move to a blocking thread
         let session_result = tokio::task::spawn_blocking(move || -> Result<SshSession> {
-            debug!("SSH: Connecting to {}", addr);
+            debug!("SSH: Connecting to {} (proxy: {:?})", addr, proxy_owned);
 
-            let tcp = TcpStream::connect_timeout(
-                &addr
-                    .parse()
-                    .map_err(|e| anyhow::anyhow!("Invalid address {}: {}", addr, e))?,
-                timeout,
-            )?;
+            let tcp = if let Some(p) = proxy_owned {
+                crate::socks::SocksProxy::connect_blocking(&p, &addr)?
+            } else {
+                TcpStream::connect_timeout(
+                    &addr
+                        .parse()
+                        .map_err(|e| anyhow::anyhow!("Invalid address {}: {}", addr, e))?,
+                    timeout,
+                )?
+            };
             tcp.set_read_timeout(Some(timeout))?;
             tcp.set_write_timeout(Some(timeout))?;
 
@@ -362,6 +367,31 @@ impl NxcProtocol for SshProtocol {
         .await??;
 
         Ok(result)
+    }
+
+    async fn read_file(&self, session: &dyn NxcSession, _share: &str, path: &str) -> Result<Vec<u8>> {
+        let ssh_sess = session.downcast_ref::<SshSession>().ok_or_else(|| anyhow::anyhow!("Invalid session"))?;
+        if let Some(ref s) = ssh_sess.session {
+            let sftp = s.sftp()?;
+            let mut file = sftp.open(std::path::Path::new(path))?;
+            let mut data = Vec::new();
+            file.read_to_end(&mut data)?;
+            Ok(data)
+        } else {
+            Err(anyhow::anyhow!("SSH session not initialized"))
+        }
+    }
+
+    async fn write_file(&self, session: &dyn NxcSession, _share: &str, path: &str, data: &[u8]) -> Result<()> {
+        let ssh_sess = session.downcast_ref::<SshSession>().ok_or_else(|| anyhow::anyhow!("Invalid session"))?;
+        if let Some(ref s) = ssh_sess.session {
+            let sftp = s.sftp()?;
+            let mut file = sftp.create(std::path::Path::new(path))?;
+            file.write_all(data)?;
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("SSH session not initialized"))
+        }
     }
 }
 

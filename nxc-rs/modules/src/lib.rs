@@ -7,6 +7,10 @@ pub mod gmsa;
 pub mod adcs;
 pub mod bloodhound;
 pub mod wmi_enum;
+pub mod wmi_persist;
+pub mod lsassy;
+pub mod dcshadow;
+pub mod scripting;
 pub mod psrp;
 pub mod adb_screenshot;
 pub mod adb_shell;
@@ -150,6 +154,41 @@ impl ModuleRegistry {
 
         let wmi_enum: Box<dyn NxcModule> = Box::new(wmi_enum::WmiEnumModule::new());
         modules.insert("wmi_enum".into(), wmi_enum);
+
+        let wmi_persist: Box<dyn NxcModule> = Box::new(wmi_persist::WmiPersistModule::new());
+        modules.insert("wmi_persist".into(), wmi_persist);
+
+        let lsassy: Box<dyn NxcModule> = Box::new(lsassy::LsassyModule::new());
+        modules.insert("lsassy".into(), lsassy);
+
+        let dcshadow: Box<dyn NxcModule> = Box::new(dcshadow::DcshadowModule::new());
+        modules.insert("dcshadow".into(), dcshadow);
+
+        // ─── Dynamic Script Modules ─────────────────────────────────
+        let engine = rhai::Engine::new();
+        let script_dir = std::path::Path::new("./modules");
+        if script_dir.exists() && script_dir.is_dir() {
+            if let Ok(entries) = std::fs::read_dir(script_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.extension().and_then(|s| s.to_str()) == Some("rhai") {
+                        if let Some(file_stem) = path.file_stem().and_then(|s| s.to_str()) {
+                            let module_name = file_stem.to_string();
+                            match scripting::ScriptModule::new(module_name.clone(), path, &engine) {
+                                Ok(script_mod) => {
+                                    tracing::info!("Loaded script module: {}", module_name);
+                                    let boxed_mod: Box<dyn NxcModule> = Box::new(script_mod);
+                                    modules.insert(module_name, boxed_mod);
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to load script module {}: {}", module_name, e);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         let psrp: Box<dyn NxcModule> = Box::new(psrp::PsrpModule::new());
         modules.insert("psrp".into(), psrp);

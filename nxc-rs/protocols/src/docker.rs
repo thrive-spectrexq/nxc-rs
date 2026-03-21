@@ -78,7 +78,7 @@ impl NxcProtocol for DockerProtocol {
         &["docker_enum", "registry_enum"]
     }
 
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
+    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         let is_registry = port == 5000;
         let addr = if is_registry {
              format!("http://{}:{}/v2/", target, port)

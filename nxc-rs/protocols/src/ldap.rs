@@ -119,8 +119,64 @@ impl LdapProtocol {
             }
         }
 
-        let _ = ldap.unbind().await;
         Err(anyhow!("Could not resolve defaultNamingContext from RootDSE"))
+    }
+
+    /// Enumerate all domain users.
+    pub async fn enumerate_users(&self, session: &LdapSession) -> Result<Vec<String>> {
+        let base_dn = self.get_base_dn(session).await?;
+        let entries = self.search(session, &base_dn, ldap3::Scope::Subtree, "(&(objectCategory=person)(objectClass=user))", vec!["sAMAccountName"]).await?;
+        Ok(entries.into_iter().filter_map(|e| e.attrs.get("sAMAccountName").and_then(|v| v.first()).cloned()).collect())
+    }
+
+    /// Enumerate all domain groups.
+    pub async fn enumerate_groups(&self, session: &LdapSession) -> Result<Vec<String>> {
+        let base_dn = self.get_base_dn(session).await?;
+        let entries = self.search(session, &base_dn, ldap3::Scope::Subtree, "(objectClass=group)", vec!["cn"]).await?;
+        Ok(entries.into_iter().filter_map(|e| e.attrs.get("cn").and_then(|v| v.first()).cloned()).collect())
+    }
+
+    /// Get the domain SID via RootDSE or base object.
+    pub async fn get_domain_sid(&self, session: &LdapSession) -> Result<String> {
+        let base_dn = self.get_base_dn(session).await?;
+        let entries = self.search(session, &base_dn, ldap3::Scope::Base, "(objectClass=*)", vec!["objectSid"]).await?;
+        if let Some(entry) = entries.first() {
+            if let Some(sid_bin) = entry.bin_attrs.get("objectSid").and_then(|v| v.first()) {
+                return Ok(format!("[SID: {}]", hex::encode(sid_bin))); // In a real app we'd decode the SID blob
+            }
+        }
+        Err(anyhow!("Could not retrieve domain SID"))
+    }
+
+    /// Enumerate domain trusts.
+    pub async fn enumerate_trusts(&self, session: &LdapSession) -> Result<Vec<String>> {
+        let base_dn = self.get_base_dn(session).await?;
+        let filter = "(objectClass=trustedDomain)";
+        let entries = self.search(session, &base_dn, ldap3::Scope::Subtree, filter, vec!["cn", "trustPartner"]).await?;
+        Ok(entries.into_iter().filter_map(|e| e.attrs.get("trustPartner").and_then(|v| v.first()).cloned()).collect())
+    }
+
+    /// Enumerate SCCM (System Center Configuration Manager) objects.
+    pub async fn enumerate_sccm(&self, session: &LdapSession) -> Result<Vec<String>> {
+        let base_dn = self.get_base_dn(session).await?;
+        let filter = "(objectClass=mssmsManagementPoint)";
+        let entries = self.search(session, &base_dn, ldap3::Scope::Subtree, filter, vec!["cn", "dNSHostName"]).await?;
+        Ok(entries.into_iter().filter_map(|e| e.attrs.get("dNSHostName").and_then(|v| v.first()).cloned()).collect())
+    }
+
+    /// Enumerate Entra ID (Azure AD) sync objects.
+    pub async fn enumerate_entra_id(&self, session: &LdapSession) -> Result<Vec<String>> {
+        let base_dn = self.get_base_dn(session).await?;
+        let filter = "(description=*Azure AD Sync*)";
+        let entries = self.search(session, &base_dn, ldap3::Scope::Subtree, filter, vec!["cn", "description"]).await?;
+        Ok(entries.into_iter().filter_map(|e| e.attrs.get("cn").and_then(|v| v.first()).cloned()).collect())
+    }
+
+    /// Dump Password Settings Objects (PSO).
+    pub async fn dump_pso(&self, session: &LdapSession) -> Result<Vec<String>> {
+        let base_dn = format!("CN=Password Settings Container,CN=System,{}", self.get_base_dn(session).await?);
+        let entries = self.search(session, &base_dn, ldap3::Scope::OneLevel, "(objectClass=msDS-PasswordSettings)", vec!["cn", "msDS-PasswordReversibleEncryptionEnabled"]).await?;
+        Ok(entries.into_iter().filter_map(|e| e.attrs.get("cn").and_then(|v| v.first()).cloned()).collect())
     }
 }
 
@@ -154,31 +210,37 @@ impl NxcProtocol for LdapProtocol {
         ]
     }
 
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
+    async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         let target_owned = target.to_string();
         let timeout = self.timeout;
+        let proxy_owned = proxy.map(|s| s.to_string());
 
-        let _ = tokio::task::spawn_blocking(move || -> Result<()> {
-            let _tcp = std::net::TcpStream::connect_timeout(
-                &addr
-                    .parse()
-                    .map_err(|e| anyhow!("Invalid address {}: {}", addr, e))?,
-                timeout,
-            )?;
-            Ok(())
+        let target_clone = target_owned.clone();
+        
+        let session_result = tokio::task::spawn_blocking(move || -> Result<LdapSession> {
+            debug!("LDAP: Connecting to {} (proxy: {:?})", addr, proxy_owned);
+            let runtime = tokio::runtime::Runtime::new()?;
+            
+            // Just establish TCP to verify the port is open
+            let _tcp_stream = runtime.block_on(async {
+                 crate::connection::connect(&target_clone, port, proxy_owned.as_deref())
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Connection error: {}", e))
+            })?;
+            
+            Ok(LdapSession {
+                target: target_owned,
+                port,
+                admin: false,
+                is_ldaps: port == 636,
+                credentials: None,
+            })
         })
         .await??;
 
-        info!("LDAP: Connected to {}", self.build_url(target, port));
-
-        Ok(Box::new(LdapSession {
-            target: target_owned,
-            port,
-            admin: false,
-            is_ldaps: port == 636,
-            credentials: None,
-        }))
+        info!("LDAP: Connected to {} (verified TCP)", self.build_url(target, port));
+        Ok(Box::new(session_result))
     }
 
     async fn authenticate(

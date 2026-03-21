@@ -6,7 +6,6 @@
 mod output;
 mod telegram;
 mod relay;
-mod socks;
 
 use anyhow::Result;
 use clap::{Arg, ArgAction, Command};
@@ -686,6 +685,27 @@ pub(crate) fn build_cli() -> Command {
                 .global(true),
         )
         .arg(
+            Arg::new("shuffle")
+                .long("shuffle")
+                .help("Randomize target order")
+                .action(ArgAction::SetTrue)
+                .global(true),
+        )
+        .arg(
+            Arg::new("stealth")
+                .long("stealth")
+                .help("Stealth scan (alias for --threads 1 --jitter 500 --shuffle)")
+                .action(ArgAction::SetTrue)
+                .global(true),
+        )
+        .arg(
+            Arg::new("proxy")
+                .long("proxy")
+                .help("SOCKS5 proxy (e.g. socks5://127.0.0.1:1080)")
+                .num_args(1)
+                .global(true),
+        )
+        .arg(
             Arg::new("log")
                 .long("log")
                 .help("Export results to a custom file")
@@ -949,11 +969,21 @@ async fn main() -> Result<()> {
     }
 
     // ── Build execution options ──
-    let threads = matches.get_one::<usize>("threads").copied().unwrap_or(256);
+    let mut threads = matches.get_one::<usize>("threads").copied().unwrap_or(256);
     let timeout = matches.get_one::<u64>("timeout").copied().unwrap_or(30);
-    let jitter = matches.get_one::<u64>("jitter").copied();
+    let mut jitter = matches.get_one::<u64>("jitter").copied();
+    let mut shuffle = matches.get_flag("shuffle");
+    let proxy = matches.get_one::<String>("proxy").cloned();
+    let stealth = matches.get_flag("stealth");
     let continue_on_success = sub_matches.get_flag("continue-on-success");
     let no_bruteforce = sub_matches.get_flag("no-bruteforce");
+
+    // Apply stealth macro
+    if stealth {
+        threads = 1;
+        jitter = Some(jitter.unwrap_or(500));
+        shuffle = true;
+    }
 
     // ── Build module list ──
     let mut modules: Vec<String> = sub_matches
@@ -1014,6 +1044,8 @@ async fn main() -> Result<()> {
         threads,
         timeout: Duration::from_secs(timeout),
         jitter_ms: jitter,
+        shuffle,
+        proxy,
         continue_on_success,
         no_bruteforce,
         modules,

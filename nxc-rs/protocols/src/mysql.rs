@@ -78,7 +78,7 @@ impl NxcProtocol for MysqlProtocol {
         &["mysql_enum", "mysql_databases"]
     }
 
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
+    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         debug!("MySQL: Connecting to {}", addr);
 

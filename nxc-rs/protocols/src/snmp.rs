@@ -78,7 +78,7 @@ impl NxcProtocol for SnmpProtocol {
         &["snmp_enum", "snmp_brute"]
     }
 
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
+    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         // SNMP is UDP, so "connect" just prepares the session metadata.
         // We'll use "public" as the default community string for the initial "connect".
         info!("SNMP: Initializing session for {}:{}", target, port);

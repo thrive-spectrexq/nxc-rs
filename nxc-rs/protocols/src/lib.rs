@@ -8,7 +8,9 @@ use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use serde::{Deserialize, Serialize};
 
+pub mod ad_setup;
 pub mod adb;
+pub mod connection;
 pub mod docker;
 pub mod ftp;
 pub mod http;
@@ -28,6 +30,7 @@ pub mod vnc;
 pub mod network;
 pub mod winrm;
 pub mod wmi;
+pub mod socks;
 
 // ─── Core Traits ────────────────────────────────────────────────
 
@@ -83,7 +86,7 @@ pub trait NxcProtocol: Send + Sync {
     }
 
     /// Connect to a target, returning a session handle.
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>>;
+    async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>>;
 
     /// Authenticate an existing session.
     async fn authenticate(
@@ -94,6 +97,16 @@ pub trait NxcProtocol: Send + Sync {
 
     /// Execute a command on an authenticated session.
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput>;
+
+    /// Read a file from the target.
+    async fn read_file(&self, _session: &dyn NxcSession, _share: &str, _path: &str) -> Result<Vec<u8>> {
+        Err(anyhow::anyhow!("File read not supported for this protocol"))
+    }
+
+    /// Write a file to the target.
+    async fn write_file(&self, _session: &dyn NxcSession, _share: &str, _path: &str, _data: &[u8]) -> Result<()> {
+        Err(anyhow::anyhow!("File write not supported for this protocol"))
+    }
 }
 
 // ─── Protocol Catalogue ─────────────────────────────────────────

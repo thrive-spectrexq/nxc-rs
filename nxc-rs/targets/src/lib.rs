@@ -167,6 +167,8 @@ pub struct ExecutionOpts {
     pub threads: usize,
     pub timeout: Duration,
     pub jitter_ms: Option<u64>,
+    pub shuffle: bool,
+    pub proxy: Option<String>,
     pub continue_on_success: bool,
     pub no_bruteforce: bool,
     pub modules: Vec<String>,
@@ -179,6 +181,8 @@ impl Default for ExecutionOpts {
             threads: 256,
             timeout: Duration::from_secs(30),
             jitter_ms: None,
+            shuffle: false,
+            proxy: None,
             continue_on_success: false,
             no_bruteforce: false,
             modules: Vec::new(),
@@ -229,12 +233,26 @@ impl ExecutionEngine {
         targets: Vec<Target>,
         creds: Vec<Credentials>,
     ) -> Vec<ExecutionResult> {
+        let mut targets = targets;
+        if self.opts.shuffle {
+            use rand::seq::SliceRandom;
+            let mut rng = rand::thread_rng();
+            targets.shuffle(&mut rng);
+        }
+
         let semaphore = Arc::new(Semaphore::new(self.opts.threads));
         let mut join_handles: Vec<JoinHandle<ExecutionResult>> = Vec::new();
         let db = self.db.clone();
 
         for target in targets {
             for cred in creds.iter() {
+                // Apply jitter if specified
+                if let Some(jitter) = self.opts.jitter_ms {
+                    if jitter > 0 {
+                        tokio::time::sleep(Duration::from_millis(jitter)).await;
+                    }
+                }
+
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
                 let protocol_clone = protocol.clone();
                 let target_clone = target.clone();
@@ -242,6 +260,7 @@ impl ExecutionEngine {
                 let timeout_duration = self.opts.timeout;
                 let modules = self.opts.modules.clone();
                 let module_opts = self.opts.module_opts.clone();
+                let proxy_clone = self.opts.proxy.clone();
 
                 let db_clone = db.clone();
 
@@ -252,7 +271,7 @@ impl ExecutionEngine {
                         // Attempt connection
                         let target_str = target_clone.display();
                         let mut session = match protocol_clone
-                            .connect(&target_str, protocol_clone.default_port())
+                            .connect(&target_str, protocol_clone.default_port(), proxy_clone.as_deref())
                             .await
                         {
                             Ok(s) => s,
@@ -468,7 +487,7 @@ mod tests {
                 &[]
             }
 
-            async fn connect(&self, target: &str, _port: u16) -> Result<Box<dyn NxcSession>> {
+            async fn connect(&self, target: &str, _port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
                 if target == "192.168.1.99" {
                     return Err(anyhow::anyhow!("Connection timeout mock"));
                 }
@@ -502,6 +521,8 @@ mod tests {
             threads: 5,
             timeout: std::time::Duration::from_secs(5),
             jitter_ms: None,
+            shuffle: false,
+            proxy: None,
             continue_on_success: false,
             no_bruteforce: false,
             modules: Vec::new(),
@@ -566,7 +587,7 @@ mod tests {
             fn default_port(&self) -> u16 { 0 }
             fn supports_exec(&self) -> bool { false }
             fn supported_modules(&self) -> &[&str] { &[] }
-            async fn connect(&self, target: &str, _port: u16) -> Result<Box<dyn NxcSession>> {
+            async fn connect(&self, target: &str, _port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
                 struct MockSess { t: String }
                 impl NxcSession for MockSess {
                     fn protocol(&self) -> &'static str { "mock" }

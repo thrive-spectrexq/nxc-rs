@@ -80,11 +80,18 @@ impl NxcProtocol for HttpProtocol {
         &["iot_cam", "http_paths"] // Allows the IoT cam and path discovery modules to hook in
     }
 
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
-        let client = Client::builder()
+    async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+        let mut builder = Client::builder()
             .danger_accept_invalid_certs(!self.verify_ssl) // Option to bypass cert warnings common on IoT
-            .timeout(std::time::Duration::from_secs(10))
-            .build()
+            .user_agent(Self::get_random_user_agent())
+            .timeout(std::time::Duration::from_secs(10));
+
+        if let Some(proxy_url) = proxy {
+            let proxy_obj = reqwest::Proxy::all(proxy_url)?;
+            builder = builder.proxy(proxy_obj);
+        }
+
+        let client = builder.build()
             .context("Failed to build HTTP client")?;
 
         Ok(Box::new(HttpSession {
@@ -179,5 +186,17 @@ impl HttpProtocol {
             }
         }
         Ok(results)
+    }
+
+    fn get_random_user_agent() -> &'static str {
+        const USER_AGENTS: &[&str] = &[
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0",
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1.2 Mobile/15E148 Safari/604.1",
+        ];
+        use rand::seq::SliceRandom;
+        USER_AGENTS.choose(&mut rand::thread_rng()).unwrap_or(&USER_AGENTS[0])
     }
 }

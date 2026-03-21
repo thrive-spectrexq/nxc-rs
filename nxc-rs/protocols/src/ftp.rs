@@ -81,7 +81,7 @@ impl NxcProtocol for FtpProtocol {
         &["ls", "get", "put"]
     }
 
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
+    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         debug!("FTP: Connecting to {}", addr);
 
@@ -154,6 +154,36 @@ impl NxcProtocol for FtpProtocol {
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
         Err(anyhow!("FTP does not support explicit command execution."))
+    }
+
+    async fn read_file(&self, session: &dyn NxcSession, _share: &str, path: &str) -> Result<Vec<u8>> {
+        let ftp_sess = session.downcast_ref::<FtpSession>().ok_or_else(|| anyhow!("Invalid session"))?;
+        let addr = format!("{}:{}", ftp_sess.target, ftp_sess.port);
+        let mut ftp_stream = AsyncFtpStream::connect(&addr).await?;
+        
+        let empty = String::new();
+        let pass = ftp_sess.credentials.password.as_ref().unwrap_or(&empty);
+        ftp_stream.login(&ftp_sess.credentials.username, pass).await?;
+        
+        let mut reader = ftp_stream.retr_as_stream(path).await?;
+        let mut buffer = Vec::new();
+        reader.read_to_end(&mut buffer).await?;
+        ftp_stream.finalize_retr_stream(reader).await?;
+        Ok(buffer)
+    }
+
+    async fn write_file(&self, session: &dyn NxcSession, _share: &str, path: &str, data: &[u8]) -> Result<()> {
+        let ftp_sess = session.downcast_ref::<FtpSession>().ok_or_else(|| anyhow!("Invalid session"))?;
+        let addr = format!("{}:{}", ftp_sess.target, ftp_sess.port);
+        let mut ftp_stream = AsyncFtpStream::connect(&addr).await?;
+        
+        let empty = String::new();
+        let pass = ftp_sess.credentials.password.as_ref().unwrap_or(&empty);
+        ftp_stream.login(&ftp_sess.credentials.username, pass).await?;
+        
+        let mut cursor = std::io::Cursor::new(data);
+        ftp_stream.put_file(path, &mut cursor).await?;
+        Ok(())
     }
 }
 

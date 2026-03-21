@@ -208,7 +208,7 @@ impl NxcProtocol for WifiProtocol {
         &["wifi_recon"]
     }
 
-    async fn connect(&self, target: &str, _port: u16) -> Result<Box<dyn NxcSession>> {
+    async fn connect(&self, target: &str, _port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         // Since `wifi` actions generally interact with the host interface rather than
         // a remote TCP port, `connect` merely instantiates the session.
         Ok(Box::new(WifiSession {

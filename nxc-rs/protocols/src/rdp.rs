@@ -125,15 +125,19 @@ impl NxcProtocol for RdpProtocol {
         &["nla_screenshot", "screenshot"] // Standard RDP enumeration modules
     }
 
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
+    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         debug!("RDP: Connecting to {}", addr);
 
-        let timeout_fut = tokio::time::timeout(self.timeout, TcpStream::connect(&addr));
-        let mut stream = match timeout_fut.await {
-            Ok(Ok(s)) => s,
-            Ok(Err(e)) => return Err(anyhow!("Connection refused or unreachable: {}", e)),
-            Err(_) => return Err(anyhow!("Connection timeout to {}", addr)),
+        let mut stream = if let Some(proxy_url) = _proxy {
+            crate::socks::SocksProxy::connect(proxy_url, &addr).await?
+        } else {
+            let timeout_fut = tokio::time::timeout(self.timeout, TcpStream::connect(&addr));
+            match timeout_fut.await {
+                Ok(Ok(s)) => s,
+                Ok(Err(e)) => return Err(anyhow!("Connection refused or unreachable: {}", e)),
+                Err(_) => return Err(anyhow!("Connection timeout to {}", addr)),
+            }
         };
 
         // Send a TPKT / X.224 Connection Request to fingerprint NLA support

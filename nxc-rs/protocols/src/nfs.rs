@@ -78,7 +78,7 @@ impl NxcProtocol for NfsProtocol {
         &["ls", "get", "put", "shares"]
     }
 
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
+    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         debug!("NFS: Connecting to Portmap on {}", addr);
 
@@ -143,6 +143,25 @@ impl NxcProtocol for NfsProtocol {
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
         Err(anyhow!("NFS does not support explicit command execution."))
+    }
+
+    async fn read_file(&self, session: &dyn NxcSession, share: &str, path: &str) -> Result<Vec<u8>> {
+        let nfs_sess = session.downcast_ref::<NfsSession>().ok_or_else(|| anyhow!("Invalid session"))?;
+        debug!("NFS: Attempting to read {} from {} on {}", path, share, nfs_sess.target);
+        
+        // In a real implementation, we would:
+        // 1. MNT to the share to get the root file handle.
+        // 2. LOOKUP the path components to get the target file handle.
+        // 3. Send NFS_READ (Proc 6) with the handle.
+        
+        Err(anyhow!("Full NFS v3 READ requires iterative LOOKUP which is pending RPC structural port."))
+    }
+
+    async fn write_file(&self, session: &dyn NxcSession, share: &str, path: &str, data: &[u8]) -> Result<()> {
+        let nfs_sess = session.downcast_ref::<NfsSession>().ok_or_else(|| anyhow!("Invalid session"))?;
+        debug!("NFS: Attempting to write {} bytes to {}/{} on {}", data.len(), share, path, nfs_sess.target);
+        
+        Err(anyhow!("Full NFS v3 WRITE requires iterative LOOKUP which is pending RPC structural port."))
     }
 }
 

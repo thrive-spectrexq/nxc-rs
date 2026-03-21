@@ -54,6 +54,11 @@ pub const UUID_SRVSVC: [u8; 16] = [
     0xc8, 0x4f, 0x32, 0x4b, 0x70, 0x16, 0xd3, 0x01, 0x12, 0x78, 0x5a, 0x47, 0xbf, 0x6e, 0xe1, 0x88,
 ];
 
+// Print System Asynchronous Protocol (SPOOLSS)
+pub const UUID_SPOOLSS: [u8; 16] = [
+    0x78, 0x56, 0x34, 0x12, 0x34, 0x12, 0xcd, 0x11, 0xef, 0xaf, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92,
+];
+
 // ─── DCE/RPC Headers ───────────────────────────────────────────
 
 #[repr(u8)]
@@ -92,6 +97,11 @@ impl DcerpcHeader {
         }
     }
 
+    pub fn with_auth(mut self, auth_len: u16) -> Self {
+        self.auth_len = auth_len;
+        self
+    }
+
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = vec![
             self.rpc_ver,
@@ -103,6 +113,42 @@ impl DcerpcHeader {
         buf.extend_from_slice(&self.frag_len.to_le_bytes());
         buf.extend_from_slice(&self.auth_len.to_le_bytes());
         buf.extend_from_slice(&self.call_id.to_le_bytes());
+        buf
+    }
+}
+
+// ─── DCE/RPC Auth Verifier ────────────────────────────────────
+
+pub struct DcerpcAuth {
+    pub auth_type: u8,   // 0x0a for NTLM
+    pub auth_level: u8,  // 0x06 for Privacy, 0x05 for Integrity
+    pub auth_pad_len: u8,
+    pub auth_reserved: u8,
+    pub auth_context_id: u32,
+    pub auth_data: Vec<u8>,
+}
+
+impl DcerpcAuth {
+    pub fn new(auth_type: u8, auth_level: u8, auth_data: Vec<u8>) -> Self {
+        Self {
+            auth_type,
+            auth_level,
+            auth_pad_len: 0,
+            auth_reserved: 0,
+            auth_context_id: 0,
+            auth_data,
+        }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut buf = vec![
+            self.auth_type,
+            self.auth_level,
+            self.auth_pad_len,
+            self.auth_reserved,
+        ];
+        buf.extend_from_slice(&self.auth_context_id.to_le_bytes());
+        buf.extend_from_slice(&self.auth_data);
         buf
     }
 }

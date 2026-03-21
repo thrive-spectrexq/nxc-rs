@@ -1306,6 +1306,8 @@ async fn engine_perform_task(argv: Vec<String>) -> anyhow::Result<String> {
         threads: conf_threads,
         timeout: Duration::from_secs(conf_timeout),
         jitter_ms: matches.get_one::<u64>("jitter").copied(),
+        shuffle: matches.get_flag("shuffle"),
+        proxy: matches.get_one::<String>("proxy").cloned(),
         continue_on_success: sub_m.get_flag("continue-on-success"),
         no_bruteforce: sub_m.get_flag("no-bruteforce"),
         modules,

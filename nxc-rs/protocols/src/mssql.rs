@@ -20,6 +20,7 @@ pub struct MssqlSession {
     pub port: u16,
     pub admin: bool,
     pub credentials: Option<Credentials>,
+    pub proxy: Option<String>,
 }
 
 impl NxcSession for MssqlSession {
@@ -84,11 +85,11 @@ impl NxcProtocol for MssqlProtocol {
         &["enum_logins", "enum_databases", "mssql_enum"]
     }
 
-    async fn connect(&self, target: &str, port: u16) -> Result<Box<dyn NxcSession>> {
+    async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
-        debug!("MSSQL: Connecting to {}", addr);
+        debug!("MSSQL: Connecting to {} (proxy: {:?})", addr, proxy);
 
-        let timeout_fut = tokio::time::timeout(self.timeout, TcpStream::connect(&addr));
+        let timeout_fut = tokio::time::timeout(self.timeout, crate::connection::connect(target, port, proxy));
         match timeout_fut.await {
             Ok(Ok(_stream)) => {
                 info!("MSSQL: Connected to {}", addr);
@@ -97,6 +98,7 @@ impl NxcProtocol for MssqlProtocol {
                     port,
                     admin: false,
                     credentials: None,
+                    proxy: proxy.map(|s| s.to_string()),
                 }))
             }
             Ok(Err(e)) => Err(anyhow!("Connection refused or unreachable: {}", e)),
@@ -139,7 +141,7 @@ impl NxcProtocol for MssqlProtocol {
         
         config.trust_cert();
 
-        let tcp_fut = tokio::time::timeout(self.timeout, TcpStream::connect(&addr));
+        let tcp_fut = tokio::time::timeout(self.timeout, crate::connection::connect(&target, port, mssql_sess_mut.proxy.as_deref()));
         let tcp = match tcp_fut.await {
             Ok(Ok(s)) => s,
             _ => return Ok(AuthResult::failure("Connection timeout during auth", None)),
@@ -213,7 +215,7 @@ impl NxcProtocol for MssqlProtocol {
         
         config.trust_cert();
 
-        let tcp = TcpStream::connect(format!("{}:{}", mssql_sess.target, mssql_sess.port)).await?;
+        let tcp = crate::connection::connect(&mssql_sess.target, mssql_sess.port, mssql_sess.proxy.as_deref()).await?;
         let mut client = Client::connect(config, tcp.compat_write()).await?;
 
         // 1. Ensure xp_cmdshell is enabled
@@ -246,6 +248,20 @@ impl NxcProtocol for MssqlProtocol {
             exit_code: Some(0),
         })
     }
+
+    async fn read_file(&self, session: &dyn NxcSession, _share: &str, path: &str) -> Result<Vec<u8>> {
+        let output = self.execute(session, &format!("type {}", path)).await?;
+        Ok(output.stdout.into_bytes())
+    }
+
+    async fn write_file(&self, session: &dyn NxcSession, _share: &str, path: &str, data: &[u8]) -> Result<()> {
+        let hex_data = hex::encode(data);
+        // Using certutil to decode hex in case of binary data
+        let cmd = format!("certutil -decodehex temp.hex {} && del temp.hex", path);
+        self.execute(session, &format!("echo {} > temp.hex", hex_data)).await?;
+        self.execute(session, &cmd).await?;
+        Ok(())
+    }
 }
 
 impl MssqlProtocol {
@@ -276,7 +292,7 @@ impl MssqlProtocol {
 
         config.trust_cert();
 
-        let tcp = TcpStream::connect(format!("{}:{}", session.target, session.port)).await?;
+        let tcp = crate::connection::connect(&session.target, session.port, session.proxy.as_deref()).await?;
         let mut client = Client::connect(config, tcp.compat_write()).await?;
 
         let result = client.query(sql, &[]).await?;
