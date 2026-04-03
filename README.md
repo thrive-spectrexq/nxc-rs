@@ -3,6 +3,7 @@
 [![Rust Version](https://img.shields.io/badge/rust-1.94.0%2B-blue.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Custom-orange.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/thrive-spectrexq/nxc-rs)](https://github.com/thrive-spectrexq/nxc-rs/releases)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/thrive-spectrexq/nxc-rs/rust.yml?branch=master)](https://github.com/thrive-spectrexq/nxc-rs/actions)
 
 **NetExec-RS** is a high-performance, pure Rust reimplementation of the legendary [NetExec](https://github.com/Pennyw0rth/NetExec). It is a "Swiss army knife" for network assessment, designed for penetration testers and red teamers to automate credential spraying, service enumeration, and post-exploitation across multiple protocols.
 
