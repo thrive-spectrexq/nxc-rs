@@ -10,6 +10,7 @@ use rc4::{Rc4, StreamCipher, KeyInit};
 use hmac::Hmac;
 use sha2::Sha256;
 
+#[allow(dead_code)]
 type HmacSha256 = Hmac<Sha256>;
 
 /// Registry Secret Extractor

@@ -6,10 +6,12 @@ use anyhow::Result;
 use tracing::{info, debug};
 use tokio::net::TcpListener;
 
+#[allow(dead_code)]
 pub struct RelayServer {
     pub bind_addr: String,
 }
 
+#[allow(dead_code)]
 impl RelayServer {
     pub fn new(bind_addr: &str) -> Self {
         Self { bind_addr: bind_addr.to_string() }

@@ -38,7 +38,7 @@ impl NxcModule for Nopac {
 
     async fn run(
         &self,
-        session: &mut dyn NxcSession,
+        _session: &mut dyn NxcSession,
         _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         // NoPac is primarily a Kerberos vulnerability (KDC flaw)

@@ -2,11 +2,10 @@
 //!
 //! Dumps local NT hashes from the SAM registry hive.
 
-use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
+use crate::{ModuleOptions, ModuleResult, NxcModule};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_protocols::NxcSession;
-use nxc_auth::RegistrySecrets;
 
 pub struct SamModule {
     name: &'static str,

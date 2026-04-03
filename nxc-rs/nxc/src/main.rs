@@ -9,11 +9,8 @@ mod relay;
 mod reporting;
 
 use anyhow::Result;
-use std::path::PathBuf;
-use clap::{ArgMatches, Command, Arg, ArgAction};
-use serde_json;
+use clap::{Command, Arg, ArgAction};
 use chrono::Utc;
-use tokio::runtime;
 use colored::Colorize;
 use nxc_auth::Credentials;
 use nxc_modules::ModuleRegistry;

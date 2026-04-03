@@ -1,8 +1,7 @@
-use crate::output::NxcOutput;
 use nxc_targets::ExecutionResult;
 use serde::Serialize;
 use std::fs::File;
-use std::io::Write;
+
 use anyhow::Result;
 
 #[derive(Serialize)]

@@ -5,10 +5,9 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use nxc_protocols::{NxcSession, NxcProtocol};
+use nxc_protocols::NxcSession;
 use rhai::{Engine, AST, Dynamic, Map};
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 
