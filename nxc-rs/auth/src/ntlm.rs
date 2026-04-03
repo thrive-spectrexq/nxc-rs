@@ -319,7 +319,7 @@ impl NtlmAuthenticator {
             if negotiate_flags & NTLMSSP_NEGOTIATE_KEY_EXCH != 0 {
                 let exported_key: [u8; 16] = rand::random();
                 let key_array: &[u8; 16] = session_base_key[..16].try_into().unwrap();
-                let mut rc4_key = Rc4::new(key_array.into());
+                let mut rc4_key = Rc4::new_from_slice(key_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {}", e))?;
                 let mut encrypted = exported_key;
                 rc4_key.apply_keystream(&mut encrypted);
                 (exported_key.to_vec(), Some(encrypted.to_vec()))
@@ -503,7 +503,7 @@ impl NtlmSessionSecurity {
 
         // Encrypt first 8 bytes of HMAC with RC4(SealingKey)
         let key_array: &[u8; 16] = sealing_key[..16].try_into().unwrap();
-        let mut rc4 = Rc4::new(key_array.into());
+        let mut rc4 = Rc4::new_from_slice(key_array).expect("RC4 init fail");
         let mut encrypted_mac = [0u8; 8];
         encrypted_mac.copy_from_slice(&mac[..8]);
         rc4.apply_keystream(&mut encrypted_mac);
