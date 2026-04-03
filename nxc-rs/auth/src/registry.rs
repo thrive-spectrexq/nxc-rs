@@ -123,7 +123,7 @@ impl RegistrySecrets {
         let derived = hasher.finalize();
         key.copy_from_slice(&derived);
 
-        let mut rc4 = Rc4::new(&key.into());
+        let mut rc4 = Rc4::new_from_slice(&key).map_err(|e| anyhow!("RC4 init error: {}", e))?;
         let mut decrypted = [0u8; 16];
         decrypted.copy_from_slice(encrypted);
         rc4.apply_keystream(&mut decrypted);

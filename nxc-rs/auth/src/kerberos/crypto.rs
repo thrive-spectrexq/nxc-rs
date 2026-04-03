@@ -8,7 +8,6 @@ use std::convert::TryInto;
 use rand::Rng;
 
 type HmacMd5 = Hmac<Md5>;
-type HmacSha1 = Hmac<Sha1>;
 
 use aes::Aes256;
 use cbc::cipher::{BlockDecryptMut, BlockEncryptMut, KeyIvInit};
@@ -80,7 +79,7 @@ pub fn decrypt_rc4_hmac(key: &[u8], key_usage: u32, ciphertext: &[u8]) -> Result
 
     // 4. Decrypt data using RC4(K3)
     let k3_array: &[u8; 16] = k3[..16].try_into().unwrap();
-    let mut rc4 = Rc4::new(k3_array.into());
+    let mut rc4 = Rc4::new_from_slice(k3_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {}", e))?;
     let mut decrypted = enc_data.to_vec();
     rc4.apply_keystream(&mut decrypted);
 
@@ -132,7 +131,7 @@ pub fn encrypt_rc4_hmac(key: &[u8], key_usage: u32, plaintext: &[u8]) -> Result<
 
     // 6. Encrypt data with RC4(K3)
     let k3_array: &[u8; 16] = k3[..16].try_into().unwrap();
-    let mut rc4_key = Rc4::new(k3_array.into());
+    let mut rc4_key = Rc4::new_from_slice(k3_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {}", e))?;
     rc4_key.apply_keystream(&mut data);
 
     // 7. Format output: Checksum + EncryptedData
