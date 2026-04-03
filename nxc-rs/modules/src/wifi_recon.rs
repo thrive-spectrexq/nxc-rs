@@ -105,7 +105,7 @@ impl NxcModule for WifiRecon {
 
         if hosts.is_empty() {
             return Ok(ModuleResult {
-                success: false,
+                credentials: vec![], success: false,
                 output: "No hosts discovered on the local network via ARP.".to_string(),
                 data: json!({}),
             });
@@ -138,7 +138,7 @@ impl NxcModule for WifiRecon {
         }
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: output_summary,
             data: json!({ "hosts": discovered_services }),
         })

@@ -75,13 +75,13 @@ impl NxcModule for Gmsa {
 
         if gmsa_data.is_empty() {
             Ok(ModuleResult {
-                success: true,
+                credentials: vec![], success: true,
                 output: "No gMSA accounts with managed passwords found.".to_string(),
                 data: serde_json::json!([]),
             })
         } else {
             Ok(ModuleResult {
-                success: true,
+                credentials: vec![], success: true,
                 output,
                 data: serde_json::json!(gmsa_data),
             })

@@ -1,30 +1,67 @@
 # Rust
 target/
-**/*.rs.bk
 debug/
 release/
+**/*.rs.bk
+*.pdb
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
 venv/
 .venv/
 env/
-.env
-*.log
+ENV/
 
-# IDEs
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs and databases
+*.log
+logs/
+*.sqlite
+session.db
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# IDEs and Editors
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+*.suo
+*.sln
 
 # Project specific
 ._reference/
-session.db
 .gemini/
 .agents/
 docs/_site/
-dist/
-build/
+
+# NetExec-RS specific
+.nxc/
+nxc.db
+*.db
+*.db-shm
+*.db-wal

@@ -36,7 +36,7 @@ impl NxcModule for RedisInfo {
         let info = protocol.get_info(redis_sess).await?;
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: info.clone(),
             data: serde_json::json!({ "info": info }),
         })

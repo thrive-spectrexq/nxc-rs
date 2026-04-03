@@ -10,6 +10,8 @@ pub mod wmi_enum;
 pub mod wmi_persist;
 pub mod lsassy;
 pub mod dcshadow;
+pub mod sam;
+pub mod lsa;
 pub mod scripting;
 pub mod psrp;
 pub mod adb_screenshot;
@@ -33,6 +35,17 @@ pub mod pg_enum;
 pub mod mysql_enum;
 pub mod snmp_enum;
 pub mod docker_enum;
+pub mod smbexec;
+pub mod get;
+pub mod put;
+pub mod ldap_ad;
+pub mod mssql_clr;
+pub mod ntds;
+pub mod petitpotam;
+pub mod printerbug;
+pub mod zerologon;
+pub mod nopac;
+pub mod dpapi;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -55,11 +68,12 @@ pub struct ModuleOption {
 pub type ModuleOptions = HashMap<String, String>;
 
 /// Result of a module execution.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ModuleResult {
     pub success: bool,
     pub output: String,
     pub data: serde_json::Value,
+    pub credentials: Vec<nxc_auth::Credentials>,
 }
 
 // ─── NxcModule Trait ────────────────────────────────────────────
@@ -164,6 +178,12 @@ impl ModuleRegistry {
         let dcshadow: Box<dyn NxcModule> = Box::new(dcshadow::DcshadowModule::new());
         modules.insert("dcshadow".into(), dcshadow);
 
+        let sam_mod: Box<dyn NxcModule> = Box::new(sam::SamModule::new());
+        modules.insert("sam".into(), sam_mod);
+
+        let lsa_mod: Box<dyn NxcModule> = Box::new(lsa::LsaModule::new());
+        modules.insert("lsa".into(), lsa_mod);
+
         // ─── Dynamic Script Modules ─────────────────────────────────
         let engine = rhai::Engine::new();
         let script_dir = std::path::Path::new("./modules");
@@ -216,6 +236,39 @@ impl ModuleRegistry {
 
         let docker_enum: Box<dyn NxcModule> = Box::new(docker_enum::DockerEnum::new());
         modules.insert("docker_enum".into(), docker_enum);
+
+        let smbexec: Box<dyn NxcModule> = Box::new(smbexec::SmbExec::new());
+        modules.insert("smbexec".into(), smbexec);
+
+        let get_mod: Box<dyn NxcModule> = Box::new(get::GetModule::new());
+        modules.insert("get".into(), get_mod);
+
+        let put_mod: Box<dyn NxcModule> = Box::new(put::PutModule::new());
+        modules.insert("put".into(), put_mod);
+
+        let ldap_ad: Box<dyn NxcModule> = Box::new(ldap_ad::LdapAdModule::new());
+        modules.insert("ldap_ad".into(), ldap_ad);
+
+        let mssql_clr: Box<dyn NxcModule> = Box::new(mssql_clr::MssqlClr::new());
+        modules.insert("mssql_clr".into(), mssql_clr);
+
+        let ntds: Box<dyn NxcModule> = Box::new(ntds::Ntds::new());
+        modules.insert("ntds".into(), ntds);
+
+        let petitpotam: Box<dyn NxcModule> = Box::new(petitpotam::Petitpotam::new());
+        modules.insert("petitpotam".into(), petitpotam);
+
+        let printerbug: Box<dyn NxcModule> = Box::new(printerbug::PrinterBug::new());
+        modules.insert("printerbug".into(), printerbug);
+
+        let zerologon: Box<dyn NxcModule> = Box::new(zerologon::Zerologon::new());
+        modules.insert("zerologon".into(), zerologon);
+
+        let nopac: Box<dyn NxcModule> = Box::new(nopac::Nopac::new());
+        modules.insert("nopac".into(), nopac);
+
+        let dpapi: Box<dyn NxcModule> = Box::new(dpapi::Dpapi::new());
+        modules.insert("dpapi".into(), dpapi);
 
         Self { modules }
     }

@@ -59,7 +59,7 @@ impl NxcModule for HttpPathsModule {
                         output.push_str("  [!] No sensitive paths discovered.");
                     }
                     return Ok(ModuleResult {
-                        success: true,
+                        credentials: vec![], success: true,
                         output,
                         data: serde_json::json!({ "found": found }),
                     });
@@ -69,7 +69,7 @@ impl NxcModule for HttpPathsModule {
         }
 
         Ok(ModuleResult {
-            success: false,
+            credentials: vec![], success: false,
             output: "Invalid session type for http_paths".to_string(),
             data: serde_json::json!({}),
         })

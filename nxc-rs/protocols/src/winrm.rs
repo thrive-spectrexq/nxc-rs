@@ -7,11 +7,12 @@
 use crate::{CommandOutput, NxcProtocol, NxcSession};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use nxc_auth::{AuthResult, Credentials};
+use nxc_auth::{AuthResult, Credentials, kerberos::KerberosClient};
 use reqwest::Client;
 use std::time::Duration;
 use tracing::{debug, info};
 use uuid::Uuid;
+use base64::{Engine as _, engine::general_purpose};
 
 // ─── WinRM Session ────────────────────────────────────────────────
 
@@ -186,11 +187,16 @@ impl NxcProtocol for WinrmProtocol {
         session: &mut dyn NxcSession,
         creds: &Credentials,
     ) -> Result<AuthResult> {
-        let winrm_sess = unsafe { &mut *(session as *mut dyn NxcSession as *mut WinrmSession) };
+        let winrm_sess = session.as_any_mut().downcast_mut::<WinrmSession>().ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
         let url = self.build_url(&winrm_sess.target, winrm_sess.port);
         let client = self.build_client(winrm_sess.proxy.as_deref())?;
 
         debug!("WinRM: Authenticating {}@{}", creds.username, url);
+
+        if creds.use_kerberos {
+            debug!("WinRM: Authenticating {} via Kerberos (Negotiate)", creds.username);
+            return self.authenticate_kerberos(winrm_sess, creds).await;
+        }
 
         // NTLM Handshake over HTTP
         let auth = nxc_auth::NtlmAuthenticator::new(creds.domain.as_deref());
@@ -209,9 +215,9 @@ impl NxcProtocol for WinrmProtocol {
         let t2_base64 = www_auth.strip_prefix("Negotiate ").or(www_auth.strip_prefix("NTLM ")).ok_or_else(|| anyhow!("No NTLM challenge found"))?;
         let t2_msg = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, t2_base64)?;
         
-        let (nonce, target_info) = auth.parse_type2(&t2_msg)?;
-        let t3_msg = auth.generate_type3(creds, &nonce, &target_info)?;
-        let t3_base64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, t3_msg);
+        let challenge = auth.parse_type2(&t2_msg)?;
+        let t3_msg = auth.generate_type3(creds, &challenge)?;
+        let t3_base64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, t3_msg.message);
 
         // Final Auth check with a dummy header or small SOAP probe
         let probe_resp = client.post(&url)
@@ -230,7 +236,7 @@ impl NxcProtocol for WinrmProtocol {
     }
 
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput> {
-         let winrm_sess = unsafe { &*(session as *const dyn NxcSession as *const WinrmSession) };
+         let winrm_sess = session.as_any().downcast_ref::<WinrmSession>().ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
          let url = &winrm_sess.endpoint;
          let client = self.build_client(winrm_sess.proxy.as_deref())?;
          
@@ -424,4 +430,51 @@ $k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
         
         format!("powershell -c \"{}; {}\"", bypass_inline, original)
     }
+
+    /// Perform Kerberos authentication over WinRM (HTTP Negotiate)
+    async fn authenticate_kerberos(&self, winrm_sess: &mut WinrmSession, creds: &Credentials) -> Result<AuthResult> {
+        let domain = creds.domain.as_deref().unwrap_or("DOMAIN");
+        let kdc_ip = &winrm_sess.target; // In real scenarios, this might be a different DC IP
+
+        let krb_client = KerberosClient::new(domain, kdc_ip);
+        
+        // 1. Request TGT
+        let tgt = krb_client.request_tgt_with_creds(creds).await?;
+        
+        // 2. Request TGS for HTTP service
+        let spn = format!("HTTP/{}", winrm_sess.target);
+        let tgs = krb_client.request_tgs(&tgt, &spn).await?;
+        
+        // 3. Build AP-REQ
+        let ap_req = krb_client.build_ap_req(&tgs)?;
+        let token = general_purpose::STANDARD.encode(ap_req);
+        
+        // 4. Send Negotiate request
+        let url = self.build_url(&winrm_sess.target, winrm_sess.port);
+        let client = self.build_client(winrm_sess.proxy.as_deref())?;
+        
+        let request = client
+            .post(&url)
+            .header("Content-Length", "0")
+            .header("Content-Type", "application/soap+xml;charset=UTF-8")
+            .header("User-Agent", "Microsoft WinRM Client")
+            .header("Authorization", format!("Negotiate {}", token))
+            .body("");
+
+        let response = match request.send().await {
+            Ok(resp) => resp,
+            Err(e) => return Ok(AuthResult::failure(&format!("HTTP connection failed: {}", e), None)),
+        };
+
+        if response.status().is_success() || response.status().as_u16() == 405 {
+            // Success or method not allowed usually indicates authenticated endpoint access
+            debug!("WinRM: Kerberos Auth successful for {}", creds.username);
+            Ok(AuthResult::success(true))
+        } else if response.status().as_u16() == 401 {
+            Ok(AuthResult::failure("Kerberos authentication failed (401 Unauthorized)", None))
+        } else {
+             Ok(AuthResult::failure(&format!("Unexpected status code: {}", response.status()), None))
+        }
+    }
 }
+

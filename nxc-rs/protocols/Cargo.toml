@@ -34,4 +34,10 @@ snmp = "0.2"
 tokio-socks = { workspace = true }
 socks = { workspace = true }
 url = "2.5.8"
+rasn = "0.28"
+image = "0.24"
 hex.workspace = true
+
+[features]
+winauth = []
+integrated-auth-gssapi = []

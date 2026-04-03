@@ -6,10 +6,9 @@
 use crate::{CommandOutput, NxcProtocol, NxcSession};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use nxc_auth::{AuthResult, Credentials};
+use nxc_auth::{AuthResult, Credentials, kerberos::KerberosClient};
 use std::time::Duration;
 use tiberius::{AuthMethod, Client, Config};
-use tokio::net::TcpStream;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 use tracing::{debug, info};
 
@@ -111,10 +110,19 @@ impl NxcProtocol for MssqlProtocol {
         session: &mut dyn NxcSession,
         creds: &Credentials,
     ) -> Result<AuthResult> {
-        let mssql_sess_mut = match session.protocol() {
-            "mssql" => unsafe { &mut *(session as *mut dyn NxcSession as *mut MssqlSession) },
-            _ => return Err(anyhow!("Invalid session type")),
-        };
+        let mssql_sess_mut = session
+            .as_any_mut()
+            .downcast_mut::<MssqlSession>()
+            .ok_or_else(|| anyhow!("Invalid session type"))?;
+
+        if creds.username.is_empty() {
+            return Ok(AuthResult::success(false));
+        }
+
+        if creds.use_kerberos {
+            debug!("MSSQL: Authenticating {} via Kerberos", creds.username);
+            return self.authenticate_kerberos(mssql_sess_mut, creds).await;
+        }
 
         let username = creds.username.clone();
         let password = creds.password.clone().unwrap_or_default();
@@ -188,10 +196,10 @@ impl NxcProtocol for MssqlProtocol {
     }
 
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput> {
-        let mssql_sess = match session.protocol() {
-            "mssql" => unsafe { &*(session as *const dyn NxcSession as *const MssqlSession) },
-            _ => return Err(anyhow!("Invalid session type")),
-        };
+        let mssql_sess = session
+            .as_any()
+            .downcast_ref::<MssqlSession>()
+            .ok_or_else(|| anyhow!("Invalid session type"))?;
 
         let creds = mssql_sess
             .credentials
@@ -318,4 +326,55 @@ impl MssqlProtocol {
         let _ = client.close().await;
         Ok(results)
     }
+
+    /// Enumerate linked servers.
+    pub async fn enumerate_links(&self, session: &MssqlSession) -> Result<Vec<serde_json::Value>> {
+        let sql = "SELECT name, product, provider, data_source, is_remote_login_enabled, is_rpc_out_enabled FROM sys.servers WHERE is_linked = 1";
+        self.query_json(session, sql).await
+    }
+
+    /// Perform Kerberos authentication over MSSQL
+    async fn authenticate_kerberos(&self, mssql_sess: &mut MssqlSession, creds: &Credentials) -> Result<AuthResult> {
+        let domain = creds.domain.as_deref().unwrap_or("DOMAIN");
+        let kdc_ip = &mssql_sess.target; 
+
+        let krb_client = KerberosClient::new(domain, kdc_ip);
+        
+        // 1. Request TGT
+        let tgt = krb_client.request_tgt_with_creds(creds).await?;
+        
+        // 2. Request TGS for MSSQL service
+        let spn = format!("MSSQLSvc/{}:{}", mssql_sess.target, mssql_sess.port);
+        let _tgs = krb_client.request_tgs(&tgt, &spn).await?;
+        
+        // 3. Initiate Connection with Tiberius
+        let mut config = Config::new();
+        config.host(&mssql_sess.target);
+        config.port(mssql_sess.port);
+        
+        #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
+        config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, creds.username), creds.password.as_deref().unwrap_or_default()));
+        
+        config.trust_cert();
+
+        #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
+        {
+            return Ok(AuthResult::failure("Kerberos/Windows Auth not supported", None));
+        }
+
+        #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
+        {
+            let tcp = crate::connection::connect(&mssql_sess.target, mssql_sess.port, mssql_sess.proxy.as_deref()).await?;
+            match tokio::time::timeout(self.timeout, Client::connect(config, tcp.compat_write())).await {
+                Ok(Ok(_client)) => {
+                    debug!("MSSQL: Kerberos Auth successful for {}", creds.username);
+                    mssql_sess.credentials = Some(creds.clone());
+                    Ok(AuthResult::success(false))
+                }
+                Ok(Err(e)) => Ok(AuthResult::failure(&format!("Auth failed: {}", e), None)),
+                Err(_) => Ok(AuthResult::failure("Connection timeout", None)),
+            }
+        }
+    }
 }
+

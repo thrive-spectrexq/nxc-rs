@@ -34,7 +34,7 @@ impl NxcModule for NfsShares {
     }
 
     fn supported_protocols(&self) -> &[&str] {
-        &["nfs"]
+        &["nfs", "smb"]
     }
 
     async fn run(
@@ -42,13 +42,22 @@ impl NxcModule for NfsShares {
         session: &mut dyn NxcSession,
         _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let nfs_sess = match session.downcast_mut::<nxc_protocols::nfs::NfsSession>() {
-            Some(s) => s,
-            None => return Err(anyhow::anyhow!("Module only supports NFS")),
-        };
+        match session.protocol() {
+            "nfs" => self.run_nfs(session).await,
+            "smb" => self.run_smb(session).await,
+            _ => Err(anyhow::anyhow!("Module only supports NFS and SMB")),
+        }
+    }
+}
+
+impl NfsShares {
+    async fn run_nfs(&self, session: &mut dyn NxcSession) -> Result<ModuleResult> {
+        let nfs_sess = session
+            .as_any()
+            .downcast_ref::<nxc_protocols::nfs::NfsSession>()
+            .ok_or_else(|| anyhow::anyhow!("Invalid session type for NFS shares"))?;
 
         let protocol = nxc_protocols::nfs::NfsProtocol::new();
-
         let mut output_lines = Vec::new();
         output_lines.push(format!("Enumerating NFS exports on {}", nfs_sess.target));
 
@@ -62,16 +71,37 @@ impl NxcModule for NfsShares {
                     }
                 }
                 Ok(ModuleResult {
-                    success: true,
+                    credentials: vec![], success: true,
                     output: output_lines.join("\n"),
                     data: serde_json::json!({ "shares": shares }),
                 })
             }
             Err(e) => Ok(ModuleResult {
-                success: false,
+                credentials: vec![], success: false,
                 output: format!("Failed to list NFS exports: {}", e),
                 data: serde_json::Value::Null,
             }),
         }
+    }
+
+    async fn run_smb(&self, session: &mut dyn NxcSession) -> Result<ModuleResult> {
+        let smb_sess = session
+            .as_any()
+            .downcast_ref::<nxc_protocols::smb::SmbSession>()
+            .ok_or_else(|| anyhow::anyhow!("Invalid session type for SMB shares"))?;
+
+        let protocol = nxc_protocols::smb::SmbProtocol::new();
+        let shares = protocol.list_shares(smb_sess).await?;
+        
+        let mut output = String::from("Available SMB Shares:\n");
+        for share in &shares {
+            output.push_str(&format!("  {}\n", share));
+        }
+        
+        Ok(ModuleResult {
+            credentials: vec![], success: true,
+            output,
+            data: serde_json::json!({ "shares": shares }),
+        })
     }
 }

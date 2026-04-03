@@ -114,7 +114,7 @@ Write-Output 'WMI Persistence Cleaned Up Successfully'"#,
         };
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: format!("Execution Output:\n{}", output.stdout),
             data: serde_json::json!({
                 "action": action,

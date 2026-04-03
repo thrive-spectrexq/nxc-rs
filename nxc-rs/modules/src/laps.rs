@@ -152,7 +152,7 @@ impl NxcModule for Laps {
         }
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: output_lines.join("\n"),
             data: serde_json::json!(laps_results),
         })

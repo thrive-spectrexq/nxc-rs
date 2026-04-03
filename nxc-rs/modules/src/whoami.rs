@@ -111,7 +111,7 @@ impl NxcModule for Whoami {
 
         if entries.is_empty() {
             return Ok(ModuleResult {
-                success: false,
+                credentials: vec![], success: false,
                 output: format!("User '{}' not found in LDAP", user_to_query),
                 data: serde_json::Value::Null,
             });
@@ -164,7 +164,7 @@ impl NxcModule for Whoami {
         output_lines.push(format!("SID: {}", get_attr("objectSid")));
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: output_lines.join("\n"),
             data: serde_json::Value::Object(user_data),
         })

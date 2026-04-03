@@ -61,9 +61,11 @@ impl NxcModule for FtpLs {
 
 impl FtpLs {
     async fn run_ftp(&self, session: &mut dyn NxcSession) -> Result<ModuleResult> {
-        let ftp_sess = unsafe {
-            &*(session as *const dyn NxcSession as *const nxc_protocols::ftp::FtpSession)
-        };
+        let ftp_sess = session
+            .as_any()
+            .downcast_ref::<nxc_protocols::ftp::FtpSession>()
+            .ok_or_else(|| anyhow::anyhow!("Invalid session type for FTP ls"))?;
+
         let protocol = nxc_protocols::ftp::FtpProtocol::new();
         let mut output_lines = Vec::new();
         
@@ -73,13 +75,13 @@ impl FtpLs {
                     output_lines.push(format!("  {}", file));
                 }
                 Ok(ModuleResult {
-                    success: true,
+                    credentials: vec![], success: true,
                     output: output_lines.join("\n"),
                     data: serde_json::json!({ "files": output_lines }),
                 })
             }
             Err(e) => Ok(ModuleResult {
-                success: false,
+                credentials: vec![], success: false,
                 output: format!("Failed to list files: {}", e),
                 data: serde_json::Value::Null,
             }),
@@ -87,9 +89,11 @@ impl FtpLs {
     }
 
     async fn run_smb(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
-        let smb_sess = unsafe {
-            &*(session as *const dyn NxcSession as *const nxc_protocols::smb::SmbSession)
-        };
+        let smb_sess = session
+            .as_any()
+            .downcast_ref::<nxc_protocols::smb::SmbSession>()
+            .ok_or_else(|| anyhow::anyhow!("Invalid session type for SMB ls"))?;
+
         let protocol = nxc_protocols::smb::SmbProtocol::new();
         
         if let Some(path_full) = opts.get("PATH") {
@@ -106,13 +110,13 @@ impl FtpLs {
                         output.push_str(&format!("  {}\n", entry));
                     }
                     Ok(ModuleResult {
-                        success: true,
+                        credentials: vec![], success: true,
                         output,
                         data: serde_json::json!({ "entries": entries }),
                     })
                 }
                 Err(e) => Ok(ModuleResult {
-                    success: false,
+                    credentials: vec![], success: false,
                     output: format!("Failed to list directory: {}", e),
                     data: serde_json::Value::Null,
                 }),
@@ -126,13 +130,13 @@ impl FtpLs {
                         output.push_str(&format!("  {}\n", share));
                     }
                     Ok(ModuleResult {
-                        success: true,
+                        credentials: vec![], success: true,
                         output,
                         data: serde_json::json!({ "shares": shares }),
                     })
                 }
                 Err(e) => Ok(ModuleResult {
-                    success: false,
+                    credentials: vec![], success: false,
                     output: format!("Failed to list shares: {}", e),
                     data: serde_json::Value::Null,
                 }),

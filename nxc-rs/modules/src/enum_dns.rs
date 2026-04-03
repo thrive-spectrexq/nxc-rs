@@ -158,7 +158,7 @@ impl NxcModule for EnumDns {
         }
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: output_lines.join("\n"),
             data: serde_json::Value::Object(all_records),
         })

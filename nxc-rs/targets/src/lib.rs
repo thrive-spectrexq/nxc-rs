@@ -297,9 +297,10 @@ impl ExecutionEngine {
                                 let mut final_message = auth_res.message.clone();
                                 
                                 // Save to database if successful and DB available
+                                let mut host_id = None;
                                 if let Some(ref db_instance) = db_clone {
                                     let now = Utc::now().timestamp();
-                                    let host_id = db_instance.upsert_host(&HostInfo {
+                                    host_id = db_instance.upsert_host(&HostInfo {
                                         id: None,
                                         workspace: db_instance.current_workspace().to_string(),
                                         ip: target_clone.ip.to_string(),
@@ -341,6 +342,27 @@ impl ExecutionEngine {
                                                 Ok(mod_res) => {
                                                     if mod_res.success {
                                                         final_message.push_str(&format!(" | Module {}: {}", module_name, mod_res.output));
+                                                        
+                                                        // Save module-discovered credentials to DB
+                                                        if let Some(ref db_instance) = db_clone {
+                                                            let now = Utc::now().timestamp();
+                                                            for m_cred in mod_res.credentials {
+                                                                let _ = db_instance.upsert_credential(&Credential {
+                                                                    id: None,
+                                                                    workspace: db_instance.current_workspace().to_string(),
+                                                                    domain: m_cred.domain.clone(),
+                                                                    username: m_cred.username.clone(),
+                                                                    password: m_cred.password.clone(),
+                                                                    nt_hash: m_cred.nt_hash.clone(),
+                                                                    lm_hash: m_cred.lm_hash.clone(),
+                                                                    aes_128: m_cred.aes_128_key.clone(),
+                                                                    aes_256: m_cred.aes_256_key.clone(),
+                                                                    source: Some(format!("{}:{}", protocol_clone.name(), module_name)),
+                                                                    host_id,
+                                                                    created_at: now,
+                                                                });
+                                                            }
+                                                        }
                                                     } else {
                                                         final_message.push_str(&format!(" | Module {} Failed: {}", module_name, mod_res.output));
                                                     }

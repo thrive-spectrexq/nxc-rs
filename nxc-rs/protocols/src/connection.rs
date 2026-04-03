@@ -1,6 +1,4 @@
 use anyhow::{Result, Context};
-use std::net::ToSocketAddrs;
-use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio_socks::tcp::Socks5Stream;
 use url::Url;

@@ -125,6 +125,7 @@ try {{
         let success = stdout.contains("ms-DRSR") || stdout.contains("DCShadow") && !stdout.contains("DEBUG_ERR");
 
         Ok(ModuleResult {
+            credentials: vec![],
             success,
             output: stdout.clone(),
             data: serde_json::json!({

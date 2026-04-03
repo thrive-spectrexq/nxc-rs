@@ -6,10 +6,9 @@
 use crate::{CommandOutput, NxcProtocol, NxcSession};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use nxc_auth::{AuthResult, Credentials};
+use nxc_auth::{AuthResult, Credentials, kerberos::KerberosClient};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
 use tracing::{debug, info};
 
 pub struct WmiSession {
@@ -125,10 +124,13 @@ impl NxcProtocol for WmiProtocol {
         };
 
         let addr = format!("{}:{}", wmi_sess.target, wmi_sess.port);
-        debug!("WMI: Triggering NTLM authentication on {}", addr);
+        
+        if creds.use_kerberos {
+            debug!("WMI: Authenticating {} via Kerberos (RPC 0x10)", creds.username);
+            return self.authenticate_kerberos(wmi_sess, creds).await;
+        }
 
-        // Get proxy value from command line opts somehow? Currently protocol authenticate doesn't receive proxy Option natively. Wait, the NxcProtocol interface doesn't pass `proxy` to `authenticate()` or `execute()`. Let's assume we can add it to the Session object or modify WMI to use a global proxy state if needed. But for now, we'll try to use a direct connect if proxy isn't stored in the session.
-        // To properly support proxy in auth/exec, we should store it in WmiSession.
+        debug!("WMI: Triggering NTLM authentication on {}", addr);
         let mut stream = crate::connection::connect(&wmi_sess.target, wmi_sess.port, wmi_sess.proxy.as_deref()).await?;
         
         use crate::rpc::{DcerpcBind, DcerpcHeader, DcerpcAuth, PacketType, UUID_WMI_LOGIN};
@@ -158,11 +160,11 @@ impl NxcProtocol for WmiProtocol {
         // Find NTLM Challenge in the auth_data at the end
         let auth_len = u16::from_le_bytes([ack_header_raw[10], ack_header_raw[11]]) as usize;
         let t2_msg = &ack_body[ack_body.len() - auth_len + 8..];
-        let (challenge, target_info) = auth.parse_type2(t2_msg)?;
+        let challenge = auth.parse_type2(t2_msg)?;
 
         // 3. Send AlterContext with NTLM Authenticate
-        let t3_msg = auth.generate_type3(creds, &challenge, &target_info)?;
-        let dcerpc_auth_t3 = DcerpcAuth::new(0x0a, 0x06, t3_msg);
+        let t3_msg = auth.generate_type3(creds, &challenge)?;
+        let dcerpc_auth_t3 = DcerpcAuth::new(0x0a, 0x06, t3_msg.message);
         let auth_bytes_t3 = dcerpc_auth_t3.to_bytes();
         
         // Simplified AlterContext header (ptype 14)
@@ -246,6 +248,58 @@ impl NxcProtocol for WmiProtocol {
 }
 
 impl WmiProtocol {
+    /// Perform Kerberos authentication over WMI (DCERPC RPC_C_AUTHN_GSS_KERBEROS)
+    async fn authenticate_kerberos(&self, wmi_sess: &mut WmiSession, creds: &Credentials) -> Result<AuthResult> {
+        let domain = creds.domain.as_deref().unwrap_or("DOMAIN");
+        let kdc_ip = &wmi_sess.target; 
+
+        let krb_client = KerberosClient::new(domain, kdc_ip);
+        
+        // 1. Request TGT
+        let tgt = krb_client.request_tgt_with_creds(creds).await?;
+        
+        // 2. Request TGS for RPC service
+        // RPC SPN: RPCSS/hostname
+        let spn = format!("RPCSS/{}", wmi_sess.target);
+        let tgs = krb_client.request_tgs(&tgt, &spn).await?;
+        
+        // 3. Build AP-REQ
+        let ap_req = krb_client.build_ap_req(&tgs)?;
+        
+        // 4. Initiate Connection and Bind with Kerberos
+        let mut stream = crate::connection::connect(&wmi_sess.target, wmi_sess.port, wmi_sess.proxy.as_deref()).await?;
+        
+        use crate::rpc::{DcerpcBind, DcerpcHeader, DcerpcAuth, PacketType, UUID_WMI_LOGIN};
+        let bind = DcerpcBind::new(UUID_WMI_LOGIN, 0, 0);
+        let bind_bytes = bind.to_bytes();
+        
+        // AuthType: 0x10 (Kerberos), AuthLevel: RPC_C_AUTHN_LEVEL_PKT_PRIVACY (0x06)
+        let dcerpc_auth = DcerpcAuth::new(0x10, 0x06, ap_req);
+        let auth_bytes = dcerpc_auth.to_bytes();
+        
+        let frag_len = (24 + bind_bytes.len() + auth_bytes.len()) as u16;
+        let header = DcerpcHeader::new(PacketType::Bind, 1, frag_len).with_auth(auth_bytes.len() as u16 - 8);
+
+        let mut pkt = header.to_bytes();
+        pkt.extend_from_slice(&bind_bytes);
+        pkt.extend_from_slice(&auth_bytes);
+        stream.write_all(&pkt).await?;
+
+        // 5. Read BindAck
+        let mut ack_header_raw = [0u8; 24];
+        stream.read_exact(&mut ack_header_raw).await?;
+        let ack_frag_len = u16::from_le_bytes([ack_header_raw[8], ack_header_raw[9]]) as usize;
+        let mut _ack_body = vec![0u8; ack_frag_len - 24];
+        stream.read_exact(&mut _ack_body).await?;
+        
+        if ack_header_raw[2] == 0x0c { // BindAck
+             debug!("WMI: Kerberos Auth successful for {}", creds.username);
+             Ok(AuthResult::success(true))
+        } else {
+             Ok(AuthResult::failure("Kerberos bind failed", None))
+        }
+    }
+
     fn encode_ndr_string(&self, buf: &mut Vec<u8>, s: &str) {
         let utf16: Vec<u16> = s.encode_utf16().collect();
         let len = utf16.len() as u32 + 1;

@@ -20,16 +20,18 @@
 
 ## Protocols & Capabilities
 
+NetExec-RS supports **18 protocols** and **32 modules** for complete cross-protocol exploitation.
+
 | Protocol | Status | Capabilities |
 | :--- | :--- | :--- |
-| **SMB** | ✅ Active | **NTLM SSP**, Share/Disk Enum, **smbexec (SVCCTL)**, `secretsdump` skeleton |
-| **LDAP** | ✅ Active | User/Group Enum, **AD CS Enum**, **BloodHound Export**, Roasting, gMSA |
+| **SMB** | ✅ Active | **NTLM SSP**, Negotiate/Session, Share/Disk Enum, **smbexec**, lsassy, dcshadow, SAM/LSA/NTDS dumping |
+| **LDAP** | ✅ Active | User/Group Enum, **AD CS Enum**, **BloodHound Export**, Roasting, gMSA, **LAPS password reading** |
 | **SSH** | ✅ Active | Password & Key Auth, Command Exec, Sudo Check, Fingerprinting |
 | **WinRM** | ✅ Active | NTLM/Kerberos Auth, **PSRP Object handling**, Command Exec (PS/CMD) |
 | **MSSQL** | ✅ Active | SQL Query, `xp_cmdshell`, **IMPERSONATE privilege checks** |
 | **WMI** | ✅ Active | Direct execution, **Process/Service/Patch Enumeration** |
 | **ADB** | ✅ Active | Handshake, Shell execution, Screenshotting |
-| **RDP** | ✅ Active | NLA authentication, Screenshotting |
+| **RDP** | ✅ Active | NLA authentication, TSRequest generation, Screenshotting |
 | **VNC** | ✅ Active | Authentication, Screenshotting |
 | **FTP/NFS**| ✅ Active | Directory listing, Export/Share enumeration |
 | **HTTP** | ✅ Active | Web reconnaissance, SSL/TLS validation |
@@ -76,21 +78,21 @@ Each protocol has its own set of flags. For example, to see options for the newl
 # FTP Help
 cargo run --package nxc -- ftp --help
 
-# NFS Help
-cargo run --package nxc -- nfs --help
+# WinRM Help
+cargo run --package nxc -- winrm --help
 ```
 
 ### 3. Example Execution Commands
 Here are a few ways to test the current capabilities (replace `<target>` with a lab IP or CIDR):
 
-**ADB Execution**: Run commands directly on Android devices with exposed debugging ports (TCP 5555).
+**WinRM PSRP Execution**: Run PowerShell commands securely via WinRM.
 ```powershell
-cargo run --package nxc -- adb <target> -x "getprop ro.build.version.release"
+cargo run --package nxc -- winrm <target> -u Admin -p Pass123 -x "Get-Process"
 ```
 
-**FTP Navigation**: Authenticate as anonymous and list files.
+**SMB LSA Dumping**: Dump LSA secrets from an entire /24 subnet.
 ```powershell
-cargo run --package nxc -- ftp <target> -u anonymous -p anonymous --ls
+cargo run --package nxc -- smb 192.168.1.0/24 -u Admin -H 31d6cfe0d16ae931b73c59d7e0c089c0 -M lsassy
 ```
 
 **NFS Enumeration**: List exported shares via the MOUNT service.
@@ -103,8 +105,8 @@ cargo run --package nxc -- nfs <target> --enum-shares
 cargo run --package nxc -- smb <target> -L
 ```
 
-### 4. Telegram Bot Integration
-NetExec-RS includes a built-in Telegram bot for remote management.
+### 4. Telegram Bot (APEX-REAPER) Integration
+NetExec-RS includes a built-in APEX-REAPER Telegram bot for remote management.
 
 **Setup**:
 1. Create a bot via [@BotFather](https://t.me/botfather).
@@ -120,6 +122,7 @@ cargo run --package nxc -- telegram
 
 **Commands**:
 - `/help`, `/guide`, `/cheat`: Comprehensive operator's manuals and search tools.
+- `/kerberos`, `/nthash`, `/authinfo`: Authentication protocol generation and tools.
 - `/run <protocol> <target> [options]`: Full CLI-style command execution (supports `-M` and `-o`).
 - `/shell`: Activate **Interactive Shell Mode** for the most recent target.
 - `/shares`, `/users`, `/groups`: Tactical reconnaissance shortcuts.

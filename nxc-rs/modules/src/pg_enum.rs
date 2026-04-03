@@ -36,7 +36,7 @@ impl NxcModule for PostgresEnum {
         let dbs = protocol.list_databases(pg_sess).await?;
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: dbs.join(", "),
             data: serde_json::json!({ "databases": dbs }),
         })

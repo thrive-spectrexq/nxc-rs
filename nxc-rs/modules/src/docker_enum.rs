@@ -36,7 +36,7 @@ impl NxcModule for DockerEnum {
         let info = protocol.enumerate(docker_sess).await?;
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: info.clone(),
             data: serde_json::json!({ "info": info }),
         })

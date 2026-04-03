@@ -126,7 +126,7 @@ impl NxcProtocol for FtpProtocol {
         let username = creds.username.clone();
         let password = creds.password.clone().unwrap_or_default();
 
-        let ftp_sess = unsafe { &*(session as *const dyn NxcSession as *const FtpSession) };
+        let ftp_sess = session.as_any().downcast_ref::<FtpSession>().ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
         let addr = format!("{}:{}", ftp_sess.target, ftp_sess.port);
 
         debug!("FTP: Authenticating {}@{}", username, addr);
@@ -138,7 +138,7 @@ impl NxcProtocol for FtpProtocol {
                 info!("FTP: Auth success for {}@{}", username, addr);
                 // Update session with successful credentials
                 let ftp_sess_mut =
-                    unsafe { &mut *(session as *mut dyn NxcSession as *mut FtpSession) };
+                    session.as_any_mut().downcast_mut::<FtpSession>().ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
                 ftp_sess_mut.credentials = creds.clone();
                 Ok(AuthResult::success(false)) // FTP doesn't really have "admin"
             }
@@ -207,3 +207,4 @@ impl FtpProtocol {
         Ok(list)
     }
 }
+

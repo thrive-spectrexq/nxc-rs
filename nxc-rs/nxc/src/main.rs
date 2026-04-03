@@ -6,9 +6,14 @@
 mod output;
 mod telegram;
 mod relay;
+mod reporting;
 
 use anyhow::Result;
-use clap::{Arg, ArgAction, Command};
+use std::path::PathBuf;
+use clap::{ArgMatches, Command, Arg, ArgAction};
+use serde_json;
+use chrono::Utc;
+use tokio::runtime;
 use colored::Colorize;
 use nxc_auth::Credentials;
 use nxc_modules::ModuleRegistry;
@@ -18,7 +23,7 @@ use nxc_targets::{parse_targets, ExecutionEngine, ExecutionOpts};
 use output::{NxcGlobalOutput, NxcOutput};
 use std::sync::Arc;
 use std::time::Duration;
-use std::path::PathBuf;
+
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const CODENAME: &str = "Rusty-Reaper";
@@ -85,6 +90,10 @@ pub(crate) fn build_cli() -> Command {
             .long("fail-limit")
             .help("Max failed login attempts per host")
             .value_parser(clap::value_parser!(u32)),
+        Arg::new("db-creds")
+            .long("db-creds")
+            .help("Use all credentials from the current workspace in the database")
+            .action(ArgAction::SetTrue),
     ];
 
     // ── Kerberos arguments ──
@@ -129,12 +138,25 @@ pub(crate) fn build_cli() -> Command {
             .action(ArgAction::SetTrue),
     ];
 
+    // ── Export arguments ──
+    let export_args = vec![
+        Arg::new("export")
+            .long("export")
+            .help("Export results to a file (json, csv)")
+            .value_parser(["json", "csv"]),
+        Arg::new("export-path")
+            .long("export-path")
+            .help("Path to save the exported file")
+            .default_value("nxc_report"),
+    ];
+
     // ── Create protocol subcommands ──
     let smb_cmd = Command::new("smb")
         .about("SMB protocol (port 445)")
         .args(&auth_args)
         .args(&kerberos_args)
         .args(&module_args)
+        .args(&export_args)
         .arg(
             Arg::new("port")
                 .long("port")
@@ -207,6 +229,7 @@ pub(crate) fn build_cli() -> Command {
         .about("SSH protocol (port 22)")
         .args(&auth_args)
         .args(&module_args)
+        .args(&export_args)
         .arg(
             Arg::new("port")
                 .long("port")
@@ -243,6 +266,7 @@ pub(crate) fn build_cli() -> Command {
         .args(&auth_args)
         .args(&kerberos_args)
         .args(&module_args)
+        .args(&export_args)
         .arg(
             Arg::new("port")
                 .long("port")
@@ -293,6 +317,7 @@ pub(crate) fn build_cli() -> Command {
         .args(&auth_args)
         .args(&kerberos_args)
         .args(&module_args)
+        .args(&export_args)
         .arg(
             Arg::new("port")
                 .long("port")
@@ -323,6 +348,7 @@ pub(crate) fn build_cli() -> Command {
         .args(&auth_args)
         .args(&kerberos_args)
         .args(&module_args)
+        .args(&export_args)
         .arg(
             Arg::new("port")
                 .long("port")
@@ -346,6 +372,7 @@ pub(crate) fn build_cli() -> Command {
         .about("RDP protocol (port 3389)")
         .args(&auth_args)
         .args(&kerberos_args)
+        .args(&export_args)
         .arg(
             Arg::new("port")
                 .long("port")
@@ -369,6 +396,7 @@ pub(crate) fn build_cli() -> Command {
         .about("FTP protocol (port 21)")
         .args(&auth_args)
         .args(&module_args)
+        .args(&export_args)
         .arg(
             Arg::new("port")
                 .long("port")
@@ -413,6 +441,7 @@ pub(crate) fn build_cli() -> Command {
         .args(&auth_args)
         .args(&kerberos_args)
         .args(&module_args)
+        .args(&export_args)
         .arg(
             Arg::new("port")
                 .long("port")
@@ -770,10 +799,13 @@ pub(crate) fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> 
         .unwrap_or_default();
 
     let no_bruteforce = matches.get_flag("no-bruteforce");
+    let use_kerberos = matches.get_flag("kerberos");
 
     // If no credentials provided, use null session
     if usernames.is_empty() && passwords.is_empty() && hashes.is_empty() {
-        creds.push(Credentials::null_session());
+        let mut c = Credentials::null_session();
+        c.use_kerberos = use_kerberos;
+        creds.push(c);
         return creds;
     }
 
@@ -782,29 +814,37 @@ pub(crate) fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> 
         let max_len = usernames.len().max(passwords.len()).max(hashes.len());
         for i in 0..max_len {
             let user = usernames.get(i).copied().unwrap_or("");
-            if let Some(hash) = hashes.get(i) {
-                creds.push(Credentials::nt_hash(user, hash, None));
+            let mut c = if let Some(hash) = hashes.get(i) {
+                Credentials::nt_hash(user, hash, None)
             } else {
                 let pass = passwords.get(i).copied().unwrap_or("");
-                creds.push(Credentials::password(user, pass, None));
-            }
+                Credentials::password(user, pass, None)
+            };
+            c.use_kerberos = use_kerberos;
+            creds.push(c);
         }
     } else {
         // Spray mode: every user × every password/hash
         for user in &usernames {
             if !hashes.is_empty() {
                 for hash in &hashes {
-                    creds.push(Credentials::nt_hash(user, hash, None));
+                    let mut c = Credentials::nt_hash(user, hash, None);
+                    c.use_kerberos = use_kerberos;
+                    creds.push(c);
                 }
             }
             if !passwords.is_empty() {
                 for pass in &passwords {
-                    creds.push(Credentials::password(user, pass, None));
+                    let mut c = Credentials::password(user, pass, None);
+                    c.use_kerberos = use_kerberos;
+                    creds.push(c);
                 }
             }
             // If only usernames given (no pass/hash), try empty password
             if passwords.is_empty() && hashes.is_empty() {
-                creds.push(Credentials::password(user, "", None));
+                let mut c = Credentials::password(user, "", None);
+                c.use_kerberos = use_kerberos;
+                creds.push(c);
             }
         }
     }
@@ -962,7 +1002,7 @@ async fn main() -> Result<()> {
     }
 
     // ── Build credentials ──
-    let creds = build_credentials(sub_matches);
+    let mut creds = build_credentials(sub_matches);
     if creds.is_empty() {
         NxcGlobalOutput::error("No credentials specified");
         return Ok(());
@@ -991,44 +1031,52 @@ async fn main() -> Result<()> {
         .map(|vals| vals.map(|s| s.clone()).collect())
         .unwrap_or_default();
 
-    // Map protocol-specific flags to modules
-    if sub_matches.get_flag("screenshot") {
-        match protocol_name {
-            "vnc" => { if !modules.contains(&"screenshot".to_string()) { modules.push("screenshot".to_string()); } },
-            "adb" => { if !modules.contains(&"adb_screenshot".to_string()) { modules.push("adb_screenshot".to_string()); } },
-            "rdp" => { /* rdp screenshot module pending */ },
-            _ => {}
-        }
-    }
-    if sub_matches.get_flag("gmsa") && protocol_name == "ldap" {
-        if !modules.contains(&"gmsa".to_string()) {
-            modules.push("gmsa".to_string());
-        }
-    }
-    
-    // Redis flags
-    if sub_matches.get_flag("info") && protocol_name == "redis" {
-        if !modules.contains(&"redis_info".to_string()) {
-            modules.push("redis_info".to_string());
-        }
-    }
-
-    // Postgres / MySQL flags
-    if sub_matches.get_flag("dbs") {
-        match protocol_name {
-            "postgres" | "postgresql" => { if !modules.contains(&"pg_enum".to_string()) { modules.push("pg_enum".to_string()); } },
-            "mysql" => { if !modules.contains(&"mysql_enum".to_string()) { modules.push("mysql_enum".to_string()); } },
-            _ => {}
-        }
-    }
-
-    // SNMP / Docker flags
-    if sub_matches.get_flag("enum") {
-        match protocol_name {
-            "snmp" => { if !modules.contains(&"snmp_enum".to_string()) { modules.push("snmp_enum".to_string()); } },
-            "docker" => { if !modules.contains(&"docker_enum".to_string()) { modules.push("docker_enum".to_string()); } },
-            _ => {}
-        }
+    // Map protocol-specific flags to modules safely
+    match protocol_name {
+        "vnc" => {
+            if sub_matches.get_flag("screenshot") && !modules.contains(&"screenshot".to_string()) {
+                modules.push("screenshot".to_string());
+            }
+        },
+        "adb" => {
+            if sub_matches.get_flag("screenshot") && !modules.contains(&"adb_screenshot".to_string()) {
+                modules.push("adb_screenshot".to_string());
+            }
+        },
+        "rdp" => {
+            // rdp screenshot module pending
+        },
+        "ldap" => {
+            if sub_matches.get_flag("gmsa") && !modules.contains(&"gmsa".to_string()) {
+                modules.push("gmsa".to_string());
+            }
+        },
+        "redis" => {
+            if sub_matches.get_flag("info") && !modules.contains(&"redis_info".to_string()) {
+                modules.push("redis_info".to_string());
+            }
+        },
+        "postgres" | "postgresql" => {
+            if sub_matches.get_flag("dbs") && !modules.contains(&"pg_enum".to_string()) {
+                modules.push("pg_enum".to_string());
+            }
+        },
+        "mysql" => {
+            if sub_matches.get_flag("dbs") && !modules.contains(&"mysql_enum".to_string()) {
+                modules.push("mysql_enum".to_string());
+            }
+        },
+        "snmp" => {
+            if sub_matches.get_flag("enum") && !modules.contains(&"snmp_enum".to_string()) {
+                modules.push("snmp_enum".to_string());
+            }
+        },
+        "docker" => {
+            if sub_matches.get_flag("enum") && !modules.contains(&"docker_enum".to_string()) {
+                modules.push("docker_enum".to_string());
+            }
+        },
+        _ => {}
     }
 
     let mut module_opts = std::collections::HashMap::new();
@@ -1056,7 +1104,13 @@ async fn main() -> Result<()> {
     let workspace = matches.get_one::<String>("workspace").map(|s| s.as_str()).unwrap_or("default");
     
     // Ensure .nxc directory exists in home or current dir
-    let db_path = PathBuf::from("nxc.db");
+    let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).unwrap_or_else(|_| ".".to_string());
+    let dot_nxc = std::path::PathBuf::from(home).join(".nxc");
+    if !dot_nxc.exists() {
+        let _ = std::fs::create_dir_all(&dot_nxc);
+    }
+    let db_path = dot_nxc.join("nxc.db");
+    
     let db = match NxcDb::new(&db_path, workspace) {
         Ok(d) => Some(Arc::new(d)),
         Err(e) => {
@@ -1073,11 +1127,36 @@ async fn main() -> Result<()> {
     }
     NxcGlobalOutput::info(&format!(
         "Protocol: {} | Targets: {} | Credentials: {} | Threads: {}",
-        protocol_name.to_uppercase().bold(),
+        protocol_name,
         all_targets.len(),
         creds.len(),
         threads
     ));
+
+    // ── Load Credentials from DB if requested ──
+    if sub_matches.get_flag("db-creds") {
+        if let Some(ref d) = db {
+            match d.list_credentials() {
+                Ok(db_creds) => {
+                    for c in db_creds {
+                        let mut nxc_cred = nxc_auth::Credentials::default();
+                        nxc_cred.domain = c.domain.clone();
+                        nxc_cred.username = c.username.clone();
+                        nxc_cred.password = c.password.clone();
+                        nxc_cred.nt_hash = c.nt_hash.clone();
+                        nxc_cred.lm_hash = c.lm_hash.clone();
+                        nxc_cred.aes_128_key = c.aes_128.clone();
+                        nxc_cred.aes_256_key = c.aes_256.clone();
+                        creds.push(nxc_cred);
+                    }
+                    NxcGlobalOutput::info(&format!("Loaded {} credentials from database", creds.len()));
+                }
+                Err(e) => NxcGlobalOutput::warn(&format!("Failed to load credentials from DB: {}", e)),
+            }
+        } else {
+            NxcGlobalOutput::warn("Database not initialized, cannot load --db-creds");
+        }
+    }
 
     // ── Run the execution engine ──
     let mut engine = ExecutionEngine::new(exec_opts);
@@ -1122,6 +1201,31 @@ async fn main() -> Result<()> {
         successes.to_string().green().bold(),
         admins.to_string().yellow().bold()
     ));
+
+    // ── Handle Exports ──
+    if let Some(format) = sub_matches.get_one::<String>("export") {
+        let mut path = sub_matches.get_one::<String>("export-path").unwrap().to_string();
+        if !path.ends_with(format) {
+            path = format!("{}.{}", path, format);
+        }
+        
+        let report = reporting::Report {
+            timestamp: Utc::now().to_rfc3339(),
+            protocol: protocol_name.to_string(),
+            results: results.clone(),
+        };
+
+        let res = match format.as_str() {
+            "json" => reporting::export_json(&path, &report),
+            "csv" => reporting::export_csv(&path, &results),
+            _ => unreachable!(),
+        };
+
+        match res {
+            Ok(_) => NxcGlobalOutput::info(&format!("Results exported to {}", path.bold().green())),
+            Err(e) => NxcGlobalOutput::warn(&format!("Failed to export results: {}", e)),
+        }
+    }
 
     Ok(())
 }

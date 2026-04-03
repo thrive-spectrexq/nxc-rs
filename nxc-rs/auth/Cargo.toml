@@ -2,7 +2,7 @@
 name = "nxc-auth"
 version.workspace = true
 edition.workspace = true
-description = "NetExec-RS authentication engine — NTLM, Kerberos, certificate auth"
+description = "NetExec-RS authentication engine — NTLM SSP, Kerberos V5, certificate auth"
 
 [dependencies]
 
@@ -12,7 +12,14 @@ anyhow = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
+once_cell = { workspace = true }
 zeroize = { workspace = true }
+chrono = { workspace = true }
+rand = { workspace = true }
+hex = { workspace = true }
+
+# Cryptography — NTLM
 md4 = { workspace = true }
 hmac = { workspace = true }
 md-5 = { workspace = true }
@@ -20,6 +27,23 @@ rc4 = { workspace = true }
 aes = { workspace = true }
 des = { workspace = true }
 hostname = { workspace = true }
-chrono = { workspace = true }
-rand = { workspace = true }
-hex = { workspace = true }
+
+# Cryptography — Kerberos
+sha1 = { workspace = true }
+sha2 = { workspace = true }
+cbc = { workspace = true }
+cipher = { workspace = true }
+digest = { workspace = true }
+pbkdf2 = { workspace = true }
+rasn = { workspace = true }
+bytes = { workspace = true }
+p12 = { workspace = true }
+x509-parser = { workspace = true }
+
+# Registry parsing
+nt-hive = { workspace = true }
+aes-kw = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

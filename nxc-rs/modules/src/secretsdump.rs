@@ -34,14 +34,14 @@ impl NxcModule for SecretsDumpModule {
             match protocol.secrets_dump(smb_sess).await {
                 Ok(output) => {
                     return Ok(ModuleResult {
-                        success: true,
+                        credentials: vec![], success: true,
                         output,
                         data: serde_json::json!({}),
                     });
                 }
                 Err(e) => {
                     return Ok(ModuleResult {
-                        success: false,
+                        credentials: vec![], success: false,
                         output: format!("SecretsDump Error: {}", e),
                         data: serde_json::json!({}),
                     });
@@ -50,7 +50,7 @@ impl NxcModule for SecretsDumpModule {
         }
 
         Ok(ModuleResult {
-            success: false,
+            credentials: vec![], success: false,
             output: "Invalid session type for secretsdump".to_string(),
             data: serde_json::json!({}),
         })

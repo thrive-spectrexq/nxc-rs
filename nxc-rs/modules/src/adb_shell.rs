@@ -54,7 +54,7 @@ impl NxcModule for AdbShell {
         let protocol = AdbProtocol::new();
         match protocol.execute(session, cmd).await {
             Ok(output) => Ok(ModuleResult {
-                success: true,
+                credentials: vec![], success: true,
                 output: output.stdout.clone(),
                 data: json!({
                     "stdout": output.stdout,
@@ -63,7 +63,7 @@ impl NxcModule for AdbShell {
                 }),
             }),
             Err(e) => Ok(ModuleResult {
-                success: false,
+                credentials: vec![], success: false,
                 output: format!("Failed to execute command: {}", e),
                 data: json!({ "error": format!("{}", e) }),
             }),

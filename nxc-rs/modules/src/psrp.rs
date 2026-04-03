@@ -38,7 +38,7 @@ impl NxcModule for PsrpModule {
         // 3. Execute Pipeline
         
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: "PSRP session initialized. Fragment parsing pending.".to_string(),
             data: serde_json::json!({
                 "session_id": "89BC86C4-34B7-48EE-9076-2917034E1D13"

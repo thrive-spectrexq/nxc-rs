@@ -102,13 +102,13 @@ impl NxcModule for BloodhoundModule {
             if let Err(e) = self.upload_to_bloodhound(bh_uri, bh_user, bh_pass, &payload).await {
                 error!("BloodHound: Failed to upload data: {}", e);
                 return Ok(ModuleResult {
-                    success: false,
+                    credentials: vec![], success: false,
                     output: format!("Failed to push to BloodHound API: {}", e),
                     data: payload,
                 });
             } else {
                 return Ok(ModuleResult {
-                    success: true,
+                    credentials: vec![], success: true,
                     output: format!("BloodHound collection and upload complete! Published {} users and {} computers to {}.", users_json.len(), computers_json.len(), bh_uri),
                     data: serde_json::json!({"status": "uploaded"}),
                 });
@@ -116,7 +116,7 @@ impl NxcModule for BloodhoundModule {
         }
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: format!("BloodHound collection complete. Generated {} users and {} computers.", users_json.len(), computers_json.len()),
             data: payload,
         })

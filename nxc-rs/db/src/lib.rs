@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS nxc_shares (
     read_access  INTEGER DEFAULT 0,
     write_access INTEGER DEFAULT 0
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_nxc_creds_unique ON nxc_credentials(workspace, username, domain);
 "#;
 
 // ─── Data Types ─────────────────────────────────────────────────
@@ -206,6 +208,29 @@ impl NxcDb {
             ],
         )?;
         Ok(conn.last_insert_rowid())
+    }
+
+    /// Upsert a credential based on username, domain, and hash.
+    pub fn upsert_credential(&self, cred: &Credential) -> Result<()> {
+        let conn = self.pool.get()?;
+        conn.execute(
+            "INSERT INTO nxc_credentials (workspace, domain, username, password, nt_hash, lm_hash, aes_128, aes_256, source, host_id, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+             ON CONFLICT(workspace, username, domain) DO UPDATE SET
+                password = COALESCE(excluded.password, password),
+                nt_hash = COALESCE(excluded.nt_hash, nt_hash),
+                lm_hash = COALESCE(excluded.lm_hash, lm_hash),
+                aes_128 = COALESCE(excluded.aes_128, aes_128),
+                aes_256 = COALESCE(excluded.aes_256, aes_256),
+                source = excluded.source,
+                created_at = excluded.created_at",
+            rusqlite::params![
+                cred.workspace, cred.domain, cred.username, cred.password,
+                cred.nt_hash, cred.lm_hash, cred.aes_128, cred.aes_256,
+                cred.source, cred.host_id, cred.created_at
+            ],
+        )?;
+        Ok(())
     }
 
     pub fn list_credentials(&self) -> Result<Vec<Credential>> {

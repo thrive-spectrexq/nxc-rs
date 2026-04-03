@@ -36,7 +36,7 @@ impl NxcModule for SnmpEnum {
         let report = protocol.enumerate(snmp_sess).await?;
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: report.clone(),
             data: serde_json::json!({ "report": report }),
         })

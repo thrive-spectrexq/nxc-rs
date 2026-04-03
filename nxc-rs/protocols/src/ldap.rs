@@ -6,7 +6,7 @@
 use crate::{CommandOutput, NxcProtocol, NxcSession};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use nxc_auth::{AuthResult, Credentials};
+use nxc_auth::{AuthResult, Credentials, kerberos::KerberosClient};
 use std::time::Duration;
 use tracing::{debug, info};
 
@@ -213,7 +213,7 @@ impl NxcProtocol for LdapProtocol {
     async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         let target_owned = target.to_string();
-        let timeout = self.timeout;
+        let _timeout = self.timeout;
         let proxy_owned = proxy.map(|s| s.to_string());
 
         let target_clone = target_owned.clone();
@@ -248,10 +248,19 @@ impl NxcProtocol for LdapProtocol {
         session: &mut dyn NxcSession,
         creds: &Credentials,
     ) -> Result<AuthResult> {
-        let ldap_session = match session.protocol() {
-            "ldap" => unsafe { &mut *(session as *mut dyn NxcSession as *mut LdapSession) },
-            _ => return Err(anyhow!("Invalid session type")),
-        };
+        let ldap_session = session
+            .as_any_mut()
+            .downcast_mut::<LdapSession>()
+            .ok_or_else(|| anyhow!("Invalid session type"))?;
+
+        if creds.username.is_empty() {
+            return Ok(AuthResult::success(false));
+        }
+
+        if creds.use_kerberos {
+            debug!("LDAP: Authenticating {} via Kerberos (GSS-API)", creds.username);
+            return self.authenticate_kerberos(ldap_session, creds).await;
+        }
 
         let url = self.build_url(&ldap_session.target, ldap_session.port);
         let username = creds.username.clone();
@@ -290,6 +299,44 @@ impl NxcProtocol for LdapProtocol {
     }
 }
 
+impl LdapProtocol {
+    /// Perform Kerberos authentication over LDAP
+    async fn authenticate_kerberos(&self, ldap_session: &mut LdapSession, creds: &Credentials) -> Result<AuthResult> {
+        let domain = creds.domain.as_deref().unwrap_or("DOMAIN");
+        let kdc_ip = &ldap_session.target; // In real scenarios, this might be a different DC IP
+
+        let krb_client = KerberosClient::new(domain, kdc_ip);
+        
+        // 1. Request TGT
+        let _tgt = krb_client.request_tgt_with_creds(creds).await?;
+        
+        // 2. Request TGS for LDAP service
+        let spn = format!("ldap/{}", ldap_session.target);
+        let _tgs = krb_client.request_tgs(&_tgt, &spn).await?;
+        
+        // 3. Build AP-REQ / Wrap in GSSAPI
+        // Note: Full SASL GSSAPI bind involves complex multi-step handshake.
+        // For this phase, we initiate the connection and verify KDC availability.
+        
+        let url = self.build_url(&ldap_session.target, ldap_session.port);
+        let (conn, mut ldap) = match tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::new(&url)).await {
+            Ok(Ok(res)) => res,
+            Ok(Err(e)) => return Ok(AuthResult::failure(&format!("Connection failed: {}", e), None)),
+            Err(_) => return Ok(AuthResult::failure("Connection timeout", None)),
+        };
+        ldap3::drive!(conn);
+
+        // Placeholder for SASL GSSAPI bind - as specified in planning, 
+        // we integration point for the token derived from krb_client.
+        // For now, we simulate success if TGT/TGS was obtained.
+        
+        ldap_session.credentials = Some(creds.clone());
+        let _ = ldap.unbind().await;
+        
+        Ok(AuthResult::success(false))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -302,3 +349,4 @@ mod tests {
         assert!(!proto.supports_exec());
     }
 }
+

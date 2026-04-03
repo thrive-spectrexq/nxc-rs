@@ -86,7 +86,7 @@ impl NxcModule for ScriptModule {
         let result: Dynamic = engine.call_fn(&mut scope, &self.ast, "run", (context, options))?;
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: result.to_string(),
             data: serde_json::json!({
                 "script_path": self.path.to_string_lossy(),

@@ -162,7 +162,7 @@ impl NxcModule for NetDiscovery {
         }
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output: output_summary,
             data: json!({}),
         })

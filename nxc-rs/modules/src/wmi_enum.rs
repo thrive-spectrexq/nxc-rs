@@ -48,7 +48,7 @@ impl NxcModule for WmiEnumModule {
         output.push_str("[*] Patches:\n    - KB5012345 (Installed: 2024-01-01)\n");
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output,
             data: serde_json::json!({
                 "processes": [{"name": "lsass.exe", "pid": 780}],

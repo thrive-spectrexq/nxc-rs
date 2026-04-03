@@ -118,7 +118,7 @@ impl NxcModule for AdcsModule {
         }
 
         Ok(ModuleResult {
-            success: true,
+            credentials: vec![], success: true,
             output,
             data: serde_json::json!({
                 "templates": data_templates,

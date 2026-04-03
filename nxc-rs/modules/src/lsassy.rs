@@ -116,6 +116,7 @@ if (Test-Path "{}") {{
             .replace("DEBUG_ERR: ", "");
 
         Ok(ModuleResult {
+            credentials: vec![],
             success,
             output: clean_output.clone(),
             data: serde_json::json!({
