@@ -595,7 +595,7 @@ async fn handle_interactive_callbacks(
 
     if let Some(data) = query.data {
         let msg = match query.message {
-            Some(teloxide::types::MaybeInaccessibleMessage::Regular(m)) => m,
+            Some(teloxide::types::MaybeInaccessibleMessage::Regular(m)) => *m,
             _ => {
                 return Ok(());
             }

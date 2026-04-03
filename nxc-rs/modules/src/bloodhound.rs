@@ -153,7 +153,7 @@ impl BloodhoundModule {
         let mut buffer = Cursor::new(Vec::<u8>::new());
         {
             let mut zip = ZipWriter::new(&mut buffer);
-            let options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+            let options = FileOptions::<'static, ()>::default().compression_method(zip::CompressionMethod::Deflated);
             zip.start_file("bloodhound_data.json", options)?;
             
             let json_string = serde_json::to_string(payload)?;
