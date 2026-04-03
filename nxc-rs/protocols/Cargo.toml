@@ -5,7 +5,7 @@ edition.workspace = true
 description = "NetExec-RS protocol handlers — SMB, LDAP, WinRM, RDP, MSSQL, SSH, FTP, VNC, WMI, NFS"
 
 [dependencies]
-ldap3 = "0.11"
+ldap3 = "0.12"
 
 base64 = "0.22"
 tokio-rustls = "0.26"

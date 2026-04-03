@@ -36,7 +36,7 @@ rand = "0.8"
 ssh2 = "0.9"
 hostname = "0.4"
 async-trait = "0.1"
-ldap3 = "0.11"
+ldap3 = "0.12"
 suppaftp = { version = "8.0", features = ["tokio", "tokio-rustls-ring"] }
 teloxide = { version = "0.13", features = ["macros", "ctrlc_handler"] }
 dotenvy = "0.15"
