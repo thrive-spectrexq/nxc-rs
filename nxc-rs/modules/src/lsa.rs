@@ -2,7 +2,7 @@
 //!
 //! Dumps LSA secrets (cached credentials, etc.) from the SECURITY hive.
 
-use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
+use crate::{ModuleOptions, ModuleResult, NxcModule};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_protocols::NxcSession;

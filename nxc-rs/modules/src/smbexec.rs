@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use nxc_protocols::{NxcSession, CommandOutput};
+use nxc_protocols::NxcSession;
 use crate::{ModuleOptions, ModuleResult, NxcModule};
 use tracing::info;
 

@@ -60,7 +60,7 @@ impl NxcModule for BloodhoundModule {
         info!("BloodHound: Collecting data from {}...", session.target());
 
         let mut users_json = Vec::new();
-        let mut computers_json: Vec<serde_json::Value> = Vec::new();
+        let computers_json: Vec<serde_json::Value> = Vec::new();
 
         if session.protocol() == "ldap" {
             use nxc_protocols::ldap::{LdapProtocol, LdapSession};

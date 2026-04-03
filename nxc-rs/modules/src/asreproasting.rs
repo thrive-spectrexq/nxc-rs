@@ -109,7 +109,7 @@ impl NxcModule for Asreproasting {
             if !domain.is_empty() {
                 // Perform AS-REQ without credentials (no pre-authentication)
                 if let Ok(tgt) = krb_client.request_tgt(&sam, None, None, None).await {
-                    let encoded = hex::encode(&tgt.ticket_data);
+                    let _encoded = hex::encode(&tgt.ticket_data);
                     let checksum = hex::encode(&tgt.ticket_data[0..16.min(tgt.ticket_data.len())]);
                     let cipher = hex::encode(&tgt.ticket_data[16.min(tgt.ticket_data.len())..]);
 

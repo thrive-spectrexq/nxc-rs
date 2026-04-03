@@ -11,7 +11,6 @@ use nxc_auth::{AuthResult, Credentials, kerberos::KerberosClient};
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
-use tokio::sync::Mutex;
 use rand;
 use tracing::debug;
 
@@ -709,7 +708,7 @@ impl SmbProtocol {
         Ok(String::from_utf8_lossy(&output).to_string())
     }
 
-    async fn call_smbexec(&self, session: &SmbSession, command: &str) -> Result<String> {
+    async fn call_smbexec(&self, _session: &SmbSession, _command: &str) -> Result<String> {
         // Implementation of service-based execution...
         Ok("Executed via smbexec".into())
     }
