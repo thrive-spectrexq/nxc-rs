@@ -8,6 +8,7 @@ use std::convert::TryInto;
 use rand::Rng;
 
 type HmacMd5 = Hmac<Md5>;
+type HmacSha1 = Hmac<Sha1>;
 
 use aes::Aes256;
 use cbc::cipher::{BlockDecryptMut, BlockEncryptMut, KeyIvInit};
