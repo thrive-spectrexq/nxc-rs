@@ -60,6 +60,15 @@ Guidelines:
         let mut current_user_prompt = user_prompt.to_string();
 
         loop {
+            // Push the user message to history before completing
+            // Gemini expects a clean User -> Assistant -> User sequence
+            self.history.push(Message {
+                role: Role::User,
+                content: current_user_prompt.clone(),
+                tool_calls: None,
+                tool_results: None,
+            });
+
             // Get tool definitions for the provider
             let tool_defs: Vec<_> = self.tools.all().iter().map(|t| crate::providers::ToolDefinition {
                 name: t.name().to_string(),

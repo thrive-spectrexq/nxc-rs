@@ -2,7 +2,7 @@ use super::{AiProvider, AiResponse, Message, Role, ToolCall, ToolDefinition};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 
 pub struct GeminiProvider {
@@ -33,7 +33,7 @@ impl AiProvider for GeminiProvider {
     async fn complete(
         &self,
         system_prompt: &str,
-        user_prompt: &str,
+        _user_prompt: &str,
         history: &[Message],
         tools: &[ToolDefinition],
     ) -> Result<AiResponse> {
@@ -91,11 +91,8 @@ impl AiProvider for GeminiProvider {
             }
         }
 
-        // Add current user prompt
-        contents.push(json!({
-            "role": "user",
-            "parts": [{"text": user_prompt}]
-        }));
+        // The current user prompt is now assumed to be part of the history (the final message)
+        // or passed via history if we modified AiAgent to push it first.
 
         let mut body = json!({
             "contents": contents,
@@ -132,7 +129,7 @@ impl AiProvider for GeminiProvider {
         let gemini_resp: GeminiResponse = resp.json().await?;
         
         let candidate = gemini_resp.candidates.get(0).context("No candidates in Gemini response")?;
-        let mut text = None;
+        let mut text: Option<String> = None;
         let mut tool_calls = Vec::new();
 
         for part in &candidate.content.parts {
