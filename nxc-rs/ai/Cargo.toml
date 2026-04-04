@@ -1,0 +1,22 @@
+[package]
+name = "nxc-ai"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+dotenvy = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+# Workspace members
+nxc-auth = { path = "../auth" }
+nxc-protocols = { path = "../protocols" }
+nxc-targets = { path = "../targets" }
+nxc-db = { path = "../db" }
+nxc-modules = { path = "../modules" }

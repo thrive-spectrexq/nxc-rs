@@ -8,7 +8,7 @@ mod telegram;
 mod relay;
 mod reporting;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Command, Arg, ArgAction};
 use chrono::Utc;
 use colored::Colorize;
@@ -28,19 +28,28 @@ const CODENAME: &str = "Rusty-Reaper";
 pub(crate) fn build_cli() -> Command {
     let banner = format!(
         r#"
-     .   .
-    .|   |.     _   _          _     _____
-    ||   ||    | \ | |   ___  | |_  | ____| __  __   ___    ___
-    \\( )//    |  \| |  / _ \ | __| |  _|   \ \/ /  / _ \  / __|
-    .=[ ]=.    | |\  | |  __/ | |_  | |___   >  <  |  __/ | (__
-   / /`-`\ \   |_| \_|  \___|  \__| |_____| /_/\_\  \___|  \___|
-   ` \   / `
-     `   `
+          _
+         / \
+        |   |
+     _  \___/  _
+    / \  / \  / \
+    \__\/---\/__/
+       /  |  \
+      /   |   \
+     /    |    \
+    /     |     \
+
+      _      _____  _____  _____ __  __  _____  ____      ____  ____
+     | \ | || ____||_   _|| ____|\ \/ / | ____|/ ___|    |  _ \/ ___|
+     |  \| ||  _|    | |  |  _|   \  /  |  _| | |        | |_) \___ \
+     | |\  || |___   | |  | |___  /  \  | |___| |___  __ |  _ < ___) |
+     |_| \_||_____|  |_|  |_____|/_/\_\ |_____|\____||__||_| \_\____/
 
     NetExec-RS — The Network Execution Tool (Pure Rust)
 
     Version : {}
     Codename: {}
+    Creator : @thrive-spectrexq
 "#,
         VERSION, CODENAME
     );
@@ -774,6 +783,27 @@ pub(crate) fn build_cli() -> Command {
                         .required(true),
                 ),
         )
+        .subcommand(
+            Command::new("ai")
+                .about("LLM-powered automation and network discovery")
+                .arg(
+                    Arg::new("prompt")
+                        .help("Natural language prompt for the AI agent (e.g., 'Scan 10.0.0.0/24 for hosts with SMB')")
+                        .required(true)
+                        .index(1),
+                )
+                .arg(
+                    Arg::new("provider")
+                        .long("provider")
+                        .help("AI provider to use (gemini, openai, anthropic)")
+                        .default_value("gemini"),
+                )
+                .arg(
+                    Arg::new("model")
+                        .long("model")
+                        .help("Specific model to use (default: gemini-1.5-flash)"),
+                ),
+        )
 }
 
 /// Build credentials from CLI arguments.
@@ -1222,6 +1252,50 @@ async fn main() -> Result<()> {
             Ok(_) => NxcGlobalOutput::info(&format!("Results exported to {}", path.bold().green())),
             Err(e) => NxcGlobalOutput::warn(&format!("Failed to export results: {}", e)),
         }
+    }
+
+    if let Some(ai_matches) = matches.subcommand_matches("ai") {
+        let prompt = ai_matches.get_one::<String>("prompt").unwrap();
+        let provider_name = ai_matches.get_one::<String>("provider").unwrap();
+        let model = ai_matches.get_one::<String>("model").cloned();
+        
+        dotenvy::dotenv().ok();
+        
+        let api_key = match provider_name.as_str() {
+            "gemini" => std::env::var("GEMINI_API_KEY").context("GEMINI_API_KEY not found in .env"),
+            "openai" => std::env::var("OPENAI_API_KEY").context("OPENAI_API_KEY not found in .env"),
+            "anthropic" => std::env::var("ANTHROPIC_API_KEY").context("ANTHROPIC_API_KEY not found in .env"),
+            _ => anyhow::bail!("Unsupported AI provider: {}", provider_name),
+        }?;
+
+        println!("Initializing AI Automation Engine with provider: {}...", provider_name.cyan());
+        
+        // Initialize AI Agent
+        let provider: Box<dyn nxc_ai::providers::AiProvider> = match provider_name.as_str() {
+            "gemini" => Box::new(nxc_ai::GeminiProvider::new(api_key, model)),
+            _ => anyhow::bail!("Provider {} is not yet fully implemented", provider_name),
+        };
+
+        // Initialize shared resources for AI tools
+        let db_path = std::path::Path::new("nxc.db");
+        let db = Arc::new(nxc_db::NxcDb::new(db_path, "default")?);
+        let registry_mod = Arc::new(nxc_modules::ModuleRegistry::new());
+
+        let mut registry = nxc_ai::ToolRegistry::new();
+        registry.register(Box::new(nxc_ai::ScanTool));
+        registry.register(Box::new(nxc_ai::ProtocolTool));
+        registry.register(Box::new(nxc_ai::QueryDbTool::new(db)));
+        registry.register(Box::new(nxc_ai::SearchModulesTool::new(registry_mod)));
+        registry.register(Box::new(nxc_ai::UtilityTool));
+
+        let mut agent = nxc_ai::AiAgent::new(provider, registry, Box::new(nxc_ai::agent::CliFeedback));
+        
+        println!("Goal: {}", prompt.green());
+        if let Err(e) = agent.run(prompt).await {
+            eprintln!("{} AI Error: {}", "ERROR".red().bold(), e);
+        }
+        
+        return Ok(());
     }
 
     Ok(())
