@@ -130,7 +130,23 @@ cargo run --package nxc -- telegram
 - `/shares`, `/users`, `/groups`: Tactical reconnaissance shortcuts.
 - `/clear`, `/reset`: Flush session memory and clear terminal space.
 
-### 5. Build for Production
+### 5. AI Mission Control (CLI)
+The **Elite Reaper** AI orchestrator can be launched directly from the CLI for autonomous missions. It supports conversational multi-turn interaction.
+
+**Launch an Initial Mission**:
+```powershell
+cargo run --package nxc -- ai "Find hosts on 192.168.1.0/24 with SMB signing disabled"
+```
+
+**Conversation Examples**:
+- **SMB & Discovery**: `ai "Scan 10.0.0.0/24 for port 445 and identify OS versions"`
+- **LDAP Recon**: `ai "Enumerate all GPO names from the domain using ldap protocol"`
+- **Web Audit**: `ai "Check if 192.168.1.50 has any active web directories on port 80 or 443"`
+- **Credential Auditing**: `ai "Audit 172.16.5.0/24 for default passwords on mssql and ssh services"`
+
+*Type `quit`, `exit`, or `bye` to end the session.*
+
+### 6. Build for Production
 If you want to use the compiled binary directly without `cargo run`, you can build a release version:
 ```powershell
 cargo build --release --package nxc
@@ -154,7 +170,7 @@ NetExec-RS is designed with a layered approach for maximum maintainability:
 
 ## License & Disclaimer
 
-Distributed under a Custom Proprietary License. See `LICENSE` for more information.
+Distributed under a Custom Proprietary License. See [LICENSE](LICENSE) for more information.
 
 ### Legal Disclaimer
 **NetExec-RS is for authorized security testing only.** Use of this tool for attacking targets without prior mutual consent is illegal. It is the end user's responsibility to obey all applicable local, state, and federal laws. Developers assume no liability and are not responsible for any misuse or damage caused by this program.
