@@ -14,9 +14,11 @@ nxc-protocols = { path = "../protocols" }
 nxc-modules = { path = "../modules" }
 nxc-db = { path = "../db" }
 nxc-targets = { path = "../targets" }
+nxc-ai = { path = "../ai" }
 tokio = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }
+async-trait = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 indicatif = { workspace = true }

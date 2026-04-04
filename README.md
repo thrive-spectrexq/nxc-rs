@@ -14,6 +14,7 @@
 *   **Pure Rust**: Zero dependencies on Python or Impacket. Native implementation of NTLM SSP, Kerberos, and SMB.
 *   **Stealthy & Robust**: Built-in lockout detection, jitter, and secure TLS communication.
 *   **Professional Telegram Bot**: Remote mission control with **Interactive Shell**, full module support, and tactical guides.
+*   **AI Mission Orchestrator**: Fully autonomous agent powered by **LLMs** for natural language mission control, automated reconnaissance, and tool chaining.
 *   **Advanced Recon**: Integrated AD CS, BloodHound, and WMI reconnaissance modules.
 
 ---
@@ -122,7 +123,8 @@ cargo run --package nxc -- telegram
 
 **Commands**:
 - `/help`, `/guide`, `/cheat`: Comprehensive operator's manuals and search tools.
-- `/kerberos`, `/nthash`, `/authinfo`: Authentication protocol generation and tools.
+- `/ai <instruction>`: **Autonomous Mission Control**. Let the AI agent orchestrate discovery, scanning, and exploitation using the full protocol suite.
+- `/ping`, `/dns`, `/geo`: Tactical network utilities for rapid connectivity and identity checks.
 - `/run <protocol> <target> [options]`: Full CLI-style command execution (supports `-M` and `-o`).
 - `/shell`: Activate **Interactive Shell Mode** for the most recent target.
 - `/shares`, `/users`, `/groups`: Tactical reconnaissance shortcuts.

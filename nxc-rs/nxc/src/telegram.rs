@@ -208,6 +208,8 @@ enum TelegramBotCommand {
     Smtp(String),
     #[command(description = "Network discovery & scanning")]
     Network(String),
+    #[command(description = "AI-powered automation: /ai <prompt>")]
+    Ai(String),
 
     // --- 📊 Specialized Enumeration Shortcuts ---
     #[command(description = "Quickly list SMB shares on a target")]
@@ -538,6 +540,9 @@ async fn handle_command(
         TelegramBotCommand::Stats => {
             database_show_stats(bot, msg).await?;
         }
+        TelegramBotCommand::Ai(p) => {
+            engine_execute_ai(bot, msg, p).await?;
+        }
     }
     Ok(())
 }
@@ -639,6 +644,7 @@ async fn ui_send_dashboard(bot: Bot, msg: Message) -> Result<(), teloxide::Reque
     let text = format!("🛸 <b>NETEXEC-RS: APEX MISSION CONTROL v{}</b>\n\n\
         <b>Operational Command Matrix:</b>\n\n\
         🚀 <b>Deploy:</b> /run /smb /ssh /ldap /winrm /mssql /rdp /wmi\n\
+        ⚡ <b>Automation:</b> /ai (LLM-powered discovery & execution)\n\
         🌐 <b>Extend:</b> /ftp /nfs /http /mysql /pgsql /redis /snmp /smtp\n\
         🐚 <b>Interactive:</b> /shell (persistent access on last target)\n\
         🔍 <b>Intel:</b> /search /modules /protocols\n\
@@ -1431,6 +1437,79 @@ async fn engine_perform_task(argv: Vec<String>) -> anyhow::Result<String> {
     ));
 
     Ok(report)
+}
+
+struct TelegramFeedback {
+    bot: Bot,
+    chat_id: ChatId,
+}
+
+#[async_trait::async_trait]
+impl nxc_ai::agent::AgentFeedback for TelegramFeedback {
+    async fn on_thought(&self, text: &str) -> anyhow::Result<()> {
+        let text = format!("🧠 <b>AI thought:</b>\n<i>{}</i>", html_escape::encode_safe(text));
+        let _ = self.bot.send_message(self.chat_id, text).parse_mode(ParseMode::Html).await;
+        Ok(())
+    }
+    async fn on_tool_call(&self, name: &str, args: &str) -> anyhow::Result<()> {
+        let text = format!("🛠️ <b>Action:</b> <code>{}</code>\nArgs: <code>{}</code>", 
+            html_escape::encode_safe(name), 
+            html_escape::encode_safe(args));
+        let _ = self.bot.send_message(self.chat_id, text).parse_mode(ParseMode::Html).await;
+        Ok(())
+    }
+    async fn on_tool_result(&self, _name: &str, result: &str) -> anyhow::Result<()> {
+        let text = format!("📦 <b>Result:</b>\n<pre>{}</pre>", html_escape::encode_safe(result));
+        // Only send if not too long, or truncate
+        if text.len() > 4000 {
+             let _ = self.bot.send_message(self.chat_id, "📦 <b>Result:</b> (Output too long, see database)").parse_mode(ParseMode::Html).await;
+        } else {
+             let _ = self.bot.send_message(self.chat_id, text).parse_mode(ParseMode::Html).await;
+        }
+        Ok(())
+    }
+}
+
+async fn engine_execute_ai(bot: Bot, msg: Message, prompt: String) -> Result<(), teloxide::RequestError> {
+    let chat_id = msg.chat.id;
+    if prompt.is_empty() {
+        bot.send_message(chat_id, "💡 Usage: <code>/ai Scan my network for SMB</code>").parse_mode(ParseMode::Html).await?;
+        return Ok(());
+    }
+
+    dotenvy::dotenv().ok();
+    let api_key = match std::env::var("GEMINI_API_KEY") {
+        Ok(k) => k,
+        Err(_) => {
+            bot.send_message(chat_id, "❌ <b>AI ERROR</b>\nGEMINI_API_KEY not found in environment.").await?;
+            return Ok(());
+        }
+    };
+
+    bot.send_message(chat_id, "🌩️ <b>Initializing AI Automation Agent...</b>").parse_mode(ParseMode::Html).await?;
+
+    let provider = Box::new(nxc_ai::GeminiProvider::new(api_key, None));
+    
+    // Initialize shared resources for AI tools
+    let db_path = std::path::Path::new("nxc.db");
+    let db = std::sync::Arc::new(nxc_db::NxcDb::new(db_path, "default").unwrap()); // Simplified for now
+    let registry_mod = std::sync::Arc::new(nxc_modules::ModuleRegistry::new());
+
+    let mut registry = nxc_ai::ToolRegistry::new();
+    registry.register(Box::new(nxc_ai::ScanTool));
+    registry.register(Box::new(nxc_ai::ProtocolTool));
+    registry.register(Box::new(nxc_ai::QueryDbTool::new(db)));
+    registry.register(Box::new(nxc_ai::SearchModulesTool::new(registry_mod)));
+    registry.register(Box::new(nxc_ai::UtilityTool));
+
+    let feedback = Box::new(TelegramFeedback { bot: bot.clone(), chat_id });
+    let mut agent = nxc_ai::AiAgent::new(provider, registry, feedback);
+
+    if let Err(e) = agent.run(&prompt).await {
+         bot.send_message(chat_id, format!("❌ <b>AI CRITICAL FAULT:</b>\n<code>{}</code>", e)).parse_mode(ParseMode::Html).await?;
+    }
+
+    Ok(())
 }
 
 // --- 👤 Session & Operator Data Commands ---
