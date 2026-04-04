@@ -28,43 +28,55 @@ impl NxcOutput {
 
     /// Format the prefix: `PROTO  host            port   hostname`
     fn prefix(&self) -> String {
+        let proto_color = match self.protocol.to_lowercase().as_str() {
+            "smb" => self.protocol.bold().green(),
+            "ldap" => self.protocol.bold().blue(),
+            "winrm" => self.protocol.bold().cyan(),
+            "ssh" => self.protocol.bold().yellow(),
+            "mssql" => self.protocol.bold().magenta(),
+            "http" | "https" => self.protocol.bold().bright_cyan(),
+            "rdp" | "vnc" => self.protocol.bold().bright_blue(),
+            "ftp" | "nfs" => self.protocol.bold().bright_yellow(),
+            _ => self.protocol.bold().white(),
+        };
+
         format!(
             "{:<8} {:<15} {:<6} {:<16}",
-            self.protocol.bold().blue(),
-            self.host,
-            self.port,
+            proto_color,
+            self.host.cyan(),
+            self.port.to_string().yellow(),
             if self.hostname.is_empty() {
-                "NONE".to_string()
+                "NONE".dimmed().to_string()
             } else {
-                self.hostname.clone()
+                self.hostname.bold().white().to_string()
             }
         )
     }
 
-    /// `[*]` informational display — blue.
+    /// `[◈]` informational display — blue.
     pub fn display(&self, msg: &str) {
-        println!("{} {} {}", self.prefix(), "[*]".bold().blue(), msg);
+        println!("{} {} {}", self.prefix(), "◈".bold().blue(), msg);
     }
 
-    /// `[+]` success — green. Use for auth successes.
+    /// `[✔]` success — green. Use for auth successes.
     pub fn success(&self, msg: &str) {
-        println!("{} {} {}", self.prefix(), "[+]".bold().green(), msg);
+        println!("{} {} {}", self.prefix(), "✔".bold().green(), msg);
     }
 
-    /// `[+]` admin success (Pwn3d!) — yellow highlight.
+    /// `[★]` admin success (Pwn3d!) — yellow highlight.
     pub fn pwned(&self, msg: &str) {
         println!(
             "{} {} {} {}",
             self.prefix(),
-            "[+]".bold().green(),
-            msg,
-            "(Pwn3d!)".bold().yellow()
+            "★".bold().yellow(),
+            msg.bold().green(),
+            "💀 (Pwn3d!)".bold().yellow()
         );
     }
 
-    /// `[-]` failure — red. Use for auth failures.
+    /// `[✘]` failure — red. Use for auth failures.
     pub fn fail(&self, msg: &str) {
-        println!("{} {} {}", self.prefix(), "[-]".bold().red(), msg);
+        println!("{} {} {}", self.prefix(), "✘".bold().red(), msg.dimmed());
     }
 
     /// Highlighted important message — yellow.
@@ -74,7 +86,7 @@ impl NxcOutput {
 
     /// `[!]` error — red bold.
     pub fn error(&self, msg: &str) {
-        eprintln!("{} {} {}", self.prefix(), "[!]".bold().red(), msg.red());
+        eprintln!("{} {} {}", self.prefix(), "⚠".bold().red(), msg.red());
     }
 }
 
@@ -89,34 +101,65 @@ pub struct NxcGlobalOutput;
 
 #[allow(dead_code)]
 impl NxcGlobalOutput {
-    pub fn banner() {
-        let banner = r#"
-     .   .
-    .|   |.     _   _          _     _____
-    ||   ||    | \ | |   ___  | |_  | ____| __  __   ___    ___
-    \\( )//    |  \| |  / _ \ | __| |  _|   \ \/ /  / _ \  / __|
-    .=[ ]=.    | |\  | |  __/ | |_  | |___   >  <  |  __/ | (__
-   / /`-`\ \   |_| \_|  \___|  \__| |_____| /_/\_\  \___|  \___|
-   ` \   / `
-     `   `
-"#;
-        println!("{}", banner.bold().cyan());
+    pub fn banner(version: &str, codename: &str) {
+        let spider = format!(
+            r#"
+           {}   {}
+          {}   {}
+          {}   {}
+          {}( ){}
+          {}={ }={}
+         {} {} {}
+         {} {} {}
+           {}   {}
+"#,
+            ".".cyan().bold(), ".".cyan().bold(),
+            ".|".cyan().bold(), "|.".cyan().bold(),
+            "||".cyan().bold(), "||".cyan().bold(),
+            "\\\\".cyan().bold(), "//".cyan().bold(),
+            ".[".cyan().bold(), " ".white().bold(), "].".cyan().bold(),
+            "/ /".cyan().bold(), "˙-˙".yellow().bold(), "\\ \\".cyan().bold(),
+            "˙".cyan().bold(), "\\ /".yellow().bold(), "˙".cyan().bold(),
+            "˙".cyan().bold(), "˙".cyan().bold()
+        );
+
+        let text = format!(
+            r#"
+      _      _____  _____  _____ __  __  _____  ____      ____  ____
+     | \ | || ____||_   _|| ____|\ \/ / | ____|/ ___|    |  _ \/ ___|
+     |  \| ||  _|    | |  |  _|   \  /  |  _| | |        | |_) \___ \
+     | |\  || |___   | |  | |___  /  \  | |___| |___  __ |  _ < ___) |
+     |_| \_||_____|  |_|  |_____|/_/\_\ |_____|\____||__||_| \_\____/
+
+    NetExec-RS — {}
+
+    Version : {}
+    Codename: {}
+    Maintained by: {}
+"#,
+            "The Network Execution Tool (Pure Rust)".white().bold(),
+            version.yellow().bold(),
+            codename.yellow().bold(),
+            "@thrive-spectrexq".yellow().bold()
+        );
+
+        println!("{}{}", spider, text);
     }
 
     pub fn info(msg: &str) {
-        println!("{} {}", "[*]".bold().blue(), msg);
+        println!("{} {}", "🕷".bold().blue(), msg);
     }
 
     pub fn success(msg: &str) {
-        println!("{} {}", "[+]".bold().green(), msg);
+        println!("{} {}", "✔".bold().green(), msg);
     }
 
     pub fn warn(msg: &str) {
-        println!("{} {}", "[!]".bold().yellow(), msg.yellow());
+        println!("{} {}", "⚠".bold().yellow(), msg.yellow());
     }
 
     pub fn error(msg: &str) {
-        eprintln!("{} {}", "[!]".bold().red(), msg.red());
+        eprintln!("{} {}", "✘".bold().red(), msg.red());
     }
 }
 
