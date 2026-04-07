@@ -633,6 +633,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "const-oid"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
+
+[[package]]
 name = "const-random"
 version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -944,6 +950,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4850db49bf08e663084f7fb5c87d202ef91a3907271aff24a94eb97ff039153c"
 dependencies = [
  "block-buffer 0.12.0",
+ "const-oid",
  "crypto-common 0.2.1",
 ]
 
@@ -2334,7 +2341,7 @@ dependencies = [
  "saturating",
  "serde",
  "serde_json",
- "sha1",
+ "sha1 0.10.6",
  "sha2",
  "thiserror 2.0.18",
  "uuid",
@@ -2516,7 +2523,7 @@ dependencies = [
  "rc4",
  "serde",
  "serde_json",
- "sha1",
+ "sha1 0.11.0",
  "sha2",
  "tempfile",
  "thiserror 2.0.18",
@@ -2730,7 +2737,7 @@ dependencies = [
  "hmac",
  "lazy_static",
  "rc2",
- "sha1",
+ "sha1 0.10.6",
  "yasna",
 ]
 
@@ -3517,7 +3524,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3763,6 +3770,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.0",
+ "digest 0.11.2",
+]
+
+[[package]]
 name = "sha1_smol"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3931,7 +3949,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.52.0",
  "windows-sys 0.59.0",
 ]
 
@@ -5406,7 +5423,7 @@ dependencies = [
  "memchr",
  "pbkdf2",
  "ppmd-rust",
- "sha1",
+ "sha1 0.10.6",
  "time",
  "typed-path",
  "zeroize",
