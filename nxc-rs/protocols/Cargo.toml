@@ -27,7 +27,7 @@ bytes = "1.11.1"
 des = { workspace = true }
 suppaftp = { workspace = true }
 rand = { workspace = true }
-redis = { version = "0.27", features = ["tokio-comp"] }
+redis = { version = "1.2", features = ["tokio-comp"] }
 mysql_async = "0.36"
 tokio-postgres = "0.7"
 snmp = "0.2"
