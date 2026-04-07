@@ -229,9 +229,38 @@ pub const UUID_DRSUAPI: [u8; 16] = [
     0x35, 0x42, 0x51, 0xe3, 0x06, 0x4b, 0xd1, 0x11, 0xab, 0x04, 0x00, 0xc0, 0x4f, 0xc2, 0xdc, 0xd2,
 ];
 
+// Encrypting File System Remote (EFSR)
+pub const UUID_EFSR: [u8; 16] = [
+    0x88, 0xd4, 0x81, 0xc6, 0x50, 0xd8, 0xd0, 0x11, 0x8c, 0x52, 0x00, 0xc0, 0x4f, 0xd9, 0x0f, 0x7e,
+];
+
 pub mod drsuapi {
     pub const DRS_BIND: u16 = 0;
     pub const DRS_GET_NC_CHANGES: u16 = 3;
+}
+
+pub mod efsr {
+    pub const EFSRPC_OPEN_FILE_RAW: u16 = 0;
+
+    pub fn build_efsrpc_open_file_raw(target_path: &str) -> Vec<u8> {
+        let mut buf = Vec::new();
+        // FileName (Pointer + string)
+        buf.extend_from_slice(&0x00020000u32.to_le_bytes()); // Pointer
+        
+        let path_u16: Vec<u16> = target_path.encode_utf16().chain(std::iter::once(0)).collect();
+        // Array lengths for NDR string
+        buf.extend_from_slice(&(path_u16.len() as u32).to_le_bytes()); // Max count
+        buf.extend_from_slice(&0u32.to_le_bytes()); // Offset
+        buf.extend_from_slice(&(path_u16.len() as u32).to_le_bytes()); // Actual count
+        for u in path_u16 {
+            buf.extend_from_slice(&u.to_le_bytes());
+        }
+        while buf.len() % 4 != 0 { buf.push(0); } // align
+        
+        // Flags
+        buf.extend_from_slice(&0u32.to_le_bytes());
+        buf
+    }
 }
 
 // Server Service (SRVSVC)

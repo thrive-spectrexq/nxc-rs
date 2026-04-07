@@ -47,6 +47,8 @@ pub mod zerologon;
 pub mod nopac;
 pub mod dpapi;
 pub mod execute_assembly;
+pub mod spider_plus;
+pub mod coerce_plus;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -273,6 +275,12 @@ impl ModuleRegistry {
 
         let execute_assembly: Box<dyn NxcModule> = Box::new(execute_assembly::ExecuteAssembly::new());
         modules.insert("execute-assembly".into(), execute_assembly);
+
+        let spider_plus: Box<dyn NxcModule> = Box::new(spider_plus::SpiderPlus::new());
+        modules.insert("spider_plus".into(), spider_plus);
+
+        let coerce_plus: Box<dyn NxcModule> = Box::new(coerce_plus::CoercePlus::new());
+        modules.insert("coerce_plus".into(), coerce_plus);
 
         Self { modules }
     }
