@@ -46,6 +46,7 @@ pub mod printerbug;
 pub mod zerologon;
 pub mod nopac;
 pub mod dpapi;
+pub mod execute_assembly;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -269,6 +270,9 @@ impl ModuleRegistry {
 
         let dpapi: Box<dyn NxcModule> = Box::new(dpapi::Dpapi::new());
         modules.insert("dpapi".into(), dpapi);
+
+        let execute_assembly: Box<dyn NxcModule> = Box::new(execute_assembly::ExecuteAssembly::new());
+        modules.insert("execute-assembly".into(), execute_assembly);
 
         Self { modules }
     }
