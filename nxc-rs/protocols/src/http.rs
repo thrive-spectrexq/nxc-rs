@@ -13,6 +13,7 @@ pub struct HttpSession {
     pub target: String,
     pub port: u16,
     pub admin: bool,
+    pub use_ssl: bool,
     pub client: Client,
     pub credentials: Option<Credentials>,
 }
@@ -77,7 +78,7 @@ impl NxcProtocol for HttpProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["iot_cam", "http_paths"] // Allows the IoT cam and path discovery modules to hook in
+        &["iot_cam", "http_paths", "web_crawler", "web_fuzzer", "web_vuln", "vhost_enum", "cms_enum", "graphql_enum", "waf_detect", "web_auth_brute", "cors_vuln", "web_dav", "method_fuzz", "lfi_fuzzer", "ssrf_fuzzer", "jwt_audit"] 
     }
 
     async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
@@ -98,6 +99,7 @@ impl NxcProtocol for HttpProtocol {
             target: target.to_string(),
             port,
             admin: false,
+            use_ssl: self.use_ssl,
             client,
             credentials: None,
         }))

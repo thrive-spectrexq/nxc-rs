@@ -1320,18 +1320,29 @@ async fn main() -> Result<()> {
     println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed());
 
     // ── Handle Exports ──
+    let report = reporting::Report {
+        timestamp: Utc::now().to_rfc3339(),
+        protocol: protocol_name.to_string(),
+        results: results.clone(),
+    };
+
+    // 1. Automatic Workspace Reporting
+    let ws_reports_dir = dot_nxc.join("workspaces").join(workspace).join("reports");
+    if let Ok(_) = std::fs::create_dir_all(&ws_reports_dir) {
+        let filename = format!("report_{}_{}.json", protocol_name, Utc::now().format("%Y%m%d_%H%M%S"));
+        let report_path = ws_reports_dir.join(filename);
+        if let Ok(_) = reporting::export_json(report_path.to_str().unwrap(), &report) {
+            // Silently saved to workspace
+        }
+    }
+
+    // 2. User-requested Exports
     if let Some(format) = sub_matches.get_one::<String>("export") {
         let mut path = sub_matches.get_one::<String>("export-path").unwrap().to_string();
         if !path.ends_with(format) {
             path = format!("{}.{}", path, format);
         }
         
-        let report = reporting::Report {
-            timestamp: Utc::now().to_rfc3339(),
-            protocol: protocol_name.to_string(),
-            results: results.clone(),
-        };
-
         let res = match format.as_str() {
             "json" => reporting::export_json(&path, &report),
             "csv" => reporting::export_csv(&path, &results),

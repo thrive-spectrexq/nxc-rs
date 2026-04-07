@@ -201,6 +201,7 @@ pub struct ExecutionResult {
     pub admin: bool,
     pub message: String,
     pub duration_ms: u64,
+    pub module_data: std::collections::HashMap<String, serde_json::Value>,
 }
 
 /// The concurrent execution engine.
@@ -284,6 +285,7 @@ impl ExecutionEngine {
                                     admin: false,
                                     message: format!("Connection failed: {}", e),
                                     duration_ms: start_time.elapsed().as_millis() as u64,
+                                    module_data: std::collections::HashMap::new(),
                                 }
                             }
                         };
@@ -334,6 +336,7 @@ impl ExecutionEngine {
                                 }
 
                                 // Execute modules if requested
+                                let mut module_data = std::collections::HashMap::new();
                                 if auth_res.success && !modules.is_empty() {
                                     let registry = nxc_modules::ModuleRegistry::new();
                                     for module_name in &modules {
@@ -342,6 +345,7 @@ impl ExecutionEngine {
                                                 Ok(mod_res) => {
                                                     if mod_res.success {
                                                         final_message.push_str(&format!(" | Module {}: {}", module_name, mod_res.output));
+                                                        module_data.insert(module_name.clone(), mod_res.data);
                                                         
                                                         // Save module-discovered credentials to DB
                                                         if let Some(ref db_instance) = db_clone {
@@ -385,6 +389,7 @@ impl ExecutionEngine {
                                     admin: auth_res.admin,
                                     message: final_message,
                                     duration_ms: start_time.elapsed().as_millis() as u64,
+                                    module_data,
                                 }
                             }
                             Err(e) => ExecutionResult {
@@ -395,6 +400,7 @@ impl ExecutionEngine {
                                 admin: false,
                                 message: format!("Auth error: {}", e),
                                 duration_ms: start_time.elapsed().as_millis() as u64,
+                                module_data: std::collections::HashMap::new(),
                             },
                         }
                     })
@@ -413,6 +419,7 @@ impl ExecutionEngine {
                             admin: false,
                             message: "Timeout".to_string(),
                             duration_ms: start_time.elapsed().as_millis() as u64,
+                            module_data: std::collections::HashMap::new(),
                         },
                     }
                 });

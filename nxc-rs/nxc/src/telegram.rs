@@ -44,7 +44,7 @@ const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_TARGET_HISTORY: usize = 20;
 const AUTH_ENGINE_VERSION: &str = "2.0 (Kerberos V5 + PKINIT + NTLM SSP)";
 const SUPPORTED_PROTOCOLS: usize = 18;
-const SUPPORTED_MODULES: usize = 32;
+const SUPPORTED_MODULES: usize = 67;
 
 // --- 🔐 Security & Access Control ---
 
@@ -645,7 +645,8 @@ async fn ui_send_dashboard(bot: Bot, msg: Message) -> Result<(), teloxide::Reque
         <b>Operational Command Matrix:</b>\n\n\
         🚀 <b>Deploy:</b> /run /smb /ssh /ldap /winrm /mssql /rdp /wmi\n\
         ⚡ <b>Automation:</b> /ai (LLM-powered discovery & execution)\n\
-        🌐 <b>Extend:</b> /ftp /nfs /http /mysql /pgsql /redis /snmp /smtp\n\
+        🌐 <b>Web & Extend:</b> /http /ftp /nfs /mysql /pgsql /redis /snmp /smtp\n\
+        🕸️ <b>Web Arsenal:</b> /run http --vuln (Detects SQLi, XSS, SSRF)\n\
         🐚 <b>Interactive:</b> /shell (persistent access on last target)\n\
         🔍 <b>Intel:</b> /search /modules /protocols\n\
         🔐 <b>Auth Engine:</b> /authinfo /kerberos /nthash\n\
@@ -693,10 +694,15 @@ async fn ui_send_handbook(bot: Bot, msg: Message) -> Result<(), teloxide::Reques
         • Pass-the-Hash: <code>-u admin -H &lt;nt_hash&gt;</code>\n\
         • Kerberos Forge: <code>-k --aes-key &lt;key&gt; --kdc-host &lt;dc&gt;</code>\n\
         • Credential Spray: <code>-u users.txt -p pass.txt</code> (Brute-force mode)\n\n\
-        <b>3. Protocol &amp; Module Deployment</b>\n\
+        <b>3. Protocol & Module Deployment</b>\n\
         Execute tasks with <code>/run &lt;proto&gt; &lt;target&gt; [options]</code>\n\
         Attach offensive payloads with <code>-M &lt;module_name&gt;</code>\n\n\
-        <b>4. Strategic Options</b>\n\
+        <b>4. Specialized Web Reconnaissance</b>\n\
+        • SQLi/XSS Audit: <code>/http &lt;target&gt; -M web_vuln</code>\n\
+        • VHost Enumeration: <code>/http &lt;target&gt; -M vhost_enum</code>\n\
+        • CMS Discovery: <code>/http &lt;target&gt; -M cms_enum</code>\n\
+        • Spider/Crawl: <code>/http &lt;target&gt; -M web_crawler</code>\n\n\
+        <b>5. Strategic Options</b>\n\
         • Speed: <code>--threads 500</code> (Max concurrency)\n\
         • Stealth: <code>--jitter 1500</code> (Avoid detection)\n\
         • Persistence: <code>--continue-on-success</code> (Keep trying)\n\n\
@@ -1425,6 +1431,11 @@ async fn engine_perform_task(argv: Vec<String>) -> anyhow::Result<String> {
             "{:<3} {:<18} | {:<12} | {}\n",
             tag, r.target, r.username, r.message
         ));
+
+        // Include structured module data if present
+        for (mod_name, data) in &r.module_data {
+            report.push_str(&format!("    └── [Module: {}] Data: {}\n", mod_name, data));
+        }
     }
     report.push_str("──────────────────────────────────────────────\n");
     let ok = raw_results.iter().filter(|x| x.success).count();

@@ -145,7 +145,7 @@ impl NxcProtocol for RdpProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["nla_screenshot", "screenshot"] // Standard RDP enumeration modules
+        &["nla_screenshot", "screenshot", "rdp_sec_check"] // Standard RDP enumeration modules
     }
 
     async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {

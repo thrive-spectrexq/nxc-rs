@@ -680,7 +680,9 @@ impl NxcProtocol for SmbProtocol {
     fn name(&self) -> &'static str { "smb" }
     fn default_port(&self) -> u16 { 445 }
     fn supports_exec(&self) -> bool { true }
-    fn supported_modules(&self) -> &[&str] { &["enum_shares", "secretsdump", "sam", "smbexec", "ntds"] }
+    fn supported_modules(&self) -> &[&str] {
+        &["smbexec", "sam", "lsa", "ntds", "zerologon", "petitpotam", "coerce_plus", "printerbug", "dpapi", "lsassy", "spider_plus", "execute_assembly", "adcs", "enum_shares", "smb_ghost"]
+    }
 
     async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
         let stream = crate::connection::connect(target, port, proxy).await?.into_std()?;
