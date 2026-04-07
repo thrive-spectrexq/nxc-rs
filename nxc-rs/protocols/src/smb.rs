@@ -134,6 +134,19 @@ impl std::fmt::Display for ShareInfo {
     }
 }
 
+// ─── SMB File Info ─────────────────────────────────────────────
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct FileInfo {
+    pub name: String,
+    pub is_dir: bool,
+    pub size: u64,
+    pub ctime: u64,
+    pub mtime: u64,
+    pub atime: u64,
+}
+
+
 // ─── SMB Protocol Handler ───────────────────────────────────────
 
 pub struct SmbProtocol {
@@ -237,6 +250,34 @@ impl SmbProtocol {
         let status = u32::from_le_bytes(resp[8..12].try_into()?);
         if status != 0 { return Err(anyhow::anyhow!("Query directory failed: 0x{:08x}", status)); }
         self.parse_query_directory_response(&resp)
+    }
+
+    pub async fn list_directory_detailed(&self, session: &SmbSession, share: &str, dir_path: &str) -> Result<Vec<FileInfo>> {
+        debug!("SMB: Listing detailed directory '{}' on share '{}'", dir_path, share);
+        let tree_id = self.tree_connect(session, share).await?;
+        let fid = self.create_file(session, tree_id, dir_path, 0x00000001, 0x00100081).await?;
+        let packet = {
+            let mut p = self.build_smb2_query_directory_request(fid);
+            p[36..40].copy_from_slice(&tree_id.to_le_bytes());
+            p[40..48].copy_from_slice(&session.session_id.to_le_bytes());
+            p
+        };
+        
+        let resp = {
+            let mut lock = session.stream.lock().await;
+            let stream = lock.as_mut().ok_or_else(|| anyhow::anyhow!("No active stream"))?;
+            Self::send_smb2_packet(stream, &packet)?;
+            Self::recv_smb2_packet(stream)?
+        };
+        
+        let _ = self.close_file(session, tree_id, &fid).await;
+        let status = u32::from_le_bytes(resp[8..12].try_into()?);
+        if status != 0 { 
+            // 0x80000006 is STATUS_NO_MORE_FILES or similar in some cases, just return empty
+            if status == 0x80000006 { return Ok(Vec::new()); }
+            return Err(anyhow::anyhow!("Query directory failed: 0x{:08x}", status)); 
+        }
+        self.parse_query_directory_detailed_response(&resp)
     }
 
     // --- Core SMB2 Primitives ---
@@ -477,6 +518,43 @@ impl SmbProtocol {
             if cur + 64 + name_len > off + len { break; }
             let name = String::from_utf16_lossy(&data[cur+64..cur+64+name_len].chunks_exact(2).map(|c| u16::from_le_bytes([c[0],c[1]])).collect::<Vec<u16>>());
             if name != "." && name != ".." { entries.push(name); }
+            if next_off == 0 { break; }
+            cur += next_off;
+        }
+        Ok(entries)
+    }
+
+    fn parse_query_directory_detailed_response(&self, data: &[u8]) -> Result<Vec<FileInfo>> {
+        let mut entries = Vec::new();
+        if data.len() < 72 { return Ok(entries); }
+        let off = u16::from_le_bytes(data[64..66].try_into()?) as usize;
+        let len = u32::from_le_bytes(data[68..72].try_into()?) as usize;
+        if off + len > data.len() { return Ok(entries); }
+        let mut cur = off;
+        while cur + 64 <= off + len {
+            let next_off = u32::from_le_bytes(data[cur..cur+4].try_into()?) as usize;
+            
+            let ctime = u64::from_le_bytes(data[cur+8..cur+16].try_into()?);
+            let atime = u64::from_le_bytes(data[cur+16..cur+24].try_into()?);
+            let mtime = u64::from_le_bytes(data[cur+24..cur+32].try_into()?);
+            let eof_size = u64::from_le_bytes(data[cur+40..cur+48].try_into()?);
+            let attrs = u32::from_le_bytes(data[cur+56..cur+60].try_into()?);
+            let is_dir = (attrs & 0x10) != 0; // FILE_ATTRIBUTE_DIRECTORY
+            
+            let name_len = u32::from_le_bytes(data[cur+60..cur+64].try_into()?) as usize;
+            if cur + 64 + name_len > off + len { break; }
+            let name = String::from_utf16_lossy(&data[cur+64..cur+64+name_len].chunks_exact(2).map(|c| u16::from_le_bytes([c[0],c[1]])).collect::<Vec<u16>>());
+            
+            if name != "." && name != ".." { 
+                entries.push(FileInfo {
+                    name,
+                    is_dir,
+                    size: eof_size,
+                    ctime,
+                    mtime,
+                    atime,
+                });
+            }
             if next_off == 0 { break; }
             cur += next_off;
         }
