@@ -201,13 +201,7 @@ impl NxcProtocol for LdapProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &[
-            "whoami",
-            "laps",
-            "enum_dns",
-            "kerberoasting",
-            "asreproasting",
-        ]
+        &["ldap_ad", "bloodhound", "asreproasting", "kerberoasting", "laps", "gmsa", "enum_dns", "ldap_ma_quota"]
     }
 
     async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {

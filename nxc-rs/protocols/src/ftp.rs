@@ -78,7 +78,7 @@ impl NxcProtocol for FtpProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["ls", "get", "put"]
+        &["ls", "get", "put", "ftp_anon"]
     }
 
     async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {

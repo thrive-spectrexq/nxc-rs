@@ -49,6 +49,27 @@ pub mod dpapi;
 pub mod execute_assembly;
 pub mod spider_plus;
 pub mod coerce_plus;
+pub mod web_crawler;
+pub mod web_fuzzer;
+pub mod web_vuln;
+pub mod vhost_enum;
+pub mod cms_enum;
+pub mod graphql_enum;
+pub mod waf_detect;
+pub mod web_auth_brute;
+pub mod cors_vuln;
+pub mod web_dav;
+pub mod method_fuzz;
+pub mod lfi_fuzzer;
+pub mod ssrf_fuzzer;
+pub mod jwt_audit;
+pub mod ldap_ma_quota;
+pub mod smb_ghost;
+pub mod mssql_privesc;
+pub mod mssql_unc;
+pub mod ftp_anon;
+pub mod rdp_sec_check;
+pub mod ssh_auth_methods;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -281,6 +302,69 @@ impl ModuleRegistry {
 
         let coerce_plus: Box<dyn NxcModule> = Box::new(coerce_plus::CoercePlus::new());
         modules.insert("coerce_plus".into(), coerce_plus);
+
+        let web_crawler: Box<dyn NxcModule> = Box::new(web_crawler::WebCrawler::new());
+        modules.insert("web_crawler".into(), web_crawler);
+
+        let web_fuzzer: Box<dyn NxcModule> = Box::new(web_fuzzer::WebFuzzer::new());
+        modules.insert("web_fuzzer".into(), web_fuzzer);
+
+        let web_vuln: Box<dyn NxcModule> = Box::new(web_vuln::WebVuln::new());
+        modules.insert("web_vuln".into(), web_vuln);
+
+        let vhost_enum: Box<dyn NxcModule> = Box::new(vhost_enum::VhostEnum::new());
+        modules.insert("vhost_enum".into(), vhost_enum);
+
+        let cms_enum: Box<dyn NxcModule> = Box::new(cms_enum::CmsEnum::new());
+        modules.insert("cms_enum".into(), cms_enum);
+
+        let graphql_enum: Box<dyn NxcModule> = Box::new(graphql_enum::GraphqlEnum::new());
+        modules.insert("graphql_enum".into(), graphql_enum);
+
+        let waf_detect: Box<dyn NxcModule> = Box::new(waf_detect::WafDetect::new());
+        modules.insert("waf_detect".into(), waf_detect);
+
+        let web_auth_brute: Box<dyn NxcModule> = Box::new(web_auth_brute::WebAuthBrute::new());
+        modules.insert("web_auth_brute".into(), web_auth_brute);
+
+        let cors_vuln: Box<dyn NxcModule> = Box::new(cors_vuln::CorsVuln::new());
+        modules.insert("cors_vuln".into(), cors_vuln);
+
+        let web_dav: Box<dyn NxcModule> = Box::new(web_dav::WebDav::new());
+        modules.insert("web_dav".into(), web_dav);
+
+        let method_fuzz: Box<dyn NxcModule> = Box::new(method_fuzz::MethodFuzz::new());
+        modules.insert("method_fuzz".into(), method_fuzz);
+
+        let lfi_fuzzer: Box<dyn NxcModule> = Box::new(lfi_fuzzer::LfiFuzzer::new());
+        modules.insert("lfi_fuzzer".into(), lfi_fuzzer);
+
+        let ssrf_fuzzer: Box<dyn NxcModule> = Box::new(ssrf_fuzzer::SsrfFuzzer::new());
+        modules.insert("ssrf_fuzzer".into(), ssrf_fuzzer);
+
+        let jwt_audit: Box<dyn NxcModule> = Box::new(jwt_audit::JwtAudit::new());
+        modules.insert("jwt_audit".into(), jwt_audit);
+
+        let ldap_ma_quota: Box<dyn NxcModule> = Box::new(ldap_ma_quota::LdapMaQuota::new());
+        modules.insert("ldap_ma_quota".into(), ldap_ma_quota);
+
+        let smb_ghost: Box<dyn NxcModule> = Box::new(smb_ghost::SmbGhost::new());
+        modules.insert("smb_ghost".into(), smb_ghost);
+
+        let mssql_privesc: Box<dyn NxcModule> = Box::new(mssql_privesc::MssqlPrivesc::new());
+        modules.insert("mssql_privesc".into(), mssql_privesc);
+
+        let mssql_unc: Box<dyn NxcModule> = Box::new(mssql_unc::MssqlUnc::new());
+        modules.insert("mssql_unc".into(), mssql_unc);
+
+        let ftp_anon: Box<dyn NxcModule> = Box::new(ftp_anon::FtpAnon::new());
+        modules.insert("ftp_anon".into(), ftp_anon);
+
+        let rdp_sec_check: Box<dyn NxcModule> = Box::new(rdp_sec_check::RdpSecCheck::new());
+        modules.insert("rdp_sec_check".into(), rdp_sec_check);
+
+        let ssh_auth_methods: Box<dyn NxcModule> = Box::new(ssh_auth_methods::SshAuthMethods::new());
+        modules.insert("ssh_auth_methods".into(), ssh_auth_methods);
 
         Self { modules }
     }

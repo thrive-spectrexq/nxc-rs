@@ -199,7 +199,7 @@ impl NxcProtocol for SshProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &[]
+        &["ssh_auth_methods"]
     }
 
     async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {

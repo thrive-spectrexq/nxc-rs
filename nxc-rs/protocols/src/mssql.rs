@@ -81,7 +81,7 @@ impl NxcProtocol for MssqlProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["enum_logins", "enum_databases", "mssql_enum"]
+        &["enum_logins", "enum_databases", "mssql_enum", "mssql_privesc", "mssql_unc"]
     }
 
     async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
