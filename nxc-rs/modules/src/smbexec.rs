@@ -2,10 +2,10 @@
 //!
 //! Executes commands on a remote Windows host by creating a temporary service.
 
+use crate::{ModuleOptions, ModuleResult, NxcModule};
 use anyhow::Result;
 use async_trait::async_trait;
 use nxc_protocols::NxcSession;
-use crate::{ModuleOptions, ModuleResult, NxcModule};
 use tracing::info;
 
 pub struct SmbExec;
@@ -50,14 +50,17 @@ impl NxcModule for SmbExec {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let cmd = opts.get("CMD").ok_or_else(|| anyhow::anyhow!("CMD option is required"))?;
-        
+        let cmd = opts
+            .get("CMD")
+            .ok_or_else(|| anyhow::anyhow!("CMD option is required"))?;
+
         info!("SmbExec: Running '{}' on {}", cmd, session.target());
-        
+
         // SmbProtocol::execute handles the heavy lifting of SVCCTL orchestration
         let output_stdout = "Executed via smbexec service. Output requires named pipe reader.";
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: output_stdout.into(),
             data: serde_json::json!({
                 "stdout": output_stdout,

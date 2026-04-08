@@ -35,14 +35,12 @@ impl NxcModule for WebCrawler {
     }
 
     fn options(&self) -> Vec<ModuleOption> {
-        vec![
-            ModuleOption {
-                name: "DEPTH".to_string(),
-                description: "Maximum crawl depth".to_string(),
-                required: false,
-                default: Some("2".to_string()),
-            },
-        ]
+        vec![ModuleOption {
+            name: "DEPTH".to_string(),
+            description: "Maximum crawl depth".to_string(),
+            required: false,
+            default: Some("2".to_string()),
+        }]
     }
 
     async fn run(
@@ -57,9 +55,15 @@ impl NxcModule for WebCrawler {
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         let base_url = format!("{}://{}:{}", scheme, http_sess.target, http_sess.port);
-        let max_depth = opts.get("DEPTH").and_then(|s| s.parse::<usize>().ok()).unwrap_or(2);
+        let max_depth = opts
+            .get("DEPTH")
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(2);
 
-        info!("Starting web crawl against {} up to depth {}", base_url, max_depth);
+        info!(
+            "Starting web crawl against {} up to depth {}",
+            base_url, max_depth
+        );
 
         let mut visited = HashSet::new();
         let mut queue = vec![(base_url.clone(), 0)];
@@ -85,10 +89,12 @@ impl NxcModule for WebCrawler {
                 if let Ok(text) = res.text().await {
                     // Extremely basic regex-free extraction for speed & portability
                     // Extract hrefs
-                    let hrefs: Vec<&str> = text.split("href=\"").skip(1)
+                    let hrefs: Vec<&str> = text
+                        .split("href=\"")
+                        .skip(1)
                         .filter_map(|s| s.split('\"').next())
                         .collect();
-                    
+
                     for href in hrefs {
                         if href.starts_with("http") && href.contains(&http_sess.target) {
                             queue.push((href.to_string(), depth + 1));
@@ -98,17 +104,21 @@ impl NxcModule for WebCrawler {
                     }
 
                     // Extract JS scripts
-                    let scripts: Vec<&str> = text.split("src=\"").skip(1)
+                    let scripts: Vec<&str> = text
+                        .split("src=\"")
+                        .skip(1)
                         .filter_map(|s| s.split('\"').next())
                         .filter(|s| s.ends_with(".js"))
                         .collect();
-                    
+
                     for script in scripts {
                         js_files.insert(script.to_string());
                     }
 
                     // Extract crude emails
-                    let mailtos: Vec<&str> = text.split("mailto:").skip(1)
+                    let mailtos: Vec<&str> = text
+                        .split("mailto:")
+                        .skip(1)
                         .filter_map(|s| s.split('\"').next())
                         .collect();
                     for mailto in mailtos {
@@ -120,7 +130,10 @@ impl NxcModule for WebCrawler {
 
         let mut output = String::from("Crawl Results:\n");
         output.push_str(&format!("  [*] Total Scraped URLs: {}\n", visited.len()));
-        output.push_str(&format!("  [*] JavaScript Files Discovered: {}\n", js_files.len()));
+        output.push_str(&format!(
+            "  [*] JavaScript Files Discovered: {}\n",
+            js_files.len()
+        ));
         output.push_str(&format!("  [*] Emails Discovered: {}\n", emails.len()));
 
         if !emails.is_empty() {

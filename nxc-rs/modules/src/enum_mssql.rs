@@ -140,7 +140,8 @@ impl NxcModule for MssqlEnum {
         }
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: output_lines.join("\n"),
             data: serde_json::Value::Object(data),
         })

@@ -26,7 +26,11 @@ impl NxcModule for RedisInfo {
         &["redis"]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         let redis_sess = session
             .as_any()
             .downcast_ref::<RedisSession>()
@@ -36,7 +40,8 @@ impl NxcModule for RedisInfo {
         let info = protocol.get_info(redis_sess).await?;
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: info.clone(),
             data: serde_json::json!({ "info": info }),
         })

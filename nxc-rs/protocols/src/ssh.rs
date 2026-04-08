@@ -202,7 +202,12 @@ impl NxcProtocol for SshProtocol {
         &["ssh_auth_methods"]
     }
 
-    async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         let target_owned = target.to_string();
         let timeout = self.timeout;
@@ -369,8 +374,15 @@ impl NxcProtocol for SshProtocol {
         Ok(result)
     }
 
-    async fn read_file(&self, session: &dyn NxcSession, _share: &str, path: &str) -> Result<Vec<u8>> {
-        let ssh_sess = session.downcast_ref::<SshSession>().ok_or_else(|| anyhow::anyhow!("Invalid session"))?;
+    async fn read_file(
+        &self,
+        session: &dyn NxcSession,
+        _share: &str,
+        path: &str,
+    ) -> Result<Vec<u8>> {
+        let ssh_sess = session
+            .downcast_ref::<SshSession>()
+            .ok_or_else(|| anyhow::anyhow!("Invalid session"))?;
         if let Some(ref s) = ssh_sess.session {
             let sftp = s.sftp()?;
             let mut file = sftp.open(std::path::Path::new(path))?;
@@ -382,8 +394,16 @@ impl NxcProtocol for SshProtocol {
         }
     }
 
-    async fn write_file(&self, session: &dyn NxcSession, _share: &str, path: &str, data: &[u8]) -> Result<()> {
-        let ssh_sess = session.downcast_ref::<SshSession>().ok_or_else(|| anyhow::anyhow!("Invalid session"))?;
+    async fn write_file(
+        &self,
+        session: &dyn NxcSession,
+        _share: &str,
+        path: &str,
+        data: &[u8],
+    ) -> Result<()> {
+        let ssh_sess = session
+            .downcast_ref::<SshSession>()
+            .ok_or_else(|| anyhow::anyhow!("Invalid session"))?;
         if let Some(ref s) = ssh_sess.session {
             let sftp = s.sftp()?;
             let mut file = sftp.create(std::path::Path::new(path))?;

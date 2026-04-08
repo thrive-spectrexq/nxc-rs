@@ -36,7 +36,11 @@ pub struct AiAgent {
 }
 
 impl AiAgent {
-    pub fn new(provider: Box<dyn AiProvider>, tools: ToolRegistry, feedback: Box<dyn AgentFeedback>) -> Self {
+    pub fn new(
+        provider: Box<dyn AiProvider>,
+        tools: ToolRegistry,
+        feedback: Box<dyn AgentFeedback>,
+    ) -> Self {
         Self {
             provider,
             tools,
@@ -70,13 +74,26 @@ Guidelines:
             });
 
             // Get tool definitions for the provider
-            let tool_defs: Vec<_> = self.tools.all().iter().map(|t| crate::providers::ToolDefinition {
-                name: t.name().to_string(),
-                description: t.description().to_string(),
-                parameters: t.parameters(),
-            }).collect();
+            let tool_defs: Vec<_> = self
+                .tools
+                .all()
+                .iter()
+                .map(|t| crate::providers::ToolDefinition {
+                    name: t.name().to_string(),
+                    description: t.description().to_string(),
+                    parameters: t.parameters(),
+                })
+                .collect();
 
-            let resp = self.provider.complete(system_prompt, &current_user_prompt, &self.history, &tool_defs).await?;
+            let resp = self
+                .provider
+                .complete(
+                    system_prompt,
+                    &current_user_prompt,
+                    &self.history,
+                    &tool_defs,
+                )
+                .await?;
 
             // Unify thought and tool calls into a single Assistant message for Gemini compatibility
             let mut assistant_msg = Message {
@@ -104,15 +121,18 @@ Guidelines:
             let mut tool_results = Vec::new();
             for tc in &resp.tool_calls {
                 self.feedback.on_tool_call(&tc.name, &tc.arguments).await?;
-                
-                let tool = self.tools.get(&tc.name).context(format!("Tool not found: {}", tc.name))?;
+
+                let tool = self
+                    .tools
+                    .get(&tc.name)
+                    .context(format!("Tool not found: {}", tc.name))?;
                 let args: Value = serde_json::from_str(&tc.arguments)?;
-                
+
                 let result = tool.call(args).await?;
                 let result_str = serde_json::to_string(&result)?;
-                
+
                 self.feedback.on_tool_result(&tc.name, &result_str).await?;
-                
+
                 tool_results.push(ToolResult {
                     call_id: tc.name.clone(),
                     content: result_str,
@@ -127,7 +147,8 @@ Guidelines:
             });
 
             // Continue the loop with a prompt to process tool results
-            current_user_prompt = "Process the tool results and provide a summary or the next step.".to_string();
+            current_user_prompt =
+                "Process the tool results and provide a summary or the next step.".to_string();
         }
 
         Ok(())

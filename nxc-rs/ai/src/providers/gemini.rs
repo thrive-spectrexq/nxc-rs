@@ -45,7 +45,7 @@ impl AiProvider for GeminiProvider {
         let mut contents = Vec::new();
 
         // System instruction is handled separately in Gemini v1beta
-        // But for simplicity/compatibility we can prepended to history if needed, 
+        // But for simplicity/compatibility we can prepended to history if needed,
         // however Gemini has a system_instruction field.
 
         for msg in history {
@@ -127,8 +127,11 @@ impl AiProvider for GeminiProvider {
         }
 
         let gemini_resp: GeminiResponse = resp.json().await?;
-        
-        let candidate = gemini_resp.candidates.get(0).context("No candidates in Gemini response")?;
+
+        let candidate = gemini_resp
+            .candidates
+            .get(0)
+            .context("No candidates in Gemini response")?;
         let mut text: Option<String> = None;
         let mut tool_calls = Vec::new();
 

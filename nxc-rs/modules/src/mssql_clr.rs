@@ -8,8 +8,8 @@
 use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use nxc_protocols::NxcSession;
 use nxc_protocols::mssql::{MssqlProtocol, MssqlSession};
+use nxc_protocols::NxcSession;
 use serde_json::json;
 
 pub struct MssqlClr;
@@ -35,23 +35,27 @@ impl NxcModule for MssqlClr {
     }
 
     fn options(&self) -> Vec<ModuleOption> {
-        vec![
-            ModuleOption {
-                name: "action".into(),
-                description: "Action: enable, list, disable".into(),
-                required: false,
-                default: Some("list".into()),
-            },
-        ]
+        vec![ModuleOption {
+            name: "action".into(),
+            description: "Action: enable, list, disable".into(),
+            required: false,
+            default: Some("list".into()),
+        }]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
-        let mssql_sess = session.as_any().downcast_ref::<MssqlSession>()
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
+        let mssql_sess = session
+            .as_any()
+            .downcast_ref::<MssqlSession>()
             .ok_or_else(|| anyhow!("Invalid session type"))?;
-            
+
         let proto = MssqlProtocol::new();
         let action = opts.get("action").map(|s| s.as_str()).unwrap_or("list");
-        
+
         let mut output = String::new();
         let mut results = json!({});
 
@@ -68,10 +72,15 @@ impl NxcModule for MssqlClr {
             }
             "list" | _ => {
                 let assemblies = self.list_assemblies(&proto, mssql_sess).await?;
-                output.push_str(&format!("\n[+] Loaded Assemblies ({}):\n", assemblies.len()));
+                output.push_str(&format!(
+                    "\n[+] Loaded Assemblies ({}):\n",
+                    assemblies.len()
+                ));
                 for ass in &assemblies {
-                    output.push_str(&format!("  - {} (Permissions: {})\n", 
-                        ass["name"], ass["permission_set"]));
+                    output.push_str(&format!(
+                        "  - {} (Permissions: {})\n",
+                        ass["name"], ass["permission_set"]
+                    ));
                 }
                 results["assemblies"] = json!(assemblies);
             }
@@ -99,8 +108,13 @@ impl MssqlClr {
         Ok(())
     }
 
-    async fn list_assemblies(&self, proto: &MssqlProtocol, session: &MssqlSession) -> Result<Vec<serde_json::Value>> {
-        let sql = "SELECT name, permission_set_desc as permission_set, create_date FROM sys.assemblies";
+    async fn list_assemblies(
+        &self,
+        proto: &MssqlProtocol,
+        session: &MssqlSession,
+    ) -> Result<Vec<serde_json::Value>> {
+        let sql =
+            "SELECT name, permission_set_desc as permission_set, create_date FROM sys.assemblies";
         proto.query_json(session, sql).await
     }
 }

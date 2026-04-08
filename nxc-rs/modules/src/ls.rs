@@ -40,7 +40,9 @@ impl NxcModule for FtpLs {
     fn options(&self) -> Vec<crate::ModuleOption> {
         vec![crate::ModuleOption {
             name: "PATH".to_string(),
-            description: "Remote share and path to list (e.g. C$\\Windows). If not specified, lists shares.".to_string(),
+            description:
+                "Remote share and path to list (e.g. C$\\Windows). If not specified, lists shares."
+                    .to_string(),
             required: false,
             default: None,
         }]
@@ -68,41 +70,50 @@ impl FtpLs {
 
         let protocol = nxc_protocols::ftp::FtpProtocol::new();
         let mut output_lines = Vec::new();
-        
-        match protocol.list_files(&ftp_sess.target, ftp_sess.port, &ftp_sess.credentials).await {
+
+        match protocol
+            .list_files(&ftp_sess.target, ftp_sess.port, &ftp_sess.credentials)
+            .await
+        {
             Ok(files) => {
                 for file in files {
                     output_lines.push(format!("  {}", file));
                 }
                 Ok(ModuleResult {
-                    credentials: vec![], success: true,
+                    credentials: vec![],
+                    success: true,
                     output: output_lines.join("\n"),
                     data: serde_json::json!({ "files": output_lines }),
                 })
             }
             Err(e) => Ok(ModuleResult {
-                credentials: vec![], success: false,
+                credentials: vec![],
+                success: false,
                 output: format!("Failed to list files: {}", e),
                 data: serde_json::Value::Null,
             }),
         }
     }
 
-    async fn run_smb(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run_smb(
+        &self,
+        session: &mut dyn NxcSession,
+        opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         let smb_sess = session
             .as_any()
             .downcast_ref::<nxc_protocols::smb::SmbSession>()
             .ok_or_else(|| anyhow::anyhow!("Invalid session type for SMB ls"))?;
 
         let protocol = nxc_protocols::smb::SmbProtocol::new();
-        
+
         if let Some(path_full) = opts.get("PATH") {
             // Split path into share and subpath (e.g. C$\Windows -> share=C$, path=Windows)
             let (share, path) = match path_full.split_once('\\') {
                 Some((s, p)) => (s, p),
                 None => (path_full.as_str(), ""),
             };
-            
+
             match protocol.list_directory(smb_sess, share, path).await {
                 Ok(entries) => {
                     let mut output = format!("Listing entries in {}\\{}:\n", share, path);
@@ -110,13 +121,15 @@ impl FtpLs {
                         output.push_str(&format!("  {}\n", entry));
                     }
                     Ok(ModuleResult {
-                        credentials: vec![], success: true,
+                        credentials: vec![],
+                        success: true,
                         output,
                         data: serde_json::json!({ "entries": entries }),
                     })
                 }
                 Err(e) => Ok(ModuleResult {
-                    credentials: vec![], success: false,
+                    credentials: vec![],
+                    success: false,
                     output: format!("Failed to list directory: {}", e),
                     data: serde_json::Value::Null,
                 }),
@@ -130,13 +143,15 @@ impl FtpLs {
                         output.push_str(&format!("  {}\n", share));
                     }
                     Ok(ModuleResult {
-                        credentials: vec![], success: true,
+                        credentials: vec![],
+                        success: true,
                         output,
                         data: serde_json::json!({ "shares": shares }),
                     })
                 }
                 Err(e) => Ok(ModuleResult {
-                    credentials: vec![], success: false,
+                    credentials: vec![],
+                    success: false,
                     output: format!("Failed to list shares: {}", e),
                     data: serde_json::Value::Null,
                 }),

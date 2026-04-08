@@ -107,11 +107,25 @@ impl NxcModule for Laps {
             ));
         } else {
             for entry in &entries {
-                let name = entry.attrs.get("name").and_then(|v| v.first()).cloned().unwrap_or_default();
-                let sam = entry.attrs.get("sAMAccountName").and_then(|v| v.first()).cloned().unwrap_or_default();
-                
+                let name = entry
+                    .attrs
+                    .get("name")
+                    .and_then(|v| v.first())
+                    .cloned()
+                    .unwrap_or_default();
+                let sam = entry
+                    .attrs
+                    .get("sAMAccountName")
+                    .and_then(|v| v.first())
+                    .cloned()
+                    .unwrap_or_default();
+
                 let mut expiration = "Never".to_string();
-                if let Some(exp_str) = entry.attrs.get("msLAPS-PasswordExpirationTime").and_then(|v| v.first()) {
+                if let Some(exp_str) = entry
+                    .attrs
+                    .get("msLAPS-PasswordExpirationTime")
+                    .and_then(|v| v.first())
+                {
                     if let Ok(exp_val) = exp_str.parse::<i64>() {
                         // Windows FileTime is 100ns intervals since 1601-01-01
                         let secs = (exp_val / 10_000_000) - 11_644_473_600;
@@ -121,12 +135,24 @@ impl NxcModule for Laps {
                     }
                 }
 
-                let (version, password) = if let Some(p) = entry.attrs.get("ms-MCS-AdmPwd").and_then(|v| v.first()) {
+                let (version, password) = if let Some(p) =
+                    entry.attrs.get("ms-MCS-AdmPwd").and_then(|v| v.first())
+                {
                     ("Legacy", p.clone())
                 } else if let Some(p) = entry.attrs.get("msLAPS-Password").and_then(|v| v.first()) {
                     ("New-Clear", p.clone())
-                } else if let Some(p_bin) = entry.bin_attrs.get("msLAPS-EncryptedPassword").and_then(|v| v.first()) {
-                    ("New-Encrypted", format!("[Encrypted Blob: {}...]", hex::encode(&p_bin[..16.min(p_bin.len())])))
+                } else if let Some(p_bin) = entry
+                    .bin_attrs
+                    .get("msLAPS-EncryptedPassword")
+                    .and_then(|v| v.first())
+                {
+                    (
+                        "New-Encrypted",
+                        format!(
+                            "[Encrypted Blob: {}...]",
+                            hex::encode(&p_bin[..16.min(p_bin.len())])
+                        ),
+                    )
                 } else {
                     continue;
                 };
@@ -148,11 +174,15 @@ impl NxcModule for Laps {
         }
 
         if laps_results.is_empty() && !entries.is_empty() {
-            output_lines.push("Matched computers but could not read LAPS attributes (permission denied?)".to_string());
+            output_lines.push(
+                "Matched computers but could not read LAPS attributes (permission denied?)"
+                    .to_string(),
+            );
         }
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: output_lines.join("\n"),
             data: serde_json::json!(laps_results),
         })

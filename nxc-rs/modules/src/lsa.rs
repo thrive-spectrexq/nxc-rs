@@ -23,17 +23,30 @@ impl LsaModule {
 
 #[async_trait]
 impl NxcModule for LsaModule {
-    fn name(&self) -> &'static str { self.name }
-    fn description(&self) -> &'static str { self.description }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn name(&self) -> &'static str {
+        self.name
+    }
+    fn description(&self) -> &'static str {
+        self.description
+    }
+    fn supported_protocols(&self) -> &[&str] {
+        &["smb"]
+    }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
-        let smb_sess = session.as_any_mut().downcast_mut::<nxc_protocols::smb::SmbSession>()
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
+        let smb_sess = session
+            .as_any_mut()
+            .downcast_mut::<nxc_protocols::smb::SmbSession>()
             .ok_or_else(|| anyhow!("Module only supports SMB"))?;
-            
+
         if !smb_sess.admin {
             return Ok(ModuleResult {
-                credentials: vec![], success: false,
+                credentials: vec![],
+                success: false,
                 output: "Admin privileges required for LSA dumping".into(),
                 data: serde_json::Value::Null,
             });
@@ -46,7 +59,8 @@ impl NxcModule for LsaModule {
         output.push_str("   DefaultPassword: NXCPASSWORD123!\n");
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output,
             data: serde_json::Value::Null,
         })

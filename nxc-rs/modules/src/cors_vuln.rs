@@ -49,22 +49,18 @@ impl NxcModule for CorsVuln {
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         let base_url = format!("{}://{}:{}", scheme, http_sess.target, http_sess.port);
-        
+
         info!("Starting CORS configuration audit against {}", base_url);
 
         let suffix = format!("{}evil.com", scheme);
-        let test_origins = vec![
-            "https://evil.com".to_string(),
-            "null".to_string(),
-            suffix,
-        ];
+        let test_origins = vec!["https://evil.com".to_string(), "null".to_string(), suffix];
 
         let mut output = String::from("CORS Audit Results:\n");
         let mut vulnerabilities = Vec::new();
 
         for origin in &test_origins {
             let mut req = http_sess.client.get(&base_url).header("Origin", origin);
-            
+
             if let Some(creds) = &http_sess.credentials {
                 if let Some(pw) = &creds.password {
                     req = req.basic_auth(&creds.username, Some(pw));
@@ -74,13 +70,22 @@ impl NxcModule for CorsVuln {
             }
 
             if let Ok(res) = req.send().await {
-                let allow_origin = res.headers().get("Access-Control-Allow-Origin")
-                    .and_then(|v| v.to_str().ok()).unwrap_or("");
-                let allow_creds = res.headers().get("Access-Control-Allow-Credentials")
-                    .and_then(|v| v.to_str().ok()).unwrap_or("false");
+                let allow_origin = res
+                    .headers()
+                    .get("Access-Control-Allow-Origin")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("");
+                let allow_creds = res
+                    .headers()
+                    .get("Access-Control-Allow-Credentials")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("false");
 
                 if allow_origin == origin {
-                    output.push_str(&format!("  [!] VULNERABLE: Origin '{}' reflected in Access-Control-Allow-Origin.\n", origin));
+                    output.push_str(&format!(
+                        "  [!] VULNERABLE: Origin '{}' reflected in Access-Control-Allow-Origin.\n",
+                        origin
+                    ));
                     if allow_creds == "true" {
                         output.push_str("      -> CRITICAL: Access-Control-Allow-Credentials is true! Auth hijacking possible.\n");
                     }

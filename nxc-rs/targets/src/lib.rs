@@ -4,16 +4,16 @@
 //! drives the concurrent multi-target execution engine.
 
 use anyhow::Result;
+use chrono::Utc;
 use nxc_auth::Credentials;
+use nxc_db::{Credential, HostInfo, NxcDb};
 use nxc_protocols::NxcProtocol;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
-use nxc_db::{NxcDb, HostInfo, Credential};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
-use chrono::Utc;
 
 // ─── Target Types ───────────────────────────────────────────────
 
@@ -272,7 +272,11 @@ impl ExecutionEngine {
                         // Attempt connection
                         let target_str = target_clone.display();
                         let mut session = match protocol_clone
-                            .connect(&target_str, protocol_clone.default_port(), proxy_clone.as_deref())
+                            .connect(
+                                &target_str,
+                                protocol_clone.default_port(),
+                                proxy_clone.as_deref(),
+                            )
                             .await
                         {
                             Ok(s) => s,
@@ -297,25 +301,27 @@ impl ExecutionEngine {
                         {
                             Ok(auth_res) => {
                                 let mut final_message = auth_res.message.clone();
-                                
+
                                 // Save to database if successful and DB available
                                 let mut host_id = None;
                                 if let Some(ref db_instance) = db_clone {
                                     let now = Utc::now().timestamp();
-                                    host_id = db_instance.upsert_host(&HostInfo {
-                                        id: None,
-                                        workspace: db_instance.current_workspace().to_string(),
-                                        ip: target_clone.ip.to_string(),
-                                        hostname: target_clone.hostname.clone(),
-                                        domain: None, // Could be extracted from protocol sessions if they provide it
-                                        os: None,
-                                        os_version: None,
-                                        smb_signing: None,
-                                        signing_required: None,
-                                        is_dc: false,
-                                        first_seen: now,
-                                        last_seen: now,
-                                    }).ok();
+                                    host_id = db_instance
+                                        .upsert_host(&HostInfo {
+                                            id: None,
+                                            workspace: db_instance.current_workspace().to_string(),
+                                            ip: target_clone.ip.to_string(),
+                                            hostname: target_clone.hostname.clone(),
+                                            domain: None, // Could be extracted from protocol sessions if they provide it
+                                            os: None,
+                                            os_version: None,
+                                            smb_signing: None,
+                                            signing_required: None,
+                                            is_dc: false,
+                                            first_seen: now,
+                                            last_seen: now,
+                                        })
+                                        .ok();
 
                                     if auth_res.success {
                                         let _ = db_instance.add_credential(&Credential {
@@ -344,39 +350,78 @@ impl ExecutionEngine {
                                             match module.run(session.as_mut(), &module_opts).await {
                                                 Ok(mod_res) => {
                                                     if mod_res.success {
-                                                        final_message.push_str(&format!(" | Module {}: {}", module_name, mod_res.output));
-                                                        module_data.insert(module_name.clone(), mod_res.data);
-                                                        
+                                                        final_message.push_str(&format!(
+                                                            " | Module {}: {}",
+                                                            module_name, mod_res.output
+                                                        ));
+                                                        module_data.insert(
+                                                            module_name.clone(),
+                                                            mod_res.data,
+                                                        );
+
                                                         // Save module-discovered credentials to DB
                                                         if let Some(ref db_instance) = db_clone {
                                                             let now = Utc::now().timestamp();
                                                             for m_cred in mod_res.credentials {
-                                                                let _ = db_instance.upsert_credential(&Credential {
-                                                                    id: None,
-                                                                    workspace: db_instance.current_workspace().to_string(),
-                                                                    domain: m_cred.domain.clone(),
-                                                                    username: m_cred.username.clone(),
-                                                                    password: m_cred.password.clone(),
-                                                                    nt_hash: m_cred.nt_hash.clone(),
-                                                                    lm_hash: m_cred.lm_hash.clone(),
-                                                                    aes_128: m_cred.aes_128_key.clone(),
-                                                                    aes_256: m_cred.aes_256_key.clone(),
-                                                                    source: Some(format!("{}:{}", protocol_clone.name(), module_name)),
-                                                                    host_id,
-                                                                    created_at: now,
-                                                                });
+                                                                let _ = db_instance
+                                                                    .upsert_credential(
+                                                                        &Credential {
+                                                                            id: None,
+                                                                            workspace: db_instance
+                                                                                .current_workspace()
+                                                                                .to_string(),
+                                                                            domain: m_cred
+                                                                                .domain
+                                                                                .clone(),
+                                                                            username: m_cred
+                                                                                .username
+                                                                                .clone(),
+                                                                            password: m_cred
+                                                                                .password
+                                                                                .clone(),
+                                                                            nt_hash: m_cred
+                                                                                .nt_hash
+                                                                                .clone(),
+                                                                            lm_hash: m_cred
+                                                                                .lm_hash
+                                                                                .clone(),
+                                                                            aes_128: m_cred
+                                                                                .aes_128_key
+                                                                                .clone(),
+                                                                            aes_256: m_cred
+                                                                                .aes_256_key
+                                                                                .clone(),
+                                                                            source: Some(format!(
+                                                                                "{}:{}",
+                                                                                protocol_clone
+                                                                                    .name(),
+                                                                                module_name
+                                                                            )),
+                                                                            host_id,
+                                                                            created_at: now,
+                                                                        },
+                                                                    );
                                                             }
                                                         }
                                                     } else {
-                                                        final_message.push_str(&format!(" | Module {} Failed: {}", module_name, mod_res.output));
+                                                        final_message.push_str(&format!(
+                                                            " | Module {} Failed: {}",
+                                                            module_name, mod_res.output
+                                                        ));
                                                     }
                                                 }
                                                 Err(e) => {
-                                                    final_message.push_str(&format!(" | Module {} Error: {}", module_name, e));
+                                                    final_message.push_str(&format!(
+                                                        " | Module {} Error: {}",
+                                                        module_name, e
+                                                    ));
                                                 }
                                             }
                                         } else {
-                                            final_message.push_str(&format!(" | Module {} not found", module_name));
+                                            final_message.push_str(&format!(
+                                                " | Module {} not found",
+                                                module_name
+                                            ));
                                         }
                                     }
                                 }
@@ -516,7 +561,12 @@ mod tests {
                 &[]
             }
 
-            async fn connect(&self, target: &str, _port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+            async fn connect(
+                &self,
+                target: &str,
+                _port: u16,
+                _proxy: Option<&str>,
+            ) -> Result<Box<dyn NxcSession>> {
                 if target == "192.168.1.99" {
                     return Err(anyhow::anyhow!("Connection timeout mock"));
                 }
@@ -595,9 +645,9 @@ mod tests {
     async fn test_execution_engine_db_persistence() -> Result<()> {
         use anyhow::Result;
         use async_trait::async_trait;
-        use nxc_db::NxcDb;
-        use nxc_protocols::{NxcProtocol, NxcSession, CommandOutput};
         use nxc_auth::{AuthResult, Credentials};
+        use nxc_db::NxcDb;
+        use nxc_protocols::{CommandOutput, NxcProtocol, NxcSession};
         use std::sync::Arc;
         use tempfile::tempdir;
 
@@ -612,20 +662,47 @@ mod tests {
         struct MockProto;
         #[async_trait]
         impl NxcProtocol for MockProto {
-            fn name(&self) -> &'static str { "mock" }
-            fn default_port(&self) -> u16 { 0 }
-            fn supports_exec(&self) -> bool { false }
-            fn supported_modules(&self) -> &[&str] { &[] }
-            async fn connect(&self, target: &str, _port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
-                struct MockSess { t: String }
-                impl NxcSession for MockSess {
-                    fn protocol(&self) -> &'static str { "mock" }
-                    fn target(&self) -> &str { &self.t }
-                    fn is_admin(&self) -> bool { true }
-                    fn as_any(&self) -> &dyn std::any::Any { self }
-                    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+            fn name(&self) -> &'static str {
+                "mock"
+            }
+            fn default_port(&self) -> u16 {
+                0
+            }
+            fn supports_exec(&self) -> bool {
+                false
+            }
+            fn supported_modules(&self) -> &[&str] {
+                &[]
+            }
+            async fn connect(
+                &self,
+                target: &str,
+                _port: u16,
+                _proxy: Option<&str>,
+            ) -> Result<Box<dyn NxcSession>> {
+                struct MockSess {
+                    t: String,
                 }
-                Ok(Box::new(MockSess { t: target.to_string() }))
+                impl NxcSession for MockSess {
+                    fn protocol(&self) -> &'static str {
+                        "mock"
+                    }
+                    fn target(&self) -> &str {
+                        &self.t
+                    }
+                    fn is_admin(&self) -> bool {
+                        true
+                    }
+                    fn as_any(&self) -> &dyn std::any::Any {
+                        self
+                    }
+                    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+                        self
+                    }
+                }
+                Ok(Box::new(MockSess {
+                    t: target.to_string(),
+                }))
             }
             async fn authenticate(
                 &self,
@@ -634,7 +711,11 @@ mod tests {
             ) -> Result<AuthResult> {
                 Ok(AuthResult::success(true))
             }
-            async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
+            async fn execute(
+                &self,
+                _session: &dyn NxcSession,
+                _cmd: &str,
+            ) -> Result<CommandOutput> {
                 Err(anyhow::anyhow!("mock"))
             }
         }

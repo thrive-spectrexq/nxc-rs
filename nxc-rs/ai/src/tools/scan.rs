@@ -30,9 +30,11 @@ impl NxcTool for ScanTool {
     }
 
     async fn call(&self, args: Value) -> Result<Value> {
-        let targets_spec = args["targets"].as_str().context("Missing targets argument")?;
+        let targets_spec = args["targets"]
+            .as_str()
+            .context("Missing targets argument")?;
         let targets = parse_targets(targets_spec)?;
-        
+
         let mut results = Vec::new();
         for t in targets {
             results.push(json!({

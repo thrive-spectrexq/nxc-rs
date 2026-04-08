@@ -26,7 +26,11 @@ impl NxcModule for MysqlEnum {
         &["mysql"]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         let mysql_sess = session
             .as_any()
             .downcast_ref::<MysqlSession>()
@@ -36,7 +40,8 @@ impl NxcModule for MysqlEnum {
         let dbs = protocol.list_databases(mysql_sess).await?;
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: dbs.join(", "),
             data: serde_json::json!({ "databases": dbs }),
         })

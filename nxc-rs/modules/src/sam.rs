@@ -23,17 +23,30 @@ impl SamModule {
 
 #[async_trait]
 impl NxcModule for SamModule {
-    fn name(&self) -> &'static str { self.name }
-    fn description(&self) -> &'static str { self.description }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn name(&self) -> &'static str {
+        self.name
+    }
+    fn description(&self) -> &'static str {
+        self.description
+    }
+    fn supported_protocols(&self) -> &[&str] {
+        &["smb"]
+    }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
-        let smb_sess = session.as_any_mut().downcast_mut::<nxc_protocols::smb::SmbSession>()
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
+        let smb_sess = session
+            .as_any_mut()
+            .downcast_mut::<nxc_protocols::smb::SmbSession>()
             .ok_or_else(|| anyhow!("Module only supports SMB"))?;
-            
+
         if !smb_sess.admin {
             return Ok(ModuleResult {
-                credentials: vec![], success: false,
+                credentials: vec![],
+                success: false,
                 output: "Admin privileges required for SAM dumping".into(),
                 data: serde_json::Value::Null,
             });
@@ -43,13 +56,15 @@ impl NxcModule for SamModule {
         // In a real implementation, we'd use SmbProtocol methods here.
         // For now, we simulate the logic by calling a helper in SmbProtocol.
         // We'll update SmbProtocol shortly.
-        
+
         let mut output = String::new();
         output.push_str("[*] Dumping SAM hashes...\n");
-        
+
         // This is a simplified demo of how the logic flows
         output.push_str("Administrator:500:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::\n");
-        output.push_str("Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::\n");
+        output.push_str(
+            "Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::\n",
+        );
 
         let mut credentials = Vec::new();
         // In a real run, we'd parse this from the hive data:

@@ -34,14 +34,12 @@ impl NxcModule for SsrfFuzzer {
     }
 
     fn options(&self) -> Vec<ModuleOption> {
-        vec![
-            ModuleOption {
-                name: "PATH".to_string(),
-                description: "Endpoint to test (e.g. /proxy?url=)".to_string(),
-                required: true,
-                default: None,
-            },
-        ]
+        vec![ModuleOption {
+            name: "PATH".to_string(),
+            description: "Endpoint to test (e.g. /proxy?url=)".to_string(),
+            required: true,
+            default: None,
+        }]
     }
 
     async fn run(
@@ -55,10 +53,18 @@ impl NxcModule for SsrfFuzzer {
             .ok_or_else(|| anyhow!("Module requires an HTTP session"))?;
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
-        let base_path = opts.get("PATH").ok_or_else(|| anyhow!("PATH is required"))?;
-        let url = format!("{}://{}:{}{}", scheme, http_sess.target, http_sess.port, base_path);
-        
-        info!("Starting SSRF Fuzzing (Internal Port Reflection) against {}", url);
+        let base_path = opts
+            .get("PATH")
+            .ok_or_else(|| anyhow!("PATH is required"))?;
+        let url = format!(
+            "{}://{}:{}{}",
+            scheme, http_sess.target, http_sess.port, base_path
+        );
+
+        info!(
+            "Starting SSRF Fuzzing (Internal Port Reflection) against {}",
+            url
+        );
 
         let payloads = vec![
             "http://127.0.0.1:22",
@@ -75,7 +81,7 @@ impl NxcModule for SsrfFuzzer {
         for payload in payloads {
             let test_url = format!("{}{}", url, payload);
             let mut req = http_sess.client.get(&test_url);
-            
+
             // Note: injecting into X-Forwarded-For etc. usually triggers Blind SSRF,
             // but we are relying on explicit response banners for local SSH check
             req = req.header("X-Forwarded-For", "127.0.0.1");
@@ -92,7 +98,7 @@ impl NxcModule for SsrfFuzzer {
                 if let Ok(body) = res.text().await {
                     let mut found = false;
 
-                    // Standard SSH daemon banners 
+                    // Standard SSH daemon banners
                     // e.g. SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5
                     if body.contains("SSH-2.0-") || body.contains("Protocol mismatch") {
                         found = true;
@@ -100,10 +106,12 @@ impl NxcModule for SsrfFuzzer {
 
                     if found {
                         ssrf_found = true;
-                        output.push_str(&format!("  [!] VULNERABLE to Server-Side Request Forgery!\n"));
+                        output.push_str(&format!(
+                            "  [!] VULNERABLE to Server-Side Request Forgery!\n"
+                        ));
                         output.push_str(&format!("      Payload: {}\n", payload));
                         output.push_str(&format!("      Match  : Internal SSH Banner Reflected\n"));
-                        
+
                         results.push(json!({
                             "payload": payload,
                             "match": "SSH Banner"
@@ -114,7 +122,8 @@ impl NxcModule for SsrfFuzzer {
         }
 
         if !ssrf_found {
-            output.push_str("  [-] No SSRF internal network reflection detected on probed paths.\n");
+            output
+                .push_str("  [-] No SSRF internal network reflection detected on probed paths.\n");
         }
 
         Ok(ModuleResult {

@@ -71,9 +71,13 @@ impl NxcModule for WebFuzzer {
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         let base_url = format!("{}://{}:{}", scheme, http_sess.target, http_sess.port);
         let wordlist = opts.get("WORDLIST").map(|s| s.as_str()).unwrap_or("common");
-        let threads = opts.get("THREADS").and_then(|s| s.parse::<usize>().ok()).unwrap_or(50);
-        
-        let extensions: Vec<&str> = opts.get("EXT")
+        let threads = opts
+            .get("THREADS")
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(50);
+
+        let extensions: Vec<&str> = opts
+            .get("EXT")
             .map(|s| s.as_str())
             .unwrap_or("")
             .split(',')
@@ -81,16 +85,39 @@ impl NxcModule for WebFuzzer {
             .collect();
 
         let basic_words = vec![
-            "admin", "login", "api", "test", "backup", "db", "config", "dev", "staging",
-            "dashboard", "manager", "robots.txt", ".git/config", ".env", "server-status",
-            "phpmyadmin", "wp-login.php", "wp-admin", "old", "new", "v1", "v2"
+            "admin",
+            "login",
+            "api",
+            "test",
+            "backup",
+            "db",
+            "config",
+            "dev",
+            "staging",
+            "dashboard",
+            "manager",
+            "robots.txt",
+            ".git/config",
+            ".env",
+            "server-status",
+            "phpmyadmin",
+            "wp-login.php",
+            "wp-admin",
+            "old",
+            "new",
+            "v1",
+            "v2",
         ];
 
         let words: Vec<String> = if wordlist == "common" {
             basic_words.into_iter().map(|s| s.to_string()).collect()
         } else {
             match std::fs::read_to_string(wordlist) {
-                Ok(content) => content.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect(),
+                Ok(content) => content
+                    .lines()
+                    .map(|l| l.trim().to_string())
+                    .filter(|l| !l.is_empty())
+                    .collect(),
                 Err(_) => {
                     return Ok(ModuleResult {
                         success: false,
@@ -111,7 +138,12 @@ impl NxcModule for WebFuzzer {
             }
         }
 
-        info!("Starting web fuzzing against {} with {} words across {} threads...", base_url, target_paths.len(), threads);
+        info!(
+            "Starting web fuzzing against {} with {} words across {} threads...",
+            base_url,
+            target_paths.len(),
+            threads
+        );
 
         let sem = Arc::new(Semaphore::new(threads));
         let mut tasks = Vec::new();
@@ -121,7 +153,7 @@ impl NxcModule for WebFuzzer {
             let url = format!("{}{}", base_url, path);
             let client = http_sess.client.clone();
             let creds = http_sess.credentials.clone();
-            
+
             tasks.push(tokio::spawn(async move {
                 let mut req = client.get(&url);
                 if let Some(c) = creds {
@@ -131,31 +163,38 @@ impl NxcModule for WebFuzzer {
                         req = req.basic_auth(&c.username, None::<&str>);
                     }
                 }
-                
+
                 let res = req.send().await;
                 drop(permit);
-                
+
                 match res {
                     Ok(response) => {
                         let status = response.status();
-                        if status.is_success() || status.is_redirection() || status.as_u16() == 401 || status.as_u16() == 403 {
+                        if status.is_success()
+                            || status.is_redirection()
+                            || status.as_u16() == 401
+                            || status.as_u16() == 403
+                        {
                             let len = response.content_length().unwrap_or(0);
                             Some((path, status.as_u16(), len))
                         } else {
                             None
                         }
-                    },
-                    Err(_) => None
+                    }
+                    Err(_) => None,
                 }
             }));
         }
 
         let mut output = String::from("Discovery Results:\n");
         let mut found_list = Vec::new();
-        
+
         for task in tasks {
             if let Ok(Some((path, status, len))) = task.await {
-                output.push_str(&format!("  [+] {:<20} [Status: {}, Size: {} bytes]\n", path, status, len));
+                output.push_str(&format!(
+                    "  [+] {:<20} [Status: {}, Size: {} bytes]\n",
+                    path, status, len
+                ));
                 found_list.push(json!({ "path": path, "status": status, "size": len }));
             }
         }

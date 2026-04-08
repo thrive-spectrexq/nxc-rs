@@ -1,7 +1,7 @@
-use crate::{ModuleResult, NxcModule, ModuleOptions, ModuleOption};
-use nxc_protocols::NxcSession;
+use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 use anyhow::Result;
 use async_trait::async_trait;
+use nxc_protocols::NxcSession;
 use tracing::info;
 
 pub struct HttpPathsModule;
@@ -35,14 +35,27 @@ impl NxcModule for HttpPathsModule {
         }]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         info!("HTTP: Starting Path Discovery on {}...", session.target());
 
-        if let Some(http_sess) = session.as_any().downcast_ref::<nxc_protocols::http::HttpSession>() {
-            let protocol = nxc_protocols::http::HttpProtocol { use_ssl: false, verify_ssl: false }; // Defaults
-            
+        if let Some(http_sess) = session
+            .as_any()
+            .downcast_ref::<nxc_protocols::http::HttpSession>()
+        {
+            let protocol = nxc_protocols::http::HttpProtocol {
+                use_ssl: false,
+                verify_ssl: false,
+            }; // Defaults
+
             let default_paths = "/.git,/.env,/backup,/phpmyadmin,/admin,/config";
-            let paths_str = opts.get("PATHS").map(|s| s.as_str()).unwrap_or(default_paths);
+            let paths_str = opts
+                .get("PATHS")
+                .map(|s| s.as_str())
+                .unwrap_or(default_paths);
             let paths_vec: Vec<&str> = paths_str.split(',').collect();
 
             match protocol.enumerate_paths(http_sess, &paths_vec).await {
@@ -59,7 +72,8 @@ impl NxcModule for HttpPathsModule {
                         output.push_str("  [!] No sensitive paths discovered.");
                     }
                     return Ok(ModuleResult {
-                        credentials: vec![], success: true,
+                        credentials: vec![],
+                        success: true,
                         output,
                         data: serde_json::json!({ "found": found }),
                     });
@@ -69,7 +83,8 @@ impl NxcModule for HttpPathsModule {
         }
 
         Ok(ModuleResult {
-            credentials: vec![], success: false,
+            credentials: vec![],
+            success: false,
             output: "Invalid session type for http_paths".to_string(),
             data: serde_json::json!({}),
         })

@@ -44,7 +44,7 @@ impl SpiderPlus {
 
         for entry in entries {
             let entry_name_lower = entry.name.to_lowercase();
-            
+
             // Check exclusion filter for folder/file names
             if exclude_filter.iter().any(|f| entry_name_lower.contains(f)) {
                 continue;
@@ -59,17 +59,30 @@ impl SpiderPlus {
             if entry.is_dir {
                 // Recursive call for directories
                 let _ = Box::pin(self.spider_directory(
-                    smb, session, share, &current_path, depth - 1,
-                    max_size, exclude_exts, exclude_filter, download, output_dir, results
-                )).await;
+                    smb,
+                    session,
+                    share,
+                    &current_path,
+                    depth - 1,
+                    max_size,
+                    exclude_exts,
+                    exclude_filter,
+                    download,
+                    output_dir,
+                    results,
+                ))
+                .await;
             } else {
                 // Process file
-                results.insert(current_path.clone(), serde_json::json!({
-                    "size": entry.size,
-                    "ctime": entry.ctime,
-                    "mtime": entry.mtime,
-                    "atime": entry.atime,
-                }));
+                results.insert(
+                    current_path.clone(),
+                    serde_json::json!({
+                        "size": entry.size,
+                        "ctime": entry.ctime,
+                        "mtime": entry.mtime,
+                        "atime": entry.atime,
+                    }),
+                );
 
                 if download && entry.size <= max_size {
                     let ext = Path::new(&entry.name)
@@ -90,11 +103,11 @@ impl SpiderPlus {
                             save_path.push(session.target.clone());
                             save_path.push(share);
                             save_path.push(current_path.replace("\\", "/"));
-                            
+
                             if let Some(parent) = save_path.parent() {
                                 let _ = std::fs::create_dir_all(parent);
                             }
-                            
+
                             if let Err(e) = std::fs::write(&save_path, data) {
                                 error!("Failed to write downloaded file {:?}: {}", save_path, e);
                             }
@@ -145,7 +158,9 @@ impl NxcModule for SpiderPlus {
             },
             ModuleOption {
                 name: "EXCLUDE_FILTER".to_string(),
-                description: "Comma-separated strings to exclude folders/files (Default: print$,ipc$)".to_string(),
+                description:
+                    "Comma-separated strings to exclude folders/files (Default: print$,ipc$)"
+                        .to_string(),
                 required: false,
                 default: Some("print$,ipc$".to_string()),
             },
@@ -157,7 +172,8 @@ impl NxcModule for SpiderPlus {
             },
             ModuleOption {
                 name: "OUTPUT_FOLDER".to_string(),
-                description: "Path to save files and JSON metadata (Default: ./nxc_spider_plus)".to_string(),
+                description: "Path to save files and JSON metadata (Default: ./nxc_spider_plus)"
+                    .to_string(),
                 required: false,
                 default: Some("./nxc_spider_plus".to_string()),
             },
@@ -176,18 +192,29 @@ impl NxcModule for SpiderPlus {
             _ => return Err(anyhow::anyhow!("Module only supports SMB")),
         };
 
-        let download = opts.get("DOWNLOAD_FLAG").map(|v| v.to_lowercase() == "true").unwrap_or(false);
-        let max_size: u64 = opts.get("MAX_FILE_SIZE").and_then(|v| v.parse().ok()).unwrap_or(51200);
-        let output_folder = opts.get("OUTPUT_FOLDER").cloned().unwrap_or_else(|| "./nxc_spider_plus".to_string());
-        
-        let exclude_exts: HashSet<String> = opts.get("EXCLUDE_EXTS")
+        let download = opts
+            .get("DOWNLOAD_FLAG")
+            .map(|v| v.to_lowercase() == "true")
+            .unwrap_or(false);
+        let max_size: u64 = opts
+            .get("MAX_FILE_SIZE")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(51200);
+        let output_folder = opts
+            .get("OUTPUT_FOLDER")
+            .cloned()
+            .unwrap_or_else(|| "./nxc_spider_plus".to_string());
+
+        let exclude_exts: HashSet<String> = opts
+            .get("EXCLUDE_EXTS")
             .unwrap_or(&"ico,lnk".to_string())
             .split(',')
             .map(|s| s.trim().to_lowercase())
             .filter(|s| !s.is_empty())
             .collect();
-            
-        let exclude_filter: HashSet<String> = opts.get("EXCLUDE_FILTER")
+
+        let exclude_filter: HashSet<String> = opts
+            .get("EXCLUDE_FILTER")
             .unwrap_or(&"print$,ipc$".to_string())
             .split(',')
             .map(|s| s.trim().to_lowercase())
@@ -208,26 +235,40 @@ impl NxcModule for SpiderPlus {
                 if exclude_filter.iter().any(|f| share_name_lower.contains(f)) {
                     continue; // Skip excluded shares
                 }
-                
+
                 info!("Spidering share: {}", share.name);
                 let mut share_results = HashMap::new();
-                let _ = self.spider_directory(
-                    &protocol, smb_session, &share.name, "", depth,
-                    max_size, &exclude_exts, &exclude_filter, download, &output_folder,
-                    &mut share_results
-                ).await;
-                
+                let _ = self
+                    .spider_directory(
+                        &protocol,
+                        smb_session,
+                        &share.name,
+                        "",
+                        depth,
+                        max_size,
+                        &exclude_exts,
+                        &exclude_filter,
+                        download,
+                        &output_folder,
+                        &mut share_results,
+                    )
+                    .await;
+
                 all_results.insert(share.name.clone(), serde_json::json!(share_results));
             }
         }
 
-        let host_json_path = PathBuf::from(&output_folder).join(format!("{}.json", smb_session.target));
+        let host_json_path =
+            PathBuf::from(&output_folder).join(format!("{}.json", smb_session.target));
         let json_output = serde_json::json!(all_results);
         let _ = std::fs::write(&host_json_path, serde_json::to_string_pretty(&json_output)?);
 
         Ok(ModuleResult {
             success: true,
-            output: format!("Spidering completed. Metadata saved to {:?}", host_json_path),
+            output: format!(
+                "Spidering completed. Metadata saved to {:?}",
+                host_json_path
+            ),
             data: json_output,
             credentials: vec![],
         })

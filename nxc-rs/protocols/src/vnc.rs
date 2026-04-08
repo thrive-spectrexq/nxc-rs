@@ -85,7 +85,12 @@ impl NxcProtocol for VncProtocol {
         &["screenshot"]
     }
 
-    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        _proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         debug!("VNC: Connecting to {}", addr);
 
@@ -246,37 +251,51 @@ impl VncProtocol {
         // MsgType (1) + Padding (1) + Number of Rectangles (2)
         let mut msg_header = [0u8; 4];
         stream.read_exact(&mut msg_header).await?;
-        
+
         if msg_header[0] != 0 {
-            return Err(anyhow!("Expected FramebufferUpdate (0), got {}", msg_header[0]));
+            return Err(anyhow!(
+                "Expected FramebufferUpdate (0), got {}",
+                msg_header[0]
+            ));
         }
 
         let n_rects = u16::from_be_bytes([msg_header[2], msg_header[3]]);
-        info!("VNC: Receiving {} rectangles for {}x{} screenshot", n_rects, width, height);
+        info!(
+            "VNC: Receiving {} rectangles for {}x{} screenshot",
+            n_rects, width, height
+        );
 
         let mut fb_data = vec![0u8; (width as usize) * (height as usize) * 4];
         for _ in 0..n_rects {
             let mut rect_header = [0u8; 12];
             stream.read_exact(&mut rect_header).await?;
-            
+
             let x = u16::from_be_bytes([rect_header[0], rect_header[1]]);
             let y = u16::from_be_bytes([rect_header[2], rect_header[3]]);
             let w = u16::from_be_bytes([rect_header[4], rect_header[5]]);
             let h = u16::from_be_bytes([rect_header[6], rect_header[7]]);
-            let encoding = i32::from_be_bytes([rect_header[8], rect_header[9], rect_header[10], rect_header[11]]);
+            let encoding = i32::from_be_bytes([
+                rect_header[8],
+                rect_header[9],
+                rect_header[10],
+                rect_header[11],
+            ]);
 
-            if encoding == 0 { // Raw encoding
+            if encoding == 0 {
+                // Raw encoding
                 let pixel_data_len = (w as usize) * (h as usize) * 4;
                 let mut pixels = vec![0u8; pixel_data_len];
                 stream.read_exact(&mut pixels).await?;
-                
+
                 // Copy into fb_data at correct offset
                 for row in 0..(h as usize) {
                     let src_start = row * (w as usize) * 4;
                     let dst_start = ((y as usize + row) * (width as usize) + (x as usize)) * 4;
                     let copy_len = (w as usize) * 4;
-                    if dst_start + copy_len <= fb_data.len() && src_start + copy_len <= pixels.len() {
-                        fb_data[dst_start..dst_start+copy_len].copy_from_slice(&pixels[src_start..src_start+copy_len]);
+                    if dst_start + copy_len <= fb_data.len() && src_start + copy_len <= pixels.len()
+                    {
+                        fb_data[dst_start..dst_start + copy_len]
+                            .copy_from_slice(&pixels[src_start..src_start + copy_len]);
                     }
                 }
             }
@@ -286,16 +305,16 @@ impl VncProtocol {
             .duration_since(std::time::SystemTime::UNIX_EPOCH)?
             .as_secs();
         let path = format!("screenshots/vnc_{}_{}.png", vnc_sess.target, timestamp);
-        
+
         std::fs::create_dir_all("screenshots")?;
-        
+
         // VNC usually sends BGRA, convert to RGBA for PNG
         let mut rgba_data = fb_data.clone();
         for i in (0..rgba_data.len()).step_by(4) {
             let b = rgba_data[i];
-            let r = rgba_data[i+2];
+            let r = rgba_data[i + 2];
             rgba_data[i] = r;
-            rgba_data[i+2] = b;
+            rgba_data[i + 2] = b;
         }
 
         image::save_buffer(
@@ -304,7 +323,8 @@ impl VncProtocol {
             width as u32,
             height as u32,
             image::ColorType::Rgba8,
-        ).map_err(|e| anyhow!("Failed to save PNG: {}", e))?;
+        )
+        .map_err(|e| anyhow!("Failed to save PNG: {}", e))?;
 
         info!("VNC: Screenshot saved to {}", path);
         Ok(path)

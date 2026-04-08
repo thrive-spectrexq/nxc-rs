@@ -49,7 +49,7 @@ impl NxcModule for CmsEnum {
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         let base_url = format!("{}://{}:{}", scheme, http_sess.target, http_sess.port);
-        
+
         info!("Starting CMS enumeration against {}", base_url);
 
         let mut req = http_sess.client.get(&base_url);

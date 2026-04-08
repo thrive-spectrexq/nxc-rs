@@ -1,7 +1,7 @@
 use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use nxc_protocols::{mssql::MssqlSession, mssql::MssqlProtocol, NxcSession};
+use nxc_protocols::{mssql::MssqlProtocol, mssql::MssqlSession, NxcSession};
 use serde_json::json;
 use tracing::info;
 
@@ -47,11 +47,14 @@ impl NxcModule for MssqlPrivesc {
             .downcast_ref::<MssqlSession>()
             .ok_or_else(|| anyhow!("Module requires an MSSQL session"))?;
 
-        info!("Starting MSSQL Privilege Escalation checks on {}", mssql_sess.target);
+        info!(
+            "Starting MSSQL Privilege Escalation checks on {}",
+            mssql_sess.target
+        );
 
         let mut output = String::from("MSSQL Privilege Escalation Checks:\n");
         let mut privsec_found = false;
-        
+
         let protocol = MssqlProtocol::new();
         let mut findings = Vec::new();
 
@@ -93,8 +96,14 @@ impl NxcModule for MssqlPrivesc {
                 privsec_found = true;
                 output.push_str("  [!] TRUSTWORTHY Databases Found (potential privesc if dbo):\n");
                 for row in &res {
-                    let db_name = row.get("db_name").and_then(|v| v.as_str()).unwrap_or("UNKNOWN");
-                    let owner = row.get("owner_name").and_then(|v| v.as_str()).unwrap_or("UNKNOWN");
+                    let db_name = row
+                        .get("db_name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("UNKNOWN");
+                    let owner = row
+                        .get("owner_name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("UNKNOWN");
                     output.push_str(&format!("      -> DB: {}, Owner: {}\n", db_name, owner));
                     findings.push(json!({"type": "TRUSTWORTHY_DB", "db": db_name, "owner": owner}));
                 }

@@ -49,8 +49,11 @@ impl NxcModule for GraphqlEnum {
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         let base_url = format!("{}://{}:{}", scheme, http_sess.target, http_sess.port);
-        
-        info!("Starting GraphQL Introspection enumeration against {}", base_url);
+
+        info!(
+            "Starting GraphQL Introspection enumeration against {}",
+            base_url
+        );
 
         let endpoints = vec![
             "/graphql",
@@ -67,10 +70,12 @@ impl NxcModule for GraphqlEnum {
 
         for ep in endpoints {
             let url = format!("{}{}", base_url, ep);
-            let mut req = http_sess.client.post(&url)
+            let mut req = http_sess
+                .client
+                .post(&url)
                 .header("Content-Type", "application/json")
                 .body(introspection_query.to_owned());
-            
+
             if let Some(creds) = &http_sess.credentials {
                 if let Some(pw) = &creds.password {
                     req = req.basic_auth(&creds.username, Some(pw));
@@ -83,7 +88,10 @@ impl NxcModule for GraphqlEnum {
                 if res.status().is_success() {
                     if let Ok(body) = res.text().await {
                         if body.contains("__schema") && body.contains("queryType") {
-                            output.push_str(&format!("  [+] Introspection extracted successfully at: {}\n", url));
+                            output.push_str(&format!(
+                                "  [+] Introspection extracted successfully at: {}\n",
+                                url
+                            ));
                             found_schemas.push(json!({
                                 "endpoint": url,
                                 "schema": body
@@ -96,7 +104,9 @@ impl NxcModule for GraphqlEnum {
         }
 
         if found_schemas.is_empty() {
-            output.push_str("  [!] No accessible GraphQL endpoints found or introspection is disabled.\n");
+            output.push_str(
+                "  [!] No accessible GraphQL endpoints found or introspection is disabled.\n",
+            );
         }
 
         Ok(ModuleResult {

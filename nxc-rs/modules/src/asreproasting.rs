@@ -113,14 +113,25 @@ impl NxcModule for Asreproasting {
                     let checksum = hex::encode(&tgt.ticket_data[0..16.min(tgt.ticket_data.len())]);
                     let cipher = hex::encode(&tgt.ticket_data[16.min(tgt.ticket_data.len())..]);
 
-                    hash_output = format!("$krb5asrep$23${}@{}:{}${}", sam, domain, checksum, cipher);
+                    hash_output =
+                        format!("$krb5asrep$23${}@{}:{}${}", sam, domain, checksum, cipher);
                     tracing::info!("Extracted AS-REP Hash: {}", hash_output);
                 } else {
                     hash_output = "AS-REQ Failed (mocked)".to_string();
                 }
             }
 
-            output_lines.push(format!("{:<20} {:<20} {:<15} {}", sam, uac, pwd_last_set, if hash_output.starts_with("$krb") { "HASH EXTRACTED!" } else { "" }));
+            output_lines.push(format!(
+                "{:<20} {:<20} {:<15} {}",
+                sam,
+                uac,
+                pwd_last_set,
+                if hash_output.starts_with("$krb") {
+                    "HASH EXTRACTED!"
+                } else {
+                    ""
+                }
+            ));
             results.push(serde_json::json!({
                 "username": sam,
                 "uac": uac,
@@ -133,13 +144,22 @@ impl NxcModule for Asreproasting {
             output_lines.push("No ASREProastable users found.".to_string());
         }
 
-        let hashes_only: Vec<String> = results.iter()
-            .filter_map(|r| r["hash"].as_str().filter(|h| h.starts_with("$krb")).map(|h| h.to_string()))
+        let hashes_only: Vec<String> = results
+            .iter()
+            .filter_map(|r| {
+                r["hash"]
+                    .as_str()
+                    .filter(|h| h.starts_with("$krb"))
+                    .map(|h| h.to_string())
+            })
             .collect();
-        
+
         if !hashes_only.is_empty() {
             let file_path = std::env::current_dir()?.join("asreproastable.txt");
-            let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&file_path)?;
+            let mut file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&file_path)?;
             use std::io::Write;
             for h in hashes_only {
                 writeln!(file, "{}", h)?;
@@ -148,7 +168,8 @@ impl NxcModule for Asreproasting {
         }
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: output_lines.join("\n"),
             data: serde_json::json!(results),
         })

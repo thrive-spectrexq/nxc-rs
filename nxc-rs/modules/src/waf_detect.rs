@@ -49,8 +49,11 @@ impl NxcModule for WafDetect {
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         // Malicious payload to trigger WAF blocking behavior: a standard benign SQLi
-        let base_url = format!("{}://{}:{}/?id=1'+OR+'1'='1'--", scheme, http_sess.target, http_sess.port);
-        
+        let base_url = format!(
+            "{}://{}:{}/?id=1'+OR+'1'='1'--",
+            scheme, http_sess.target, http_sess.port
+        );
+
         info!("Starting WAF Detection against {}", base_url);
 
         let mut req = http_sess.client.get(&base_url);
@@ -67,12 +70,12 @@ impl NxcModule for WafDetect {
 
         if let Ok(res) = req.send().await {
             let status = res.status().as_u16();
-            
+
             for (key, value) in res.headers() {
                 if let Ok(val) = value.to_str() {
                     let k = key.as_str().to_lowercase();
                     let v = val.to_lowercase();
-                    
+
                     // Cloudflare
                     if k == "server" && v.contains("cloudflare") {
                         detected_waf = Some("Cloudflare");
@@ -93,7 +96,9 @@ impl NxcModule for WafDetect {
                         detected_waf = Some("Akamai");
                     }
                     // F5 BIG-IP
-                    if k == "server" && v.contains("big-ip") || k == "x-cnection" && v.contains("close") {
+                    if k == "server" && v.contains("big-ip")
+                        || k == "x-cnection" && v.contains("close")
+                    {
                         detected_waf = Some("F5 BIG-IP");
                     }
                     // Sucuri
@@ -110,7 +115,9 @@ impl NxcModule for WafDetect {
                         detected_waf = Some("Cloudflare");
                     } else if body.contains("Incapsula incident ID") {
                         detected_waf = Some("Imperva Incapsula");
-                    } else if body.contains("The Amazon CloudFront distribution is configured to block") {
+                    } else if body
+                        .contains("The Amazon CloudFront distribution is configured to block")
+                    {
                         detected_waf = Some("AWS WAF");
                     } else if body.contains("Access Denied") && body.contains("Reference #") {
                         detected_waf = Some("Akamai");
@@ -126,9 +133,10 @@ impl NxcModule for WafDetect {
         match &detected_waf {
             Some(waf) => {
                 output.push_str(&format!("  [!] WAF Detected: {}\n", waf));
-            },
+            }
             None => {
-                output.push_str("  [+] No standard WAF detected (or WAF didn't block signature).\n");
+                output
+                    .push_str("  [+] No standard WAF detected (or WAF didn't block signature).\n");
             }
         }
 

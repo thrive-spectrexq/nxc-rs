@@ -71,13 +71,15 @@ impl NfsShares {
                     }
                 }
                 Ok(ModuleResult {
-                    credentials: vec![], success: true,
+                    credentials: vec![],
+                    success: true,
                     output: output_lines.join("\n"),
                     data: serde_json::json!({ "shares": shares }),
                 })
             }
             Err(e) => Ok(ModuleResult {
-                credentials: vec![], success: false,
+                credentials: vec![],
+                success: false,
                 output: format!("Failed to list NFS exports: {}", e),
                 data: serde_json::Value::Null,
             }),
@@ -92,14 +94,15 @@ impl NfsShares {
 
         let protocol = nxc_protocols::smb::SmbProtocol::new();
         let shares = protocol.list_shares(smb_sess).await?;
-        
+
         let mut output = String::from("Available SMB Shares:\n");
         for share in &shares {
             output.push_str(&format!("  {}\n", share));
         }
-        
+
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output,
             data: serde_json::json!({ "shares": shares }),
         })

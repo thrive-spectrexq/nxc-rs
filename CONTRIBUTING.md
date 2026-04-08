@@ -65,6 +65,6 @@ If you're adding a new protocol, follow the patterns in `nxc-rs/protocols`. Ensu
 ## Community
 
 - Report bugs or request features via [GitHub Issues](https://github.com/thrive-spectrexq/nxc-rs/issues).
-- Discuss ideas in the [GitHub Discussions](https://github.com/thrive-spectrexq/nxc-rs/discussions) (if enabled).
+- Discuss ideas in the [GitHub Discussions](https://github.com/thrive-spectrexq/nxc-rs/discussions).
 
 Happy hacking!

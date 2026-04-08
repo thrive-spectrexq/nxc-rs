@@ -113,14 +113,25 @@ impl NxcGlobalOutput {
          {} {} {}
            {}   {}
 "#,
-            ".".cyan().bold(), ".".cyan().bold(),
-            ".|".cyan().bold(), "|.".cyan().bold(),
-            "||".cyan().bold(), "||".cyan().bold(),
-            "\\\\".cyan().bold(), "//".cyan().bold(),
-            ".[".cyan().bold(), " ".white().bold(), "].".cyan().bold(),
-            "/ /".cyan().bold(), "˙-˙".yellow().bold(), "\\ \\".cyan().bold(),
-            "˙".cyan().bold(), "\\ /".yellow().bold(), "˙".cyan().bold(),
-            "˙".cyan().bold(), "˙".cyan().bold()
+            ".".cyan().bold(),
+            ".".cyan().bold(),
+            ".|".cyan().bold(),
+            "|.".cyan().bold(),
+            "||".cyan().bold(),
+            "||".cyan().bold(),
+            "\\\\".cyan().bold(),
+            "//".cyan().bold(),
+            ".[".cyan().bold(),
+            " ".white().bold(),
+            "].".cyan().bold(),
+            "/ /".cyan().bold(),
+            "˙-˙".yellow().bold(),
+            "\\ \\".cyan().bold(),
+            "˙".cyan().bold(),
+            "\\ /".yellow().bold(),
+            "˙".cyan().bold(),
+            "˙".cyan().bold(),
+            "˙".cyan().bold()
         );
 
         let text = format!(

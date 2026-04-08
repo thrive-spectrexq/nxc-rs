@@ -3,10 +3,10 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
 
-pub mod scan;
-pub mod protocol;
 pub mod db;
 pub mod modules;
+pub mod protocol;
+pub mod scan;
 pub mod utils;
 
 #[async_trait]
