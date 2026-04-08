@@ -8,8 +8,8 @@ use anyhow::Result;
 use hmac::{Hmac, Mac};
 use md4::{Digest, Md4};
 use md5::Md5;
+use rc4::cipher::{KeyInit, StreamCipher};
 use rc4::Rc4;
-use rc4::cipher::{StreamCipher, KeyInit};
 use tracing::debug;
 
 use crate::Credentials;
@@ -21,20 +21,20 @@ type HmacMd5 = Hmac<Md5>;
 pub const NTLMSSP_SIGNATURE: &[u8; 8] = b"NTLMSSP\0";
 
 // Negotiate flags
-pub const NTLMSSP_NEGOTIATE_UNICODE: u32       = 0x00000001;
-pub const NTLMSSP_NEGOTIATE_OEM: u32           = 0x00000002;
-pub const NTLMSSP_REQUEST_TARGET: u32          = 0x00000004;
-pub const NTLMSSP_NEGOTIATE_SIGN: u32          = 0x00000010;
-pub const NTLMSSP_NEGOTIATE_SEAL: u32          = 0x00000020;
-pub const NTLMSSP_NEGOTIATE_LM_KEY: u32        = 0x00000080;
-pub const NTLMSSP_NEGOTIATE_NTLM: u32          = 0x00000200;
-pub const NTLMSSP_NEGOTIATE_ALWAYS_SIGN: u32   = 0x00008000;
+pub const NTLMSSP_NEGOTIATE_UNICODE: u32 = 0x00000001;
+pub const NTLMSSP_NEGOTIATE_OEM: u32 = 0x00000002;
+pub const NTLMSSP_REQUEST_TARGET: u32 = 0x00000004;
+pub const NTLMSSP_NEGOTIATE_SIGN: u32 = 0x00000010;
+pub const NTLMSSP_NEGOTIATE_SEAL: u32 = 0x00000020;
+pub const NTLMSSP_NEGOTIATE_LM_KEY: u32 = 0x00000080;
+pub const NTLMSSP_NEGOTIATE_NTLM: u32 = 0x00000200;
+pub const NTLMSSP_NEGOTIATE_ALWAYS_SIGN: u32 = 0x00008000;
 pub const NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY: u32 = 0x00080000;
-pub const NTLMSSP_NEGOTIATE_TARGET_INFO: u32   = 0x00800000;
-pub const NTLMSSP_NEGOTIATE_VERSION: u32       = 0x02000000;
-pub const NTLMSSP_NEGOTIATE_128: u32           = 0x20000000;
-pub const NTLMSSP_NEGOTIATE_KEY_EXCH: u32      = 0x40000000;
-pub const NTLMSSP_NEGOTIATE_56: u32            = 0x80000000;
+pub const NTLMSSP_NEGOTIATE_TARGET_INFO: u32 = 0x00800000;
+pub const NTLMSSP_NEGOTIATE_VERSION: u32 = 0x02000000;
+pub const NTLMSSP_NEGOTIATE_128: u32 = 0x20000000;
+pub const NTLMSSP_NEGOTIATE_KEY_EXCH: u32 = 0x40000000;
+pub const NTLMSSP_NEGOTIATE_56: u32 = 0x80000000;
 
 // Default negotiate flags for Type 1 message
 pub const DEFAULT_NEGOTIATE_FLAGS: u32 = NTLMSSP_NEGOTIATE_UNICODE
@@ -115,13 +115,17 @@ impl NtlmTargetInfo {
                 0x0003 => info.dns_computer_name = Some(decode_utf16(av_data)),
                 0x0004 => info.dns_domain_name = Some(decode_utf16(av_data)),
                 0x0005 => info.dns_tree_name = Some(decode_utf16(av_data)),
-                0x0006 if av_len >= 4 => info.flags = Some(u32::from_le_bytes([
-                    av_data[0], av_data[1], av_data[2], av_data[3],
-                ])),
-                0x0007 if av_len >= 8 => info.timestamp = Some(u64::from_le_bytes([
-                    av_data[0], av_data[1], av_data[2], av_data[3],
-                    av_data[4], av_data[5], av_data[6], av_data[7],
-                ])),
+                0x0006 if av_len >= 4 => {
+                    info.flags = Some(u32::from_le_bytes([
+                        av_data[0], av_data[1], av_data[2], av_data[3],
+                    ]))
+                }
+                0x0007 if av_len >= 8 => {
+                    info.timestamp = Some(u64::from_le_bytes([
+                        av_data[0], av_data[1], av_data[2], av_data[3], av_data[4], av_data[5],
+                        av_data[6], av_data[7],
+                    ]))
+                }
                 _ => {}
             }
 
@@ -261,15 +265,12 @@ impl NtlmAuthenticator {
         let domain = creds.domain.as_deref().unwrap_or("").to_string();
 
         // Use server timestamp if available, otherwise generate our own
-        let timestamp = challenge
-            .target_info
-            .timestamp
-            .unwrap_or_else(|| {
-                // Windows FILETIME: 100ns intervals since 1601-01-01
-                let epoch_diff: u64 = 116444736000000000; // difference between 1601 and 1970 in 100ns
-                let now = chrono::Utc::now().timestamp() as u64;
-                now * 10_000_000 + epoch_diff
-            });
+        let timestamp = challenge.target_info.timestamp.unwrap_or_else(|| {
+            // Windows FILETIME: 100ns intervals since 1601-01-01
+            let epoch_diff: u64 = 116444736000000000; // difference between 1601 and 1970 in 100ns
+            let now = chrono::Utc::now().timestamp() as u64;
+            now * 10_000_000 + epoch_diff
+        });
 
         let client_nonce = rand::random::<[u8; 8]>();
 
@@ -319,7 +320,8 @@ impl NtlmAuthenticator {
             if negotiate_flags & NTLMSSP_NEGOTIATE_KEY_EXCH != 0 {
                 let exported_key: [u8; 16] = rand::random();
                 let key_array: &[u8; 16] = session_base_key[..16].try_into().unwrap();
-                let mut rc4_key = Rc4::new_from_slice(key_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {}", e))?;
+                let mut rc4_key = Rc4::new_from_slice(key_array)
+                    .map_err(|e| anyhow::anyhow!("RC4 init fail: {}", e))?;
                 let mut encrypted = exported_key;
                 rc4_key.apply_keystream(&mut encrypted);
                 (exported_key.to_vec(), Some(encrypted.to_vec()))
@@ -530,7 +532,8 @@ pub fn calculate_nt_hash(password: &str) -> [u8; 16] {
 
 /// Calculate NTLMv2 hash: HMAC-MD5(NT_Hash, UPPERCASE(user) + UPPERCASE(domain)).
 pub fn calculate_v2_hash(username: &str, domain: &str, nt_hash: &[u8; 16]) -> [u8; 16] {
-    let mut hmac = <HmacMd5 as Mac>::new_from_slice(nt_hash).expect("HMAC can take key of any size");
+    let mut hmac =
+        <HmacMd5 as Mac>::new_from_slice(nt_hash).expect("HMAC can take key of any size");
     let identity = format!("{}{}", username.to_uppercase(), domain.to_uppercase());
     let utf16: Vec<u16> = identity.encode_utf16().collect();
     let bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
@@ -657,7 +660,10 @@ mod tests {
         // MsvAvNbDomainName (0x0002)
         data.extend_from_slice(&0x0002u16.to_le_bytes());
         let domain = "TEST";
-        let domain_u16: Vec<u8> = domain.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+        let domain_u16: Vec<u8> = domain
+            .encode_utf16()
+            .flat_map(|u| u.to_le_bytes())
+            .collect();
         data.extend_from_slice(&(domain_u16.len() as u16).to_le_bytes());
         data.extend_from_slice(&domain_u16);
         // MsvAvEOL

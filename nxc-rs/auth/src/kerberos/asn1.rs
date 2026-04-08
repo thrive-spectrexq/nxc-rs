@@ -9,8 +9,7 @@ pub type KerberosTime = GeneralizedTime;
 /// Kerberos uses GeneralString for realm/principal names, but in practice
 /// these are always ASCII. This helper creates a GeneralString from a Rust &str.
 pub fn krb_string(s: &str) -> GeneralString {
-    GeneralString::try_from(s)
-        .unwrap_or_else(|_| GeneralString::try_from("").unwrap())
+    GeneralString::try_from(s).unwrap_or_else(|_| GeneralString::try_from("").unwrap())
 }
 
 #[derive(AsnType, Encode, Decode, Debug, Clone)]

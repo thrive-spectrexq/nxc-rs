@@ -3,8 +3,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_protocols::{ssh::SshSession, NxcSession};
 use serde_json::json;
-use tracing::info;
 use std::net::TcpStream;
+use tracing::info;
 
 pub struct SshAuthMethods {}
 
@@ -35,14 +35,13 @@ impl NxcModule for SshAuthMethods {
     }
 
     fn options(&self) -> Vec<ModuleOption> {
-        vec![
-            ModuleOption {
-                name: "USERNAME".to_string(),
-                description: "Target user context to request properties for (default: root)".to_string(),
-                required: false,
-                default: Some("root".to_string()),
-            },
-        ]
+        vec![ModuleOption {
+            name: "USERNAME".to_string(),
+            description: "Target user context to request properties for (default: root)"
+                .to_string(),
+            required: false,
+            default: Some("root".to_string()),
+        }]
     }
 
     async fn run(
@@ -55,11 +54,18 @@ impl NxcModule for SshAuthMethods {
             .downcast_ref::<SshSession>()
             .ok_or_else(|| anyhow!("Module requires an SSH session"))?;
 
-        let username = opts.get("USERNAME").map(|s| s.as_str()).unwrap_or("root").to_string();
+        let username = opts
+            .get("USERNAME")
+            .map(|s| s.as_str())
+            .unwrap_or("root")
+            .to_string();
         let target = ssh_sess.target.clone();
         let port = ssh_sess.port;
 
-        info!("Enumerating supported SSH auth methods for '{}' on {}:{}", username, target, port);
+        info!(
+            "Enumerating supported SSH auth methods for '{}' on {}:{}",
+            username, target, port
+        );
 
         // SSH connections from ssh2 crate are blocking, so we use spawn_blocking (which is completely acceptable and common here)
         let result = tokio::task::spawn_blocking(move || -> Result<(String, bool, Vec<String>)> {

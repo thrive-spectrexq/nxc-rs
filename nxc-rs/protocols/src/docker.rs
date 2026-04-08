@@ -78,26 +78,29 @@ impl NxcProtocol for DockerProtocol {
         &["docker_enum", "registry_enum"]
     }
 
-    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        _proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         let is_registry = port == 5000;
         let addr = if is_registry {
-             format!("http://{}:{}/v2/", target, port)
+            format!("http://{}:{}/v2/", target, port)
         } else {
-             format!("http://{}:{}/version", target, port)
+            format!("http://{}:{}/version", target, port)
         };
 
         debug!("Docker: Checking connection to {}", addr);
 
-        let client = reqwest::Client::builder()
-            .timeout(self.timeout)
-            .build()?;
+        let client = reqwest::Client::builder().timeout(self.timeout).build()?;
 
         let resp = client.get(&addr).send().await;
         match resp {
             Ok(res) => {
                 let status = res.status();
                 info!("Docker: Response from {}: {}", addr, status);
-                
+
                 let is_unauth = status.is_success();
                 Ok(Box::new(DockerSession {
                     target: target.to_string(),
@@ -108,18 +111,18 @@ impl NxcProtocol for DockerProtocol {
                 }))
             }
             Err(e) => {
-                 if e.is_status() && e.status() == Some(reqwest::StatusCode::UNAUTHORIZED) {
-                      debug!("Docker: Service found, but authentication required.");
-                      Ok(Box::new(DockerSession {
+                if e.is_status() && e.status() == Some(reqwest::StatusCode::UNAUTHORIZED) {
+                    debug!("Docker: Service found, but authentication required.");
+                    Ok(Box::new(DockerSession {
                         target: target.to_string(),
                         port,
                         admin: false,
                         is_registry,
                         credentials: None,
                     }))
-                 } else {
-                      Err(anyhow!("Connection failed: {}", e))
-                 }
+                } else {
+                    Err(anyhow!("Connection failed: {}", e))
+                }
             }
         }
     }
@@ -138,20 +141,20 @@ impl NxcProtocol for DockerProtocol {
         let password = creds.password.as_deref().unwrap_or_default();
 
         let addr = if docker_sess.is_registry {
-             format!("http://{}:{}/v2/", docker_sess.target, docker_sess.port)
+            format!("http://{}:{}/v2/", docker_sess.target, docker_sess.port)
         } else {
-             format!("http://{}:{}/version", docker_sess.target, docker_sess.port)
+            format!("http://{}:{}/version", docker_sess.target, docker_sess.port)
         };
 
         debug!("Docker: Authenticating as {} at {}", username, addr);
 
-        let client = reqwest::Client::builder()
-            .timeout(self.timeout)
-            .build()?;
+        let client = reqwest::Client::builder().timeout(self.timeout).build()?;
 
-        let resp = client.get(&addr)
+        let resp = client
+            .get(&addr)
             .basic_auth(username, Some(password))
-            .send().await;
+            .send()
+            .await;
 
         match resp {
             Ok(res) if res.status().is_success() => {
@@ -172,24 +175,28 @@ impl NxcProtocol for DockerProtocol {
     }
 
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput> {
-         let docker_sess = match session.protocol() {
+        let docker_sess = match session.protocol() {
             "docker" => unsafe { &*(session as *const dyn NxcSession as *const DockerSession) },
             _ => return Err(anyhow!("Invalid session type")),
         };
 
         if docker_sess.is_registry {
-             return Err(anyhow!("Docker Registry does not support command execution"));
+            return Err(anyhow!(
+                "Docker Registry does not support command execution"
+            ));
         }
 
         if !docker_sess.admin {
-             return Err(anyhow!("Authentication or admin access required for Docker API execution"));
+            return Err(anyhow!(
+                "Authentication or admin access required for Docker API execution"
+            ));
         }
 
         // Implementation of Docker API exec would go here.
         // 1. POST /containers/{id}/exec
         // 2. POST /exec/{id}/start
         // For now, return a placeholder as it requires a container ID.
-        
+
         Ok(CommandOutput {
             stdout: format!("Docker execution of '{}' requires an active container ID. Use docker_enum to find containers.", cmd),
             stderr: String::new(),
@@ -201,27 +208,30 @@ impl NxcProtocol for DockerProtocol {
 impl DockerProtocol {
     /// List repositories (Registry) or containers (API).
     pub async fn enumerate(&self, session: &DockerSession) -> Result<String> {
-        let client = reqwest::Client::builder()
-            .timeout(self.timeout)
-            .build()?;
+        let client = reqwest::Client::builder().timeout(self.timeout).build()?;
 
         let mut req = if session.is_registry {
-             client.get(format!("http://{}:{}/v2/_catalog", session.target, session.port))
+            client.get(format!(
+                "http://{}:{}/v2/_catalog",
+                session.target, session.port
+            ))
         } else {
-             client.get(format!("http://{}:{}/containers/json?all=1", session.target, session.port))
+            client.get(format!(
+                "http://{}:{}/containers/json?all=1",
+                session.target, session.port
+            ))
         };
 
         if let Some(ref creds) = session.credentials {
-             req = req.basic_auth(&creds.username, creds.password.as_deref());
+            req = req.basic_auth(&creds.username, creds.password.as_deref());
         }
 
         let resp = req.send().await?;
         if resp.status().is_success() {
-             let body = resp.text().await?;
-             Ok(body)
+            let body = resp.text().await?;
+            Ok(body)
         } else {
-             Err(anyhow!("Enumeration failed: {}", resp.status()))
+            Err(anyhow!("Enumeration failed: {}", resp.status()))
         }
     }
 }
-

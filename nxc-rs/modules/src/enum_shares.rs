@@ -87,7 +87,8 @@ impl NxcModule for EnumShares {
         }
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: output_lines.join("\n"),
             data: serde_json::json!(share_data),
         })

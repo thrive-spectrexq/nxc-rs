@@ -2,9 +2,7 @@
 
 [![Release](https://img.shields.io/github/v/release/thrive-spectrexq/nxc-rs?color=blue&style=flat-square)](https://github.com/thrive-spectrexq/nxc-rs/releases)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/thrive-spectrexq/nxc-rs/build-binaries.yml?branch=master&style=flat-square)](https://github.com/thrive-spectrexq/nxc-rs/actions)
-[![License](https://img.shields.io/badge/license-Custom-orange.svg?style=flat-square)](LICENSE)
-
-**NetExec-RS** is a high-performance, pure Rust reimplementation of the legendary [NetExec](https://github.com/Pennyw0rth/NetExec). It is a "Swiss army knife" for network assessment, designed for penetration testers and red teamers to automate credential spraying, service enumeration, and post-exploitation across multiple protocols.
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg?style=flat-square)](LICENSE)
 
 ---
 
@@ -170,7 +168,7 @@ NetExec-RS is designed with a layered approach for maximum maintainability:
 
 ## License & Disclaimer
 
-Distributed under a Custom Proprietary License. See [LICENSE](LICENSE) for more information.
+Distributed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE) for more information.
 
 ### Legal Disclaimer
-**NetExec-RS is for authorized security testing only.** Use of this tool for attacking targets without prior mutual consent is illegal. It is the end user's responsibility to obey all applicable local, state, and federal laws. Developers assume no liability and are not responsible for any misuse or damage caused by this program.
+**NetExec-RS is for educational purposes and authorized security testing only.** Use of this tool for attacking targets without prior mutual consent is illegal. It is the end user's responsibility to obey all applicable local, state, and federal laws. Developers assume no liability and are not responsible for any misuse or damage caused by this program.

@@ -3,73 +3,73 @@
 //! Modules are Rust structs implementing `NxcModule`, compiled into the binary.
 //! They are invoked per-protocol with `-M <module> [-o KEY=VALUE]` flags.
 
-pub mod gmsa;
-pub mod adcs;
-pub mod bloodhound;
-pub mod wmi_enum;
-pub mod wmi_persist;
-pub mod lsassy;
-pub mod dcshadow;
-pub mod sam;
-pub mod lsa;
-pub mod scripting;
-pub mod psrp;
 pub mod adb_screenshot;
 pub mod adb_shell;
+pub mod adcs;
 pub mod asreproasting;
+pub mod bloodhound;
+pub mod cms_enum;
+pub mod coerce_plus;
+pub mod cors_vuln;
+pub mod dcshadow;
+pub mod docker_enum;
+pub mod dpapi;
 pub mod enum_dns;
-pub mod secretsdump;
 pub mod enum_mssql;
 pub mod enum_shares;
+pub mod execute_assembly;
+pub mod ftp_anon;
+pub mod get;
+pub mod gmsa;
+pub mod graphql_enum;
+pub mod http_paths;
 pub mod iot_cam;
+pub mod jwt_audit;
 pub mod kerberoasting;
 pub mod laps;
-pub mod ls;
-pub mod shares;
-pub mod vnc_screenshot;
-pub mod whoami;
-pub mod net_discovery;
-pub mod http_paths;
-pub mod redis_info;
-pub mod pg_enum;
-pub mod mysql_enum;
-pub mod snmp_enum;
-pub mod docker_enum;
-pub mod smbexec;
-pub mod get;
-pub mod put;
 pub mod ldap_ad;
-pub mod mssql_clr;
-pub mod ntds;
-pub mod petitpotam;
-pub mod printerbug;
-pub mod zerologon;
-pub mod nopac;
-pub mod dpapi;
-pub mod execute_assembly;
-pub mod spider_plus;
-pub mod coerce_plus;
-pub mod web_crawler;
-pub mod web_fuzzer;
-pub mod web_vuln;
-pub mod vhost_enum;
-pub mod cms_enum;
-pub mod graphql_enum;
-pub mod waf_detect;
-pub mod web_auth_brute;
-pub mod cors_vuln;
-pub mod web_dav;
-pub mod method_fuzz;
-pub mod lfi_fuzzer;
-pub mod ssrf_fuzzer;
-pub mod jwt_audit;
 pub mod ldap_ma_quota;
-pub mod smb_ghost;
+pub mod lfi_fuzzer;
+pub mod ls;
+pub mod lsa;
+pub mod lsassy;
+pub mod method_fuzz;
+pub mod mssql_clr;
 pub mod mssql_privesc;
 pub mod mssql_unc;
-pub mod ftp_anon;
+pub mod mysql_enum;
+pub mod net_discovery;
+pub mod nopac;
+pub mod ntds;
+pub mod petitpotam;
+pub mod pg_enum;
+pub mod printerbug;
+pub mod psrp;
+pub mod put;
 pub mod rdp_sec_check;
+pub mod redis_info;
+pub mod sam;
+pub mod scripting;
+pub mod secretsdump;
+pub mod shares;
+pub mod smb_ghost;
+pub mod smbexec;
+pub mod snmp_enum;
+pub mod spider_plus;
 pub mod ssh_auth_methods;
+pub mod ssrf_fuzzer;
+pub mod vhost_enum;
+pub mod vnc_screenshot;
+pub mod waf_detect;
+pub mod web_auth_brute;
+pub mod web_crawler;
+pub mod web_dav;
+pub mod web_fuzzer;
+pub mod web_vuln;
+pub mod whoami;
+pub mod wmi_enum;
+pub mod wmi_persist;
+pub mod zerologon;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -225,7 +225,11 @@ impl ModuleRegistry {
                                     modules.insert(module_name, boxed_mod);
                                 }
                                 Err(e) => {
-                                    tracing::error!("Failed to load script module {}: {}", module_name, e);
+                                    tracing::error!(
+                                        "Failed to load script module {}: {}",
+                                        module_name,
+                                        e
+                                    );
                                 }
                             }
                         }
@@ -294,7 +298,8 @@ impl ModuleRegistry {
         let dpapi: Box<dyn NxcModule> = Box::new(dpapi::Dpapi::new());
         modules.insert("dpapi".into(), dpapi);
 
-        let execute_assembly: Box<dyn NxcModule> = Box::new(execute_assembly::ExecuteAssembly::new());
+        let execute_assembly: Box<dyn NxcModule> =
+            Box::new(execute_assembly::ExecuteAssembly::new());
         modules.insert("execute-assembly".into(), execute_assembly);
 
         let spider_plus: Box<dyn NxcModule> = Box::new(spider_plus::SpiderPlus::new());
@@ -363,7 +368,8 @@ impl ModuleRegistry {
         let rdp_sec_check: Box<dyn NxcModule> = Box::new(rdp_sec_check::RdpSecCheck::new());
         modules.insert("rdp_sec_check".into(), rdp_sec_check);
 
-        let ssh_auth_methods: Box<dyn NxcModule> = Box::new(ssh_auth_methods::SshAuthMethods::new());
+        let ssh_auth_methods: Box<dyn NxcModule> =
+            Box::new(ssh_auth_methods::SshAuthMethods::new());
         modules.insert("ssh_auth_methods".into(), ssh_auth_methods);
 
         Self { modules }

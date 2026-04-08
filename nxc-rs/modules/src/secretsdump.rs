@@ -1,7 +1,7 @@
-use crate::{ModuleResult, NxcModule, ModuleOptions};
-use nxc_protocols::NxcSession;
+use crate::{ModuleOptions, ModuleResult, NxcModule};
 use anyhow::Result;
 use async_trait::async_trait;
+use nxc_protocols::NxcSession;
 use tracing::info;
 
 pub struct SecretsDumpModule;
@@ -26,22 +26,34 @@ impl NxcModule for SecretsDumpModule {
         &["smb"]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
-        info!("SMB: Starting SecretsDump execution on {}...", session.target());
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
+        info!(
+            "SMB: Starting SecretsDump execution on {}...",
+            session.target()
+        );
 
-        if let Some(smb_sess) = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>() {
+        if let Some(smb_sess) = session
+            .as_any()
+            .downcast_ref::<nxc_protocols::smb::SmbSession>()
+        {
             let protocol = nxc_protocols::smb::SmbProtocol::new();
             match protocol.secrets_dump(smb_sess).await {
                 Ok(output) => {
                     return Ok(ModuleResult {
-                        credentials: vec![], success: true,
+                        credentials: vec![],
+                        success: true,
                         output,
                         data: serde_json::json!({}),
                     });
                 }
                 Err(e) => {
                     return Ok(ModuleResult {
-                        credentials: vec![], success: false,
+                        credentials: vec![],
+                        success: false,
                         output: format!("SecretsDump Error: {}", e),
                         data: serde_json::json!({}),
                     });
@@ -50,7 +62,8 @@ impl NxcModule for SecretsDumpModule {
         }
 
         Ok(ModuleResult {
-            credentials: vec![], success: false,
+            credentials: vec![],
+            success: false,
             output: "Invalid session type for secretsdump".to_string(),
             data: serde_json::json!({}),
         })

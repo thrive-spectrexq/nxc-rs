@@ -2,14 +2,14 @@
 //!
 //! Generates BloodHound-compatible JSON files from authenticated sessions.
 
-use crate::{ModuleResult, NxcModule, ModuleOptions, ModuleOption};
-use nxc_protocols::NxcSession;
+use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use nxc_protocols::NxcSession;
+use reqwest::{multipart, Client};
+use std::io::{Cursor, Write};
 use tracing::{debug, error, info};
-use reqwest::{Client, multipart};
-use std::io::{Write, Cursor};
-use zip::{ZipWriter, write::FileOptions};
+use zip::{write::FileOptions, ZipWriter};
 
 pub struct BloodhoundModule;
 
@@ -33,7 +33,8 @@ impl NxcModule for BloodhoundModule {
         vec![
             ModuleOption {
                 name: "bh_uri".to_string(),
-                description: "BloodHound CE REST API URI (e.g., https://127.0.0.1:8080)".to_string(),
+                description: "BloodHound CE REST API URI (e.g., https://127.0.0.1:8080)"
+                    .to_string(),
                 required: false,
                 default: None,
             },
@@ -56,7 +57,11 @@ impl NxcModule for BloodhoundModule {
         &["ldap", "smb"]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         info!("BloodHound: Collecting data from {}...", session.target());
 
         let mut users_json = Vec::new();
@@ -65,8 +70,11 @@ impl NxcModule for BloodhoundModule {
         if session.protocol() == "ldap" {
             use nxc_protocols::ldap::{LdapProtocol, LdapSession};
             let ldap_proto = LdapProtocol::default();
-            let ldap_sess = session.as_any().downcast_ref::<LdapSession>().ok_or_else(|| anyhow!("Invalid LDAP session"))?;
-            
+            let ldap_sess = session
+                .as_any()
+                .downcast_ref::<LdapSession>()
+                .ok_or_else(|| anyhow!("Invalid LDAP session"))?;
+
             if let Ok(users) = ldap_proto.enumerate_users(ldap_sess).await {
                 for user in users {
                     users_json.push(serde_json::json!({
@@ -93,16 +101,18 @@ impl NxcModule for BloodhoundModule {
         });
 
         // If BloodHound REST API options are provided, upload the data
-        if let (Some(bh_uri), Some(bh_user), Some(bh_pass)) = (
-            opts.get("bh_uri"),
-            opts.get("bh_user"),
-            opts.get("bh_pass"),
-        ) {
+        if let (Some(bh_uri), Some(bh_user), Some(bh_pass)) =
+            (opts.get("bh_uri"), opts.get("bh_user"), opts.get("bh_pass"))
+        {
             info!("BloodHound: Zipping and pushing data to {}...", bh_uri);
-            if let Err(e) = self.upload_to_bloodhound(bh_uri, bh_user, bh_pass, &payload).await {
+            if let Err(e) = self
+                .upload_to_bloodhound(bh_uri, bh_user, bh_pass, &payload)
+                .await
+            {
                 error!("BloodHound: Failed to upload data: {}", e);
                 return Ok(ModuleResult {
-                    credentials: vec![], success: false,
+                    credentials: vec![],
+                    success: false,
                     output: format!("Failed to push to BloodHound API: {}", e),
                     data: payload,
                 });
@@ -116,19 +126,30 @@ impl NxcModule for BloodhoundModule {
         }
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
-            output: format!("BloodHound collection complete. Generated {} users and {} computers.", users_json.len(), computers_json.len()),
+            credentials: vec![],
+            success: true,
+            output: format!(
+                "BloodHound collection complete. Generated {} users and {} computers.",
+                users_json.len(),
+                computers_json.len()
+            ),
             data: payload,
         })
     }
 }
 
 impl BloodhoundModule {
-    async fn upload_to_bloodhound(&self, uri: &str, user: &str, pass: &str, payload: &serde_json::Value) -> Result<()> {
+    async fn upload_to_bloodhound(
+        &self,
+        uri: &str,
+        user: &str,
+        pass: &str,
+        payload: &serde_json::Value,
+    ) -> Result<()> {
         let client = Client::builder()
             .danger_accept_invalid_certs(true)
             .build()?;
-            
+
         // 1. Authenticate with BloodHound CE API to get a session JWT
         let login_url = format!("{}/api/v2/login", uri.trim_end_matches('/'));
         let login_body = serde_json::json!({
@@ -136,47 +157,50 @@ impl BloodhoundModule {
             "username": user,
             "secret": pass
         });
-        
+
         debug!("BloodHound: Authenticating to {}", login_url);
-        let auth_resp = client.post(&login_url)
-            .json(&login_body)
-            .send().await?;
-        
+        let auth_resp = client.post(&login_url).json(&login_body).send().await?;
+
         if !auth_resp.status().is_success() {
             return Err(anyhow!("Authentication failed: {}", auth_resp.status()));
         }
-        
+
         let auth_data: serde_json::Value = auth_resp.json().await?;
-        let token = auth_data["data"]["session_token"].as_str().ok_or_else(|| anyhow!("No session token in response"))?;
-        
+        let token = auth_data["data"]["session_token"]
+            .as_str()
+            .ok_or_else(|| anyhow!("No session token in response"))?;
+
         // 2. Create in-memory zip file of the payload
         let mut buffer = Cursor::new(Vec::<u8>::new());
         {
             let mut zip = ZipWriter::new(&mut buffer);
-            let options = FileOptions::<'static, ()>::default().compression_method(zip::CompressionMethod::Deflated);
+            let options = FileOptions::<'static, ()>::default()
+                .compression_method(zip::CompressionMethod::Deflated);
             zip.start_file("bloodhound_data.json", options)?;
-            
+
             let json_string = serde_json::to_string(payload)?;
             zip.write_all(json_string.as_bytes())?;
             zip.finish()?;
         }
-        
+
         let zip_data = buffer.into_inner();
-        
+
         // 3. Upload file via multipart
         let upload_url = format!("{}/api/v2/file-upload/", uri.trim_end_matches('/'));
         let part = multipart::Part::bytes(zip_data)
             .file_name("nxc_extract.zip")
             .mime_str("application/zip")?;
-            
+
         let form = multipart::Form::new().part("file", part);
-        
+
         debug!("BloodHound: Pushing zip payload to {}", upload_url);
-        let upload_resp = client.post(&upload_url)
+        let upload_resp = client
+            .post(&upload_url)
             .header("Authorization", format!("Bearer {}", token))
             .multipart(form)
-            .send().await?;
-            
+            .send()
+            .await?;
+
         if upload_resp.status().is_success() {
             Ok(())
         } else {

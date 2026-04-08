@@ -3,9 +3,9 @@
 //! Pure Rust implementation of NTLM, Kerberos, and certificate-based
 //! authentication for all NetExec-RS protocol handlers.
 
-pub mod ntlm;
-pub mod kerberos;
 pub mod certificate;
+pub mod kerberos;
+pub mod ntlm;
 pub mod registry;
 
 use anyhow::Result;
@@ -15,12 +15,12 @@ use std::fmt;
 use zeroize::Zeroize;
 
 // Re-export key types for backward compatibility
-pub use ntlm::{
-    NtlmAuthenticator, NtlmChallenge, NtlmAuthResult, NtlmSessionSecurity,
-    NtlmTargetInfo, calculate_nt_hash, calculate_v2_hash, calculate_lm_hash,
-};
-pub use kerberos::{KerberosClient, KerberosTicket, EncryptionType};
 pub use certificate::CertificateAuth;
+pub use kerberos::{EncryptionType, KerberosClient, KerberosTicket};
+pub use ntlm::{
+    calculate_lm_hash, calculate_nt_hash, calculate_v2_hash, NtlmAuthResult, NtlmAuthenticator,
+    NtlmChallenge, NtlmSessionSecurity, NtlmTargetInfo,
+};
 pub use registry::RegistrySecrets;
 
 // ─── Credential Types ───────────────────────────────────────────

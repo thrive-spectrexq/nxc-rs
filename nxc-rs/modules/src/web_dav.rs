@@ -50,7 +50,7 @@ impl NxcModule for WebDav {
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         let base_url = format!("{}://{}:{}", scheme, http_sess.target, http_sess.port);
-        
+
         info!("Starting WebDAV Enumeration against {}", base_url);
 
         let mut output = String::from("WebDAV Enumeration Results:\n");
@@ -58,7 +58,9 @@ impl NxcModule for WebDav {
         let mut can_upload = false;
 
         // 1. Send OPTIONS request
-        let mut req_options = http_sess.client.request(reqwest::Method::OPTIONS, &base_url);
+        let mut req_options = http_sess
+            .client
+            .request(reqwest::Method::OPTIONS, &base_url);
         if let Some(creds) = &http_sess.credentials {
             if let Some(pw) = &creds.password {
                 req_options = req_options.basic_auth(&creds.username, Some(pw));
@@ -68,14 +70,27 @@ impl NxcModule for WebDav {
         }
 
         if let Ok(res) = req_options.send().await {
-            let allow_header = res.headers().get("Allow").and_then(|v| v.to_str().ok()).unwrap_or("");
-            let dav_header = res.headers().get("DAV").and_then(|v| v.to_str().ok()).unwrap_or("");
+            let allow_header = res
+                .headers()
+                .get("Allow")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+            let dav_header = res
+                .headers()
+                .get("DAV")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
 
             if !dav_header.is_empty() || allow_header.contains("PROPFIND") {
                 dav_enabled = true;
-                output.push_str(&format!("  [!] WebDAV appears ENABLED.\n      DAV Header: {}\n      Allow Header: {}\n", dav_header, allow_header));
+                output.push_str(&format!(
+                    "  [!] WebDAV appears ENABLED.\n      DAV Header: {}\n      Allow Header: {}\n",
+                    dav_header, allow_header
+                ));
             } else {
-                output.push_str("  [-] WebDAV does not appear to be natively advertised at the root.\n");
+                output.push_str(
+                    "  [-] WebDAV does not appear to be natively advertised at the root.\n",
+                );
             }
         }
 
@@ -96,14 +111,22 @@ impl NxcModule for WebDav {
 
         if let Ok(res) = req_put.send().await {
             let status = res.status();
-            if status.is_success() || status.as_u16() == 201 { // 201 Created
-               can_upload = true;
-               output.push_str(&format!("  [!] CRITICAL: Arbitrary file upload successful via PUT!\n      File created at: {}\n", upload_url));
-               
-               // Attempt cleanup
-               let _ = http_sess.client.request(reqwest::Method::DELETE, &upload_url).send().await;
+            if status.is_success() || status.as_u16() == 201 {
+                // 201 Created
+                can_upload = true;
+                output.push_str(&format!("  [!] CRITICAL: Arbitrary file upload successful via PUT!\n      File created at: {}\n", upload_url));
+
+                // Attempt cleanup
+                let _ = http_sess
+                    .client
+                    .request(reqwest::Method::DELETE, &upload_url)
+                    .send()
+                    .await;
             } else {
-                output.push_str(&format!("  [-] File upload failed via PUT (Status: {}).\n", status));
+                output.push_str(&format!(
+                    "  [-] File upload failed via PUT (Status: {}).\n",
+                    status
+                ));
             }
         }
 

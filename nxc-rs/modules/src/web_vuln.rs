@@ -55,15 +55,39 @@ impl NxcModule for WebVuln {
         info!("Starting rapid vulnerability scan against {}", base_url);
 
         let checks = vec![
-            ("/.git/config", "repositoryformatversion", "Exposed .git directory"),
+            (
+                "/.git/config",
+                "repositoryformatversion",
+                "Exposed .git directory",
+            ),
             ("/.env", "APP_ENV", "Exposed .env file"),
             ("/.env", "DB_PASSWORD", "Exposed .env file"),
-            ("/server-status", "Apache Status", "Exposed Apache server-status"),
-            ("/actuator/env", "java.version", "Spring Boot Actuator exposed"),
+            (
+                "/server-status",
+                "Apache Status",
+                "Exposed Apache server-status",
+            ),
+            (
+                "/actuator/env",
+                "java.version",
+                "Spring Boot Actuator exposed",
+            ),
             ("/WEB-INF/web.xml", "<web-app", "Exposed WEB-INF"),
-            ("/backup.zip", "", "Possible Backup file exposed (Check size)"),
-            ("/etc/passwd", "root:x:0:0", "LFI / Path Traversal successful"),
-            ("/../../../../etc/passwd", "root:x:0:0", "Path Traversal successful"),
+            (
+                "/backup.zip",
+                "",
+                "Possible Backup file exposed (Check size)",
+            ),
+            (
+                "/etc/passwd",
+                "root:x:0:0",
+                "LFI / Path Traversal successful",
+            ),
+            (
+                "/../../../../etc/passwd",
+                "root:x:0:0",
+                "Path Traversal successful",
+            ),
             ("/phpinfo.php", "PHP Version", "Exposed phpinfo"),
         ];
 
@@ -78,7 +102,7 @@ impl NxcModule for WebVuln {
             let creds = http_sess.credentials.clone();
             let signature = signature.to_string();
             let desc = desc.to_string();
-            
+
             tasks.push(tokio::spawn(async move {
                 let mut req = client.get(&url);
                 if let Some(c) = creds {
@@ -88,10 +112,10 @@ impl NxcModule for WebVuln {
                         req = req.basic_auth(&c.username, None::<&str>);
                     }
                 }
-                
+
                 let res = req.send().await;
                 drop(permit);
-                
+
                 match res {
                     Ok(response) => {
                         let status = response.status();
@@ -108,8 +132,8 @@ impl NxcModule for WebVuln {
                             }
                         }
                         None
-                    },
-                    Err(_) => None
+                    }
+                    Err(_) => None,
                 }
             }));
         }

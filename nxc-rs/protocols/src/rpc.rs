@@ -47,7 +47,7 @@ pub mod svcctl {
     pub fn build_open_sc_manager(target: &str) -> Vec<u8> {
         let mut buf = Vec::new();
         // MachineName (Pointer)
-        buf.extend_from_slice(&0x00020000u32.to_le_bytes()); 
+        buf.extend_from_slice(&0x00020000u32.to_le_bytes());
         let target_utf16: Vec<u16> = target.encode_utf16().chain(std::iter::once(0)).collect();
         buf.extend_from_slice(&(target_utf16.len() as u32).to_le_bytes()); // Max count
         buf.extend_from_slice(&0u32.to_le_bytes()); // Offset
@@ -56,8 +56,10 @@ pub mod svcctl {
             buf.extend_from_slice(&u.to_le_bytes());
         }
         // Padding for 4-byte alignment
-        while buf.len() % 4 != 0 { buf.push(0); }
-        
+        while buf.len() % 4 != 0 {
+            buf.push(0);
+        }
+
         // DatabaseName (NULL pointer)
         buf.extend_from_slice(&0u32.to_le_bytes());
         // DesiredAccess (SC_MANAGER_ALL_ACCESS = 0x000f003f)
@@ -65,17 +67,29 @@ pub mod svcctl {
         buf
     }
 
-    pub fn build_create_service(h_mgr: &[u8; 20], service_name: &str, _display_name: &str, command_path: &str) -> Vec<u8> {
+    pub fn build_create_service(
+        h_mgr: &[u8; 20],
+        service_name: &str,
+        _display_name: &str,
+        command_path: &str,
+    ) -> Vec<u8> {
         let mut buf = Vec::new();
         buf.extend_from_slice(h_mgr);
-        
+
         // ServiceName
-        let name_utf16: Vec<u16> = service_name.encode_utf16().chain(std::iter::once(0)).collect();
+        let name_utf16: Vec<u16> = service_name
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
         buf.extend_from_slice(&(name_utf16.len() as u32).to_le_bytes());
         buf.extend_from_slice(&0u32.to_le_bytes());
         buf.extend_from_slice(&(name_utf16.len() as u32).to_le_bytes());
-        for u in name_utf16 { buf.extend_from_slice(&u.to_le_bytes()); }
-        while buf.len() % 4 != 0 { buf.push(0); }
+        for u in name_utf16 {
+            buf.extend_from_slice(&u.to_le_bytes());
+        }
+        while buf.len() % 4 != 0 {
+            buf.push(0);
+        }
 
         // DisplayName (NULL)
         buf.extend_from_slice(&0u32.to_le_bytes());
@@ -87,14 +101,21 @@ pub mod svcctl {
         buf.extend_from_slice(&0x00000003u32.to_le_bytes());
         // ErrorControl (SERVICE_ERROR_NORMAL = 0x01)
         buf.extend_from_slice(&0x00000001u32.to_le_bytes());
-        
+
         // BinaryPathName
-        let path_utf16: Vec<u16> = command_path.encode_utf16().chain(std::iter::once(0)).collect();
+        let path_utf16: Vec<u16> = command_path
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
         buf.extend_from_slice(&(path_utf16.len() as u32).to_le_bytes());
         buf.extend_from_slice(&0u32.to_le_bytes());
         buf.extend_from_slice(&(path_utf16.len() as u32).to_le_bytes());
-        for u in path_utf16 { buf.extend_from_slice(&u.to_le_bytes()); }
-        while buf.len() % 4 != 0 { buf.push(0); }
+        for u in path_utf16 {
+            buf.extend_from_slice(&u.to_le_bytes());
+        }
+        while buf.len() % 4 != 0 {
+            buf.push(0);
+        }
 
         // LoadOrderGroup (NULL)
         buf.extend_from_slice(&0u32.to_le_bytes());
@@ -108,7 +129,7 @@ pub mod svcctl {
         buf.extend_from_slice(&0u32.to_le_bytes());
         // PasswordSize (0)
         buf.extend_from_slice(&0u32.to_le_bytes());
-        
+
         buf
     }
 
@@ -137,12 +158,19 @@ pub mod samr {
         let mut buf = Vec::new();
         // ServerName (Unicode pointer)
         buf.extend_from_slice(&0x00020000u32.to_le_bytes());
-        let s_u16: Vec<u16> = format!("\\\\{}", server).encode_utf16().chain(std::iter::once(0)).collect();
+        let s_u16: Vec<u16> = format!("\\\\{}", server)
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
         buf.extend_from_slice(&(s_u16.len() as u32).to_le_bytes()); // Max
         buf.extend_from_slice(&0u32.to_le_bytes()); // Offset
         buf.extend_from_slice(&(s_u16.len() as u32).to_le_bytes()); // Actual
-        for u in s_u16 { buf.extend_from_slice(&u.to_le_bytes()); }
-        while buf.len() % 4 != 0 { buf.push(0); }
+        for u in s_u16 {
+            buf.extend_from_slice(&u.to_le_bytes());
+        }
+        while buf.len() % 4 != 0 {
+            buf.push(0);
+        }
         // DesiredAccess (SAM_SERVER_ALL_ACCESS = 0x000F003F)
         buf.extend_from_slice(&0x000F003Fu32.to_le_bytes());
         buf
@@ -159,8 +187,12 @@ pub mod samr {
         buf.extend_from_slice(&(d_u16.len() as u32).to_le_bytes()); // Max
         buf.extend_from_slice(&0u32.to_le_bytes()); // Offset
         buf.extend_from_slice(&(d_u16.len() as u32).to_le_bytes()); // Actual
-        for u in d_u16 { buf.extend_from_slice(&u.to_le_bytes()); }
-        while buf.len() % 4 != 0 { buf.push(0); }
+        for u in d_u16 {
+            buf.extend_from_slice(&u.to_le_bytes());
+        }
+        while buf.len() % 4 != 0 {
+            buf.push(0);
+        }
         buf
     }
 
@@ -172,7 +204,9 @@ pub mod samr {
         // DomainSid (Pointer and SID)
         buf.extend_from_slice(&0x00020008u32.to_le_bytes());
         buf.extend_from_slice(sid_bytes);
-        while buf.len() % 4 != 0 { buf.push(0); }
+        while buf.len() % 4 != 0 {
+            buf.push(0);
+        }
         buf
     }
 
@@ -186,7 +220,6 @@ pub mod samr {
     }
 }
 
-
 pub mod srvsvc {
     pub const NET_SHARE_ENUM_ALL: u16 = 15;
 }
@@ -199,7 +232,7 @@ pub mod atsvc {
         let mut buf = Vec::new();
         // ServerName (NULL)
         buf.extend_from_slice(&0u32.to_le_bytes());
-        
+
         // AT_INFO Structure
         // JobTime (0: Run as soon as possible)
         buf.extend_from_slice(&0u32.to_le_bytes());
@@ -218,8 +251,10 @@ pub mod atsvc {
         buf.extend_from_slice(&(cmd_u16.len() as u32).to_le_bytes());
         buf.extend_from_slice(&0u32.to_le_bytes());
         buf.extend_from_slice(&(cmd_u16.len() as u32).to_le_bytes());
-        for u in cmd_u16 { buf.extend_from_slice(&u.to_le_bytes()); }
-        
+        for u in cmd_u16 {
+            buf.extend_from_slice(&u.to_le_bytes());
+        }
+
         buf
     }
 }
@@ -246,8 +281,11 @@ pub mod efsr {
         let mut buf = Vec::new();
         // FileName (Pointer + string)
         buf.extend_from_slice(&0x00020000u32.to_le_bytes()); // Pointer
-        
-        let path_u16: Vec<u16> = target_path.encode_utf16().chain(std::iter::once(0)).collect();
+
+        let path_u16: Vec<u16> = target_path
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
         // Array lengths for NDR string
         buf.extend_from_slice(&(path_u16.len() as u32).to_le_bytes()); // Max count
         buf.extend_from_slice(&0u32.to_le_bytes()); // Offset
@@ -255,8 +293,10 @@ pub mod efsr {
         for u in path_u16 {
             buf.extend_from_slice(&u.to_le_bytes());
         }
-        while buf.len() % 4 != 0 { buf.push(0); } // align
-        
+        while buf.len() % 4 != 0 {
+            buf.push(0);
+        } // align
+
         // Flags
         buf.extend_from_slice(&0u32.to_le_bytes());
         buf
@@ -334,8 +374,8 @@ impl DcerpcHeader {
 // ─── DCE/RPC Auth Verifier ────────────────────────────────────
 
 pub struct DcerpcAuth {
-    pub auth_type: u8,   // 0x0a for NTLM
-    pub auth_level: u8,  // 0x06 for Privacy, 0x05 for Integrity
+    pub auth_type: u8,  // 0x0a for NTLM
+    pub auth_level: u8, // 0x06 for Privacy, 0x05 for Integrity
     pub auth_pad_len: u8,
     pub auth_reserved: u8,
     pub auth_context_id: u32,

@@ -20,14 +20,14 @@
 
 use crate::{build_credentials, get_protocol_handler};
 use anyhow::Context;
-use std::sync::Arc;
-use nxc_db::{NxcDb, HostInfo, Credential};
+use nxc_db::{Credential, HostInfo, NxcDb};
 use nxc_modules::ModuleRegistry;
 use nxc_protocols::Protocol;
 use nxc_targets::{parse_targets, ExecutionEngine, ExecutionOpts};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::net::{TcpStream, ToSocketAddrs};
+use std::sync::Arc;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use teloxide::prelude::*;
@@ -514,13 +514,19 @@ async fn handle_command(
             let user_id = msg.from.as_ref().map(|u| u.id).unwrap_or(UserId(0));
             let s = get_session(user_id);
             if s.last_target.is_none() || s.last_protocol.is_none() {
-                bot.send_message(msg.chat.id, "❌ <b>SHELL ERROR</b>\nNo active target or protocol found in session history.").await?;
+                bot.send_message(
+                    msg.chat.id,
+                    "❌ <b>SHELL ERROR</b>\nNo active target or protocol found in session history.",
+                )
+                .await?;
             } else {
                 update_session(user_id, |sess| sess._interactive_mode = true);
                 let text = format!("🐚 <b>SHELL MODE ACTIVATED</b>\n\nTarget: <code>{}</code>\nProtocol: <code>{}</code>\n\nType commands directly to execute. Type <code>exit</code> to return to mission control.", 
                     html_escape::encode_safe(s.last_target.as_ref().unwrap()), 
                     html_escape::encode_safe(s.last_protocol.as_ref().unwrap()));
-                bot.send_message(msg.chat.id, text).parse_mode(ParseMode::Html).await?;
+                bot.send_message(msg.chat.id, text)
+                    .parse_mode(ParseMode::Html)
+                    .await?;
             }
         }
 
@@ -566,17 +572,23 @@ async fn handle_generic_stream(bot: Bot, msg: Message) -> Result<(), teloxide::R
             if s._interactive_mode {
                 if text.to_lowercase() == "exit" {
                     update_session(user_id, |sess| sess._interactive_mode = false);
-                    bot.send_message(msg.chat.id, "🚪 <b>SHELL DEACTIVATED</b>\nReturning to standard command mode.")
-                        .parse_mode(ParseMode::Html).await?;
+                    bot.send_message(
+                        msg.chat.id,
+                        "🚪 <b>SHELL DEACTIVATED</b>\nReturning to standard command mode.",
+                    )
+                    .parse_mode(ParseMode::Html)
+                    .await?;
                 } else {
-                    let cmd = format!("{} {} -x \"{}\"", s.last_protocol.as_ref().unwrap(), s.last_target.as_ref().unwrap(), text);
+                    let cmd = format!(
+                        "{} {} -x \"{}\"",
+                        s.last_protocol.as_ref().unwrap(),
+                        s.last_target.as_ref().unwrap(),
+                        text
+                    );
                     engine_execute_raw(bot, msg, cmd).await?;
                 }
             } else {
-                bot.send_message(
-                        msg.chat.id,
-                        "🛰️ <i>Awaiting valid command structure...</i>",
-                    )
+                bot.send_message(msg.chat.id, "🛰️ <i>Awaiting valid command structure...</i>")
                     .parse_mode(ParseMode::Html)
                     .await?;
             }
@@ -641,7 +653,8 @@ async fn handle_interactive_callbacks(
 // --- 🎨 UI & Presentation Logic ---
 
 async fn ui_send_dashboard(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
-    let text = format!("🛸 <b>NETEXEC-RS: APEX MISSION CONTROL v{}</b>\n\n\
+    let text = format!(
+        "🛸 <b>NETEXEC-RS: APEX MISSION CONTROL v{}</b>\n\n\
         <b>Operational Command Matrix:</b>\n\n\
         🚀 <b>Deploy:</b> /run /smb /ssh /ldap /winrm /mssql /rdp /wmi\n\
         ⚡ <b>Automation:</b> /ai (LLM-powered discovery & execution)\n\
@@ -656,7 +669,8 @@ async fn ui_send_dashboard(bot: Bot, msg: Message) -> Result<(), teloxide::Reque
         🗄️ <b>Database:</b> /hosts /creds /workspaces /stats\n\
         ⚙️ <b>System:</b> /status /guide /cheat /about\n\n\
         ◈ <i>Auth Engine: {} | {} Protocols | {} Modules</i> ◈",
-        BOT_VERSION, AUTH_ENGINE_VERSION, SUPPORTED_PROTOCOLS, SUPPORTED_MODULES);
+        BOT_VERSION, AUTH_ENGINE_VERSION, SUPPORTED_PROTOCOLS, SUPPORTED_MODULES
+    );
     bot.send_message(msg.chat.id, text)
         .parse_mode(ParseMode::Html)
         .reply_markup(main_dashboard_markup())
@@ -762,7 +776,8 @@ async fn engine_execute_search(
     let query = q.trim().to_lowercase();
     if query.is_empty() {
         bot.send_message(msg.chat.id, "💡 Usage hint: <code>/search mimikatz</code>")
-           .parse_mode(ParseMode::Html).await?;
+            .parse_mode(ParseMode::Html)
+            .await?;
         return Ok(());
     }
 
@@ -794,14 +809,14 @@ async fn engine_execute_search(
 
     if results.is_empty() {
         bot.send_message(
-                msg.chat.id,
-                format!(
-                    "❌ Zero reconnaissance results for <code>{}</code>",
-                    html_escape::encode_safe(&q)
-                ),
-            )
-            .parse_mode(ParseMode::Html)
-            .await?;
+            msg.chat.id,
+            format!(
+                "❌ Zero reconnaissance results for <code>{}</code>",
+                html_escape::encode_safe(&q)
+            ),
+        )
+        .parse_mode(ParseMode::Html)
+        .await?;
     } else {
         let total = results.len();
         let header = format!(
@@ -822,7 +837,8 @@ async fn engine_list_modules(
     let p_name = proto.trim();
     if p_name.is_empty() {
         bot.send_message(msg.chat.id, "💡 Usage hint: <code>/modules smb</code>")
-           .parse_mode(ParseMode::Html).await?;
+            .parse_mode(ParseMode::Html)
+            .await?;
         return Ok(());
     }
 
@@ -831,14 +847,14 @@ async fn engine_list_modules(
 
     if list.is_empty() {
         bot.send_message(
-                msg.chat.id,
-                format!(
-                    "❌ No payload modules found for protocol <code>{}</code>",
-                    html_escape::encode_safe(p_name)
-                ),
-            )
-            .parse_mode(ParseMode::Html)
-            .await?;
+            msg.chat.id,
+            format!(
+                "❌ No payload modules found for protocol <code>{}</code>",
+                html_escape::encode_safe(p_name)
+            ),
+        )
+        .parse_mode(ParseMode::Html)
+        .await?;
     } else {
         let mut text = format!(
             "🧩 <b>Offensive Payloads for {}</b>:\n\n",
@@ -871,11 +887,16 @@ async fn engine_execute_help(
 
     match engine_perform_task(argv.into_iter().skip(1).collect()).await {
         Ok(help_text) => {
-            bot.send_message(msg.chat.id, format!("<pre>{}</pre>", html_escape::encode_safe(&help_text)))
-                .parse_mode(ParseMode::Html).await?;
+            bot.send_message(
+                msg.chat.id,
+                format!("<pre>{}</pre>", html_escape::encode_safe(&help_text)),
+            )
+            .parse_mode(ParseMode::Html)
+            .await?;
         }
         Err(e) => {
-            bot.send_message(msg.chat.id, format!("❌ Help search error: {}", e)).await?;
+            bot.send_message(msg.chat.id, format!("❌ Help search error: {}", e))
+                .await?;
         }
     }
     Ok(())
@@ -896,19 +917,20 @@ async fn recon_ping(bot: Bot, msg: Message, target: String) -> Result<(), teloxi
     let target = target.trim();
     if target.is_empty() {
         bot.send_message(msg.chat.id, "💡 Usage: <code>/ping 8.8.8.8</code>")
-           .parse_mode(ParseMode::Html).await?;
+            .parse_mode(ParseMode::Html)
+            .await?;
         return Ok(());
     }
 
     bot.send_message(
-            msg.chat.id,
-            format!(
-                "📡 <i>Pinging {} in progress ...</i>",
-                html_escape::encode_safe(target)
-            ),
-        )
-        .parse_mode(ParseMode::Html)
-        .await?;
+        msg.chat.id,
+        format!(
+            "📡 <i>Pinging {} in progress ...</i>",
+            html_escape::encode_safe(target)
+        ),
+    )
+    .parse_mode(ParseMode::Html)
+    .await?;
 
     let output = if cfg!(windows) {
         std::process::Command::new("ping")
@@ -931,25 +953,25 @@ async fn recon_ping(bot: Bot, msg: Message, target: String) -> Result<(), teloxi
     match output {
         Ok(out) if out.status.success() => {
             bot.send_message(
-                    msg.chat.id,
-                    format!(
-                        "✅ Node <code>{}</code> is <b>Online</b> and active.",
-                        html_escape::encode_safe(target)
-                    ),
-                )
-                .parse_mode(ParseMode::Html)
-                .await?;
+                msg.chat.id,
+                format!(
+                    "✅ Node <code>{}</code> is <b>Online</b> and active.",
+                    html_escape::encode_safe(target)
+                ),
+            )
+            .parse_mode(ParseMode::Html)
+            .await?;
         }
         _ => {
             bot.send_message(
-                    msg.chat.id,
-                    format!(
-                        "❌ Node <code>{}</code> is <b>Offline</b> or unreachable.",
-                        html_escape::encode_safe(target)
-                    ),
-                )
-                .parse_mode(ParseMode::Html)
-                .await?;
+                msg.chat.id,
+                format!(
+                    "❌ Node <code>{}</code> is <b>Offline</b> or unreachable.",
+                    html_escape::encode_safe(target)
+                ),
+            )
+            .parse_mode(ParseMode::Html)
+            .await?;
         }
     }
     Ok(())
@@ -962,14 +984,21 @@ async fn recon_portscan(
 ) -> Result<(), teloxide::RequestError> {
     let parts: Vec<&str> = args.split_whitespace().collect();
     if parts.is_empty() {
-        bot.send_message(msg.chat.id, "💡 Usage: <code>/portscan 10.0.0.1 [22,445,3389]</code>")
-           .parse_mode(ParseMode::Html).await?;
+        bot.send_message(
+            msg.chat.id,
+            "💡 Usage: <code>/portscan 10.0.0.1 [22,445,3389]</code>",
+        )
+        .parse_mode(ParseMode::Html)
+        .await?;
         return Ok(());
     }
 
     let target = parts[0];
     let ports: Vec<u16> = if parts.len() > 1 {
-        parts[1].split(',').filter_map(|p| p.parse::<u16>().ok()).collect()
+        parts[1]
+            .split(',')
+            .filter_map(|p| p.parse::<u16>().ok())
+            .collect()
     } else {
         vec![
             21, 22, 23, 25, 53, 80, 110, 135, 137, 139, 443, 445, 1433, 3306, 3389, 5432, 5900,
@@ -978,15 +1007,15 @@ async fn recon_portscan(
     };
 
     bot.send_message(
-            msg.chat.id,
-            format!(
-                "🔍 <i>Scanning {} for {} critical ports ...</i>",
-                html_escape::encode_safe(target),
-                ports.len()
-            ),
-        )
-        .parse_mode(ParseMode::Html)
-        .await?;
+        msg.chat.id,
+        format!(
+            "🔍 <i>Scanning {} for {} critical ports ...</i>",
+            html_escape::encode_safe(target),
+            ports.len()
+        ),
+    )
+    .parse_mode(ParseMode::Html)
+    .await?;
 
     let mut open = Vec::new();
     for port in ports {
@@ -1002,11 +1031,14 @@ async fn recon_portscan(
 
     if open.is_empty() {
         bot.send_message(
-                msg.chat.id,
-                format!("⚠️ No open ports found on <code>{}</code>", html_escape::encode_safe(target)),
-            )
-            .parse_mode(ParseMode::Html)
-            .await?;
+            msg.chat.id,
+            format!(
+                "⚠️ No open ports found on <code>{}</code>",
+                html_escape::encode_safe(target)
+            ),
+        )
+        .parse_mode(ParseMode::Html)
+        .await?;
     } else {
         let mut text = format!(
             "🗺️ <b>Port Recon Result for <code>{}</code></b>:\n\n",
@@ -1043,19 +1075,20 @@ async fn recon_dns(bot: Bot, msg: Message, domain: String) -> Result<(), teloxid
     let domain = domain.trim();
     if domain.is_empty() {
         bot.send_message(msg.chat.id, "💡 Usage: <code>/dns target.pro</code>")
-           .parse_mode(ParseMode::Html).await?;
+            .parse_mode(ParseMode::Html)
+            .await?;
         return Ok(());
     }
 
     bot.send_message(
-            msg.chat.id,
-            format!(
-                "📖 <i>Querying records for {} ...</i>",
-                html_escape::encode_safe(domain)
-            ),
-        )
-        .parse_mode(ParseMode::Html)
-        .await?;
+        msg.chat.id,
+        format!(
+            "📖 <i>Querying records for {} ...</i>",
+            html_escape::encode_safe(domain)
+        ),
+    )
+    .parse_mode(ParseMode::Html)
+    .await?;
 
     match (domain, 0).to_socket_addrs() {
         Ok(addrs) => {
@@ -1064,7 +1097,10 @@ async fn recon_dns(bot: Bot, msg: Message, domain: String) -> Result<(), teloxid
                 html_escape::encode_safe(domain)
             );
             for a in addrs {
-                text.push_str(&format!("◈ <code>{}</code>\n", html_escape::encode_safe(&a.ip().to_string())));
+                text.push_str(&format!(
+                    "◈ <code>{}</code>\n",
+                    html_escape::encode_safe(&a.ip().to_string())
+                ));
             }
             bot.send_message(msg.chat.id, text)
                 .parse_mode(ParseMode::Html)
@@ -1072,14 +1108,14 @@ async fn recon_dns(bot: Bot, msg: Message, domain: String) -> Result<(), teloxid
         }
         Err(e) => {
             bot.send_message(
-                    msg.chat.id,
-                    format!(
-                        "❌ RESOLUTION ERROR: <code>{}</code>",
-                        html_escape::encode_safe(&e.to_string())
-                    ),
-                )
-                .parse_mode(ParseMode::Html)
-                .await?;
+                msg.chat.id,
+                format!(
+                    "❌ RESOLUTION ERROR: <code>{}</code>",
+                    html_escape::encode_safe(&e.to_string())
+                ),
+            )
+            .parse_mode(ParseMode::Html)
+            .await?;
         }
     }
     Ok(())
@@ -1093,19 +1129,20 @@ async fn recon_reverse_dns(
     let ip = ip.trim();
     if ip.is_empty() {
         bot.send_message(msg.chat.id, "💡 Usage: <code>/reverse 8.8.8.8</code>")
-           .parse_mode(ParseMode::Html).await?;
+            .parse_mode(ParseMode::Html)
+            .await?;
         return Ok(());
     }
 
     bot.send_message(
-            msg.chat.id,
-            format!(
-                "🔄 <i>Performing Reverse Pointer lookup for {} ...</i>",
-                html_escape::encode_safe(ip)
-            ),
-        )
-        .parse_mode(ParseMode::Html)
-        .await?;
+        msg.chat.id,
+        format!(
+            "🔄 <i>Performing Reverse Pointer lookup for {} ...</i>",
+            html_escape::encode_safe(ip)
+        ),
+    )
+    .parse_mode(ParseMode::Html)
+    .await?;
 
     match (ip, 0).to_socket_addrs() {
         Ok(_) => {
@@ -1114,11 +1151,14 @@ async fn recon_reverse_dns(
         }
         Err(e) => {
             bot.send_message(
-                    msg.chat.id,
-                    format!("❌ Lookup failed: <code>{}</code>", html_escape::encode_safe(&e.to_string())),
-                )
-                .parse_mode(ParseMode::Html)
-                .await?;
+                msg.chat.id,
+                format!(
+                    "❌ Lookup failed: <code>{}</code>",
+                    html_escape::encode_safe(&e.to_string())
+                ),
+            )
+            .parse_mode(ParseMode::Html)
+            .await?;
         }
     }
     Ok(())
@@ -1141,7 +1181,10 @@ async fn recon_bot_identity(bot: Bot, msg: Message) -> Result<(), teloxide::Requ
         "• Global IP: <code>{}</code>\n",
         html_escape::encode_safe(&public_ip)
     ));
-    text.push_str(&format!("• Hostname: <code>{}</code>\n", html_escape::encode_safe(&node_name)));
+    text.push_str(&format!(
+        "• Hostname: <code>{}</code>\n",
+        html_escape::encode_safe(&node_name)
+    ));
     text.push_str(&format!(
         "• OS Layer: <code>{} {}</code>\n",
         html_escape::encode_safe(std::env::consts::OS),
@@ -1163,19 +1206,20 @@ async fn recon_geo_lookup(
     let ip = ip.trim();
     if ip.is_empty() {
         bot.send_message(msg.chat.id, "💡 Usage: <code>/geo 1.1.1.1</code>")
-           .parse_mode(ParseMode::Html).await?;
+            .parse_mode(ParseMode::Html)
+            .await?;
         return Ok(());
     }
 
     bot.send_message(
-            msg.chat.id,
-            format!(
-                "🌍 <i>Geolocating target IP {} ...</i>",
-                html_escape::encode_safe(ip)
-            ),
-        )
-        .parse_mode(ParseMode::Html)
-        .await?;
+        msg.chat.id,
+        format!(
+            "🌍 <i>Geolocating target IP {} ...</i>",
+            html_escape::encode_safe(ip)
+        ),
+    )
+    .parse_mode(ParseMode::Html)
+    .await?;
 
     let url = format!("http://ip-api.com/json/{}", ip);
     match reqwest::get(url).await {
@@ -1211,13 +1255,15 @@ async fn recon_geo_lookup(
                         .await?;
                 } else {
                     bot.send_message(msg.chat.id, "❌ Geographic data not found for this IP.")
-                        .parse_mode(ParseMode::Html).await?;
+                        .parse_mode(ParseMode::Html)
+                        .await?;
                 }
             }
         }
         Err(_) => {
             bot.send_message(msg.chat.id, "❌ Failed to query GEOLOCATION API.")
-                .parse_mode(ParseMode::Html).await?;
+                .parse_mode(ParseMode::Html)
+                .await?;
         }
     }
     Ok(())
@@ -1253,13 +1299,22 @@ async fn engine_run_logic(
     let parts: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
 
     if parts.is_empty() {
-        bot.send_message(chat_id, "💡 Control Hint: <code>/run smb 10.0.0.1 -u admin</code>")
-           .parse_mode(ParseMode::Html).await?;
+        bot.send_message(
+            chat_id,
+            "💡 Control Hint: <code>/run smb 10.0.0.1 -u admin</code>",
+        )
+        .parse_mode(ParseMode::Html)
+        .await?;
         return Ok(());
     }
 
     // If only protocol is provided, show help for it
-    if parts.len() == 1 && !["ping", "portscan", "dns", "geo", "reverse", "whoami", "status", "cheat", "history"].contains(&parts[0].as_str()) {
+    if parts.len() == 1
+        && ![
+            "ping", "portscan", "dns", "geo", "reverse", "whoami", "status", "cheat", "history",
+        ]
+        .contains(&parts[0].as_str())
+    {
         return engine_execute_help(bot, msg, parts[0].clone()).await;
     }
 
@@ -1303,23 +1358,26 @@ async fn engine_run_logic(
                         .await?;
                 }
             } else {
-                bot.send_message(chat_id, format!("<pre>{}</pre>", html_escape::encode_safe(&log_text)))
-                    .parse_mode(ParseMode::Html)
-                    .await?;
+                bot.send_message(
+                    chat_id,
+                    format!("<pre>{}</pre>", html_escape::encode_safe(&log_text)),
+                )
+                .parse_mode(ParseMode::Html)
+                .await?;
             }
         }
         Err(e) => {
             let err_msg = e.to_string();
             bot.edit_message_text(
-                    chat_id,
-                    status_msg.id,
-                    format!(
-                        "❌ <b>Critical Engine Fault:</b>\n<code>{}</code>",
-                        html_escape::encode_safe(&err_msg)
-                    ),
-                )
-                .parse_mode(ParseMode::Html)
-                .await?;
+                chat_id,
+                status_msg.id,
+                format!(
+                    "❌ <b>Critical Engine Fault:</b>\n<code>{}</code>",
+                    html_escape::encode_safe(&err_msg)
+                ),
+            )
+            .parse_mode(ParseMode::Html)
+            .await?;
         }
     }
     Ok(())
@@ -1328,9 +1386,11 @@ async fn engine_run_logic(
 async fn engine_perform_task(argv: Vec<String>) -> anyhow::Result<String> {
     // ── Setup Database & Global DB check ──
     let cli = crate::build_cli();
-    
+
     // We need to find the workspace from argv before parsing everything if we want to pass it to NxcDb
-    let workspace = argv.iter().position(|r| r == "--workspace" || r == "-w")
+    let workspace = argv
+        .iter()
+        .position(|r| r == "--workspace" || r == "-w")
         .and_then(|idx| argv.get(idx + 1))
         .map(|s| s.as_str())
         .unwrap_or("default");
@@ -1340,14 +1400,12 @@ async fn engine_perform_task(argv: Vec<String>) -> anyhow::Result<String> {
 
     let matches = match cli.try_get_matches_from(argv) {
         Ok(m) => m,
-        Err(e) => {
-            match e.kind() {
-                clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion => {
-                    return Ok(e.render().to_string());
-                }
-                _ => return Err(anyhow::anyhow!("Instruction Validation Failure:\n{}", e)),
+        Err(e) => match e.kind() {
+            clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion => {
+                return Ok(e.render().to_string());
             }
-        }
+            _ => return Err(anyhow::anyhow!("Instruction Validation Failure:\n{}", e)),
+        },
     };
 
     let (p_name, sub_m) = matches
@@ -1458,33 +1516,69 @@ struct TelegramFeedback {
 #[async_trait::async_trait]
 impl nxc_ai::agent::AgentFeedback for TelegramFeedback {
     async fn on_thought(&self, text: &str) -> anyhow::Result<()> {
-        let text = format!("🧠 <b>AI thought:</b>\n<i>{}</i>", html_escape::encode_safe(text));
-        let _ = self.bot.send_message(self.chat_id, text).parse_mode(ParseMode::Html).await;
+        let text = format!(
+            "🧠 <b>AI thought:</b>\n<i>{}</i>",
+            html_escape::encode_safe(text)
+        );
+        let _ = self
+            .bot
+            .send_message(self.chat_id, text)
+            .parse_mode(ParseMode::Html)
+            .await;
         Ok(())
     }
     async fn on_tool_call(&self, name: &str, args: &str) -> anyhow::Result<()> {
-        let text = format!("🛠️ <b>Action:</b> <code>{}</code>\nArgs: <code>{}</code>", 
-            html_escape::encode_safe(name), 
-            html_escape::encode_safe(args));
-        let _ = self.bot.send_message(self.chat_id, text).parse_mode(ParseMode::Html).await;
+        let text = format!(
+            "🛠️ <b>Action:</b> <code>{}</code>\nArgs: <code>{}</code>",
+            html_escape::encode_safe(name),
+            html_escape::encode_safe(args)
+        );
+        let _ = self
+            .bot
+            .send_message(self.chat_id, text)
+            .parse_mode(ParseMode::Html)
+            .await;
         Ok(())
     }
     async fn on_tool_result(&self, _name: &str, result: &str) -> anyhow::Result<()> {
-        let text = format!("📦 <b>Result:</b>\n<pre>{}</pre>", html_escape::encode_safe(result));
+        let text = format!(
+            "📦 <b>Result:</b>\n<pre>{}</pre>",
+            html_escape::encode_safe(result)
+        );
         // Only send if not too long, or truncate
         if text.len() > 4000 {
-             let _ = self.bot.send_message(self.chat_id, "📦 <b>Result:</b> (Output too long, see database)").parse_mode(ParseMode::Html).await;
+            let _ = self
+                .bot
+                .send_message(
+                    self.chat_id,
+                    "📦 <b>Result:</b> (Output too long, see database)",
+                )
+                .parse_mode(ParseMode::Html)
+                .await;
         } else {
-             let _ = self.bot.send_message(self.chat_id, text).parse_mode(ParseMode::Html).await;
+            let _ = self
+                .bot
+                .send_message(self.chat_id, text)
+                .parse_mode(ParseMode::Html)
+                .await;
         }
         Ok(())
     }
 }
 
-async fn engine_execute_ai(bot: Bot, msg: Message, prompt: String) -> Result<(), teloxide::RequestError> {
+async fn engine_execute_ai(
+    bot: Bot,
+    msg: Message,
+    prompt: String,
+) -> Result<(), teloxide::RequestError> {
     let chat_id = msg.chat.id;
     if prompt.is_empty() {
-        bot.send_message(chat_id, "💡 Usage: <code>/ai Scan my network for SMB</code>").parse_mode(ParseMode::Html).await?;
+        bot.send_message(
+            chat_id,
+            "💡 Usage: <code>/ai Scan my network for SMB</code>",
+        )
+        .parse_mode(ParseMode::Html)
+        .await?;
         return Ok(());
     }
 
@@ -1492,15 +1586,21 @@ async fn engine_execute_ai(bot: Bot, msg: Message, prompt: String) -> Result<(),
     let api_key = match std::env::var("GEMINI_API_KEY") {
         Ok(k) => k,
         Err(_) => {
-            bot.send_message(chat_id, "❌ <b>AI ERROR</b>\nGEMINI_API_KEY not found in environment.").await?;
+            bot.send_message(
+                chat_id,
+                "❌ <b>AI ERROR</b>\nGEMINI_API_KEY not found in environment.",
+            )
+            .await?;
             return Ok(());
         }
     };
 
-    bot.send_message(chat_id, "🌩️ <b>Initializing AI Automation Agent...</b>").parse_mode(ParseMode::Html).await?;
+    bot.send_message(chat_id, "🌩️ <b>Initializing AI Automation Agent...</b>")
+        .parse_mode(ParseMode::Html)
+        .await?;
 
     let provider = Box::new(nxc_ai::GeminiProvider::new(api_key, None));
-    
+
     // Initialize shared resources for AI tools
     let db_path = std::path::Path::new("nxc.db");
     let db = std::sync::Arc::new(nxc_db::NxcDb::new(db_path, "default").unwrap()); // Simplified for now
@@ -1513,11 +1613,19 @@ async fn engine_execute_ai(bot: Bot, msg: Message, prompt: String) -> Result<(),
     registry.register(Box::new(nxc_ai::SearchModulesTool::new(registry_mod)));
     registry.register(Box::new(nxc_ai::UtilityTool));
 
-    let feedback = Box::new(TelegramFeedback { bot: bot.clone(), chat_id });
+    let feedback = Box::new(TelegramFeedback {
+        bot: bot.clone(),
+        chat_id,
+    });
     let mut agent = nxc_ai::AiAgent::new(provider, registry, feedback);
 
     if let Err(e) = agent.run(&prompt).await {
-         bot.send_message(chat_id, format!("❌ <b>AI CRITICAL FAULT:</b>\n<code>{}</code>", e)).parse_mode(ParseMode::Html).await?;
+        bot.send_message(
+            chat_id,
+            format!("❌ <b>AI CRITICAL FAULT:</b>\n<code>{}</code>", e),
+        )
+        .parse_mode(ParseMode::Html)
+        .await?;
     }
 
     Ok(())
@@ -1600,11 +1708,16 @@ async fn session_show_status(bot: Bot, msg: Message) -> Result<(), teloxide::Req
 async fn session_show_history(bot: Bot, msg: Message) -> Result<(), teloxide::RequestError> {
     let s = get_session(msg.from.as_ref().unwrap().id);
     if s.history.is_empty() {
-        bot.send_message(msg.chat.id, "📜 Operator history is currently clean.").await?;
+        bot.send_message(msg.chat.id, "📜 Operator history is currently clean.")
+            .await?;
     } else {
         let mut log = String::from("📜 <b>Target History Intelligence:</b>\n\n");
         for (i, t) in s.history.iter().rev().enumerate() {
-            log.push_str(&format!("◈ <code>{:02}</code> : <code>{}</code>\n", i + 1, html_escape::encode_safe(t)));
+            log.push_str(&format!(
+                "◈ <code>{:02}</code> : <code>{}</code>\n",
+                i + 1,
+                html_escape::encode_safe(t)
+            ));
         }
         bot.send_message(msg.chat.id, log)
             .parse_mode(ParseMode::Html)
@@ -1627,8 +1740,12 @@ async fn session_clear(bot: Bot, msg: Message) -> Result<(), teloxide::RequestEr
         *s = UserSession::default()
     });
     // Send a "blank" message or just a clear notification
-    bot.send_message(msg.chat.id, "✨ <b>TERMINAL CLEARED</b>\nSession reset. Node ready for new tasking.")
-        .parse_mode(ParseMode::Html).await?;
+    bot.send_message(
+        msg.chat.id,
+        "✨ <b>TERMINAL CLEARED</b>\nSession reset. Node ready for new tasking.",
+    )
+    .parse_mode(ParseMode::Html)
+    .await?;
     Ok(())
 }
 
@@ -1660,40 +1777,56 @@ async fn database_list_hosts(bot: Bot, msg: Message) -> Result<(), teloxide::Req
     let db = match get_db(&s.workspace) {
         Some(d) => d,
         None => {
-            bot.send_message(msg.chat.id, "❌ <b>DB ERROR</b>\nFailed to connect to database.").await?;
+            bot.send_message(
+                msg.chat.id,
+                "❌ <b>DB ERROR</b>\nFailed to connect to database.",
+            )
+            .await?;
             return Ok(());
         }
     };
 
     // Temporarily switch DB context to user's workspace
-    // Note: This is not thread-safe for multiple concurrent users with different workspaces 
+    // Note: This is not thread-safe for multiple concurrent users with different workspaces
     // if using a single global NxcDb. Ideally NxcDb methods should take workspace as arg.
     // For now, let's just list from user's workspace.
-    
+
     match db.list_hosts_in(&s.workspace) {
         Ok(hosts) => {
             let hosts: Vec<HostInfo> = hosts;
             if hosts.is_empty() {
-                bot.send_message(msg.chat.id, format!("📭 No hosts found in workspace [<code>{}</code>]", s.workspace))
-                    .parse_mode(ParseMode::Html).await?;
+                bot.send_message(
+                    msg.chat.id,
+                    format!(
+                        "📭 No hosts found in workspace [<code>{}</code>]",
+                        s.workspace
+                    ),
+                )
+                .parse_mode(ParseMode::Html)
+                .await?;
             } else {
-                let header = format!("🖥️ <b>Discovered Hosts [<code>{}</code>]</b>\n\n\
+                let header = format!(
+                    "🖥️ <b>Discovered Hosts [<code>{}</code>]</b>\n\n\
                              <code>{:<15} | {}</code>\n\
-                             ─────────────────────────\n", 
-                             s.workspace, "IP Address", "Hostname");
-                
+                             ─────────────────────────\n",
+                    s.workspace, "IP Address", "Hostname"
+                );
+
                 let mut items = Vec::new();
                 for h in hosts {
-                    items.push(format!("<code>{:<15}</code> | <code>{}</code>", 
-                        h.ip, 
-                        html_escape::encode_safe(h.hostname.as_deref().unwrap_or("unknown"))));
+                    items.push(format!(
+                        "<code>{:<15}</code> | <code>{}</code>",
+                        h.ip,
+                        html_escape::encode_safe(h.hostname.as_deref().unwrap_or("unknown"))
+                    ));
                 }
-                
+
                 send_long_msg_batched(&bot, msg.chat.id, header, items).await?;
             }
         }
         Err(e) => {
-            bot.send_message(msg.chat.id, format!("❌ <b>QUERY ERROR</b>\n{}", e)).await?;
+            bot.send_message(msg.chat.id, format!("❌ <b>QUERY ERROR</b>\n{}", e))
+                .await?;
         }
     }
     Ok(())
@@ -1705,7 +1838,11 @@ async fn database_list_creds(bot: Bot, msg: Message) -> Result<(), teloxide::Req
     let db = match get_db(&s.workspace) {
         Some(d) => d,
         None => {
-            bot.send_message(msg.chat.id, "❌ <b>DB ERROR</b>\nFailed to connect to database.").await?;
+            bot.send_message(
+                msg.chat.id,
+                "❌ <b>DB ERROR</b>\nFailed to connect to database.",
+            )
+            .await?;
             return Ok(());
         }
     };
@@ -1714,27 +1851,42 @@ async fn database_list_creds(bot: Bot, msg: Message) -> Result<(), teloxide::Req
         Ok(creds) => {
             let creds: Vec<Credential> = creds;
             if creds.is_empty() {
-                bot.send_message(msg.chat.id, format!("📭 No credentials found in workspace [<code>{}</code>]", s.workspace))
-                    .parse_mode(ParseMode::Html).await?;
+                bot.send_message(
+                    msg.chat.id,
+                    format!(
+                        "📭 No credentials found in workspace [<code>{}</code>]",
+                        s.workspace
+                    ),
+                )
+                .parse_mode(ParseMode::Html)
+                .await?;
             } else {
-                let header = format!("🔑 <b>Captured Credentials [<code>{}</code>]</b>\n\n\
+                let header = format!(
+                    "🔑 <b>Captured Credentials [<code>{}</code>]</b>\n\n\
                              <code>{:<15} : {}</code>\n\
-                             ─────────────────────────\n", 
-                             s.workspace, "Username", "Secret/Hash");
-                
+                             ─────────────────────────\n",
+                    s.workspace, "Username", "Secret/Hash"
+                );
+
                 let mut items = Vec::new();
                 for c in creds {
-                    let secret = c.password.or(c.nt_hash).unwrap_or_else(|| "none".to_string());
-                    items.push(format!("<code>{:<15}</code> : <code>{}</code>", 
-                        c.username, 
-                        html_escape::encode_safe(&secret)));
+                    let secret = c
+                        .password
+                        .or(c.nt_hash)
+                        .unwrap_or_else(|| "none".to_string());
+                    items.push(format!(
+                        "<code>{:<15}</code> : <code>{}</code>",
+                        c.username,
+                        html_escape::encode_safe(&secret)
+                    ));
                 }
-                
+
                 send_long_msg_batched(&bot, msg.chat.id, header, items).await?;
             }
         }
         Err(e) => {
-            bot.send_message(msg.chat.id, format!("❌ <b>QUERY ERROR</b>\n{}", e)).await?;
+            bot.send_message(msg.chat.id, format!("❌ <b>QUERY ERROR</b>\n{}", e))
+                .await?;
         }
     }
     Ok(())
@@ -1744,7 +1896,11 @@ async fn database_list_workspaces(bot: Bot, msg: Message) -> Result<(), teloxide
     let db = match get_db("default") {
         Some(d) => d,
         None => {
-            bot.send_message(msg.chat.id, "❌ <b>DB ERROR</b>\nFailed to connect to database.").await?;
+            bot.send_message(
+                msg.chat.id,
+                "❌ <b>DB ERROR</b>\nFailed to connect to database.",
+            )
+            .await?;
             return Ok(());
         }
     };
@@ -1755,27 +1911,43 @@ async fn database_list_workspaces(bot: Bot, msg: Message) -> Result<(), teloxide
             for w in ws {
                 report.push_str(&format!("• <code>{}</code>\n", w));
             }
-            bot.send_message(msg.chat.id, report).parse_mode(ParseMode::Html).await?;
+            bot.send_message(msg.chat.id, report)
+                .parse_mode(ParseMode::Html)
+                .await?;
         }
         Err(e) => {
-            bot.send_message(msg.chat.id, format!("❌ <b>QUERY ERROR</b>\n{}", e)).await?;
+            bot.send_message(msg.chat.id, format!("❌ <b>QUERY ERROR</b>\n{}", e))
+                .await?;
         }
     }
     Ok(())
 }
 
-async fn database_set_workspace(bot: Bot, msg: Message, name: String) -> Result<(), teloxide::RequestError> {
+async fn database_set_workspace(
+    bot: Bot,
+    msg: Message,
+    name: String,
+) -> Result<(), teloxide::RequestError> {
     let name = name.trim();
     if name.is_empty() {
-        bot.send_message(msg.chat.id, "💡 Usage: <code>/setworkspace demo</code>").parse_mode(ParseMode::Html).await?;
+        bot.send_message(msg.chat.id, "💡 Usage: <code>/setworkspace demo</code>")
+            .parse_mode(ParseMode::Html)
+            .await?;
         return Ok(());
     }
 
     let user_id = msg.from.as_ref().map(|u| u.id).unwrap_or(UserId(0));
     update_session(user_id, |s| s.workspace = name.to_string());
-    
-    bot.send_message(msg.chat.id, format!("✅ <b>WORKSPACE UPDATED</b>\nNow operating in: <code>{}</code>", name))
-        .parse_mode(ParseMode::Html).await?;
+
+    bot.send_message(
+        msg.chat.id,
+        format!(
+            "✅ <b>WORKSPACE UPDATED</b>\nNow operating in: <code>{}</code>",
+            name
+        ),
+    )
+    .parse_mode(ParseMode::Html)
+    .await?;
     Ok(())
 }
 
@@ -1785,30 +1957,38 @@ async fn database_show_stats(bot: Bot, msg: Message) -> Result<(), teloxide::Req
     let db = match get_db(&s.workspace) {
         Some(d) => d,
         None => {
-            bot.send_message(msg.chat.id, "❌ <b>DB ERROR</b>\nFailed to connect to database.").await?;
+            bot.send_message(
+                msg.chat.id,
+                "❌ <b>DB ERROR</b>\nFailed to connect to database.",
+            )
+            .await?;
             return Ok(());
         }
     };
 
     match db.get_stats_in(&s.workspace) {
         Ok(stats) => {
-            let text = format!("📊 <b>WORKSPACE INTELLIGENCE [<code>{}</code>]</b>\n\n\
+            let text = format!(
+                "📊 <b>WORKSPACE INTELLIGENCE [<code>{}</code>]</b>\n\n\
                         • 🖥️ Discovered Hosts: <code>{}</code>\n\
                         • 🔑 Captured Credentials: <code>{}</code>\n\
                         • 🏰 Domain Controllers: <code>{}</code>\n\
                         • 🛡️ Administrative Pwns: <code>{}</code>\n\n\
                         <i>Tactical overview of current operations.</i>",
-                        stats.workspace,
-                        stats.host_count,
-                        stats.cred_count,
-                        stats.dc_count,
-                        stats.admin_access_count);
-            
+                stats.workspace,
+                stats.host_count,
+                stats.cred_count,
+                stats.dc_count,
+                stats.admin_access_count
+            );
+
             bot.send_message(msg.chat.id, text)
-               .parse_mode(ParseMode::Html).await?;
+                .parse_mode(ParseMode::Html)
+                .await?;
         }
         Err(e) => {
-            bot.send_message(msg.chat.id, format!("❌ <b>QUERY ERROR</b>\n{}", e)).await?;
+            bot.send_message(msg.chat.id, format!("❌ <b>QUERY ERROR</b>\n{}", e))
+                .await?;
         }
     }
     Ok(())
@@ -1857,10 +2037,11 @@ async fn admin_whitelist(
     let admin_id = msg.from.as_ref().map(|u| u.id).unwrap_or(UserId(0));
     if !is_admin(admin_id) {
         bot.send_message(
-                msg.chat.id,
-                "❌ <b>ACCESS RESTRICTED</b>\nAdmin credentials required.",
-            )
-            .parse_mode(ParseMode::Html).await?;
+            msg.chat.id,
+            "❌ <b>ACCESS RESTRICTED</b>\nAdmin credentials required.",
+        )
+        .parse_mode(ParseMode::Html)
+        .await?;
         return Ok(());
     }
 
@@ -1870,13 +2051,21 @@ async fn admin_whitelist(
             allowed.lock().unwrap().insert(id_val);
         }
         bot.send_message(
-                msg.chat.id,
-                format!("✅ Operator <code>{}</code> successfully whitelisted.", id_val),
-            )
-            .parse_mode(ParseMode::Html).await?;
+            msg.chat.id,
+            format!(
+                "✅ Operator <code>{}</code> successfully whitelisted.",
+                id_val
+            ),
+        )
+        .parse_mode(ParseMode::Html)
+        .await?;
     } else {
-        bot.send_message(msg.chat.id, "💡 Usage: <code>/whitelist &lt;user_id&gt;</code>")
-            .parse_mode(ParseMode::Html).await?;
+        bot.send_message(
+            msg.chat.id,
+            "💡 Usage: <code>/whitelist &lt;user_id&gt;</code>",
+        )
+        .parse_mode(ParseMode::Html)
+        .await?;
     }
     Ok(())
 }
@@ -1897,7 +2086,10 @@ async fn admin_broadcast(
         map.keys().copied().collect()
     };
 
-    let b_msg = format!("📢 <b>GLOBAL BROADCAST</b>\n\n{}", html_escape::encode_safe(&text));
+    let b_msg = format!(
+        "📢 <b>GLOBAL BROADCAST</b>\n\n{}",
+        html_escape::encode_safe(&text)
+    );
 
     for uid in uids {
         let _ = bot
@@ -1907,7 +2099,8 @@ async fn admin_broadcast(
     }
 
     bot.send_message(msg.chat.id, "✅ Broadcast message dispatched.")
-       .parse_mode(ParseMode::Html).await?;
+        .parse_mode(ParseMode::Html)
+        .await?;
     Ok(())
 }
 
@@ -1916,15 +2109,15 @@ async fn admin_show_logs(bot: Bot, msg: Message) -> Result<(), teloxide::Request
         return Ok(());
     }
     bot.send_message(
-            msg.chat.id,
-            "📂 <b>LOG STREAM</b>\n\n\
+        msg.chat.id,
+        "📂 <b>LOG STREAM</b>\n\n\
             • Auth Engine events: <code>nxc-auth</code>\n\
             • Protocol handler logs: <code>nxc-protocols</code>\n\
             • Module execution logs: <code>nxc-modules</code>\n\n\
             <i>Enable tracing with RUST_LOG=debug for full output.</i>",
-        )
-        .parse_mode(ParseMode::Html)
-        .await?;
+    )
+    .parse_mode(ParseMode::Html)
+    .await?;
     Ok(())
 }
 
@@ -1978,16 +2171,16 @@ async fn auth_kerberos_test(
     let (kdc, domain, user, pass) = (parts[0], parts[1], parts[2], parts[3]);
 
     bot.send_message(
-            msg.chat.id,
-            format!(
-                "🔑 <i>Initiating Kerberos AS-REQ to {} for {}@{} ...</i>",
-                html_escape::encode_safe(kdc),
-                html_escape::encode_safe(user),
-                html_escape::encode_safe(domain)
-            ),
-        )
-        .parse_mode(ParseMode::Html)
-        .await?;
+        msg.chat.id,
+        format!(
+            "🔑 <i>Initiating Kerberos AS-REQ to {} for {}@{} ...</i>",
+            html_escape::encode_safe(kdc),
+            html_escape::encode_safe(user),
+            html_escape::encode_safe(domain)
+        ),
+    )
+    .parse_mode(ParseMode::Html)
+    .await?;
 
     let client = nxc_auth::kerberos::client::KerberosClient::new(domain, kdc);
     match client.request_tgt(user, Some(pass), None, None).await {
@@ -2015,15 +2208,15 @@ async fn auth_kerberos_test(
         }
         Err(e) => {
             bot.send_message(
-                    msg.chat.id,
-                    format!(
-                        "❌ <b>KERBEROS FAILURE</b>\n\n<code>{}</code>\n\n\
+                msg.chat.id,
+                format!(
+                    "❌ <b>KERBEROS FAILURE</b>\n\n<code>{}</code>\n\n\
                         <i>Verify KDC reachability, credentials, and domain name.</i>",
-                        html_escape::encode_safe(&e.to_string())
-                    ),
-                )
-                .parse_mode(ParseMode::Html)
-                .await?;
+                    html_escape::encode_safe(&e.to_string())
+                ),
+            )
+            .parse_mode(ParseMode::Html)
+            .await?;
         }
     }
     Ok(())
@@ -2058,7 +2251,6 @@ async fn auth_compute_nthash(
         .await?;
     Ok(())
 }
-
 
 // --- 🏗️ Utility Components ---
 
@@ -2101,21 +2293,21 @@ async fn send_long_msg_batched(
         if header.len() > MAX_MESSAGE_LENGTH {
             for chunk in chunk_string(&header, 4000) {
                 bot.send_message(chat_id, chunk)
-                   .parse_mode(ParseMode::Html)
-                   .await?;
+                    .parse_mode(ParseMode::Html)
+                    .await?;
             }
         } else {
             bot.send_message(chat_id, header)
-               .parse_mode(ParseMode::Html)
-               .await?;
+                .parse_mode(ParseMode::Html)
+                .await?;
         }
     } else {
         let mut text = header;
         for i in items {
             if text.len() + i.len() > 3800 {
                 bot.send_message(chat_id, text)
-                   .parse_mode(ParseMode::Html)
-                   .await?;
+                    .parse_mode(ParseMode::Html)
+                    .await?;
                 text = String::from("◈ ");
                 text.push_str(&i);
                 text.push('\n');
@@ -2127,8 +2319,8 @@ async fn send_long_msg_batched(
         }
         if !text.is_empty() {
             bot.send_message(chat_id, text)
-               .parse_mode(ParseMode::Html)
-               .await?;
+                .parse_mode(ParseMode::Html)
+                .await?;
         }
     }
     Ok(())

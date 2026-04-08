@@ -78,11 +78,16 @@ impl NxcProtocol for SnmpProtocol {
         &["snmp_enum", "snmp_brute"]
     }
 
-    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        _proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         // SNMP is UDP, so "connect" just prepares the session metadata.
         // We'll use "public" as the default community string for the initial "connect".
         info!("SNMP: Initializing session for {}:{}", target, port);
-        
+
         Ok(Box::new(SnmpSession {
             target: target.to_string(),
             port,
@@ -108,30 +113,36 @@ impl NxcProtocol for SnmpProtocol {
             "public".to_string()
         };
 
-        debug!("SNMP: Testing community string '{}' on {}", community, snmp_sess.target);
+        debug!(
+            "SNMP: Testing community string '{}' on {}",
+            community, snmp_sess.target
+        );
 
         let addr = format!("{}:{}", snmp_sess.target, snmp_sess.port);
         let timeout = self.timeout;
 
         // Try to get sysDescr (OID .1.3.6.1.2.1.1.1.0)
         let sys_descr_oid = &[1, 3, 6, 1, 2, 1, 1, 1, 0];
-        
+
         let community_clone = community.clone();
         let result: Result<bool, anyhow::Error> = tokio::task::spawn_blocking(move || {
             let mut sess = SyncSession::new(addr, community_clone.as_bytes(), Some(timeout), 0)
                 .map_err(|e| anyhow!("SNMP Session Error: {}", e))?;
-            let response = sess.get(sys_descr_oid).map_err(|e| anyhow!("SNMP Get Error: {:?}", e))?;
+            let response = sess
+                .get(sys_descr_oid)
+                .map_err(|e| anyhow!("SNMP Get Error: {:?}", e))?;
             Ok(response.varbinds.into_iter().next().is_some())
-        }).await?;
+        })
+        .await?;
 
         match result {
             Ok(success) => {
                 if success {
-                     debug!("SNMP: Auth successful for community '{}'", community);
-                     snmp_sess.community = community;
-                     Ok(AuthResult::success(true))
+                    debug!("SNMP: Auth successful for community '{}'", community);
+                    snmp_sess.community = community;
+                    Ok(AuthResult::success(true))
                 } else {
-                     Ok(AuthResult::failure("No varbinds in response", None))
+                    Ok(AuthResult::failure("No varbinds in response", None))
                 }
             }
             Err(e) => {
@@ -142,7 +153,7 @@ impl NxcProtocol for SnmpProtocol {
     }
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
-         Err(anyhow!("SNMP protocol does not support command execution"))
+        Err(anyhow!("SNMP protocol does not support command execution"))
     }
 }
 
@@ -173,9 +184,9 @@ impl SnmpProtocol {
                 }
             }
             Ok(report)
-        }).await?;
+        })
+        .await?;
 
         result
     }
 }
-

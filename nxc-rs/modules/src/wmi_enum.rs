@@ -2,11 +2,11 @@
 //!
 //! Enumerates processes, services, and patches via WMI.
 
-use crate::{ModuleResult, NxcModule, ModuleOptions};
-use nxc_protocols::NxcSession;
+use crate::{ModuleOptions, ModuleResult, NxcModule};
 use anyhow::Result;
 use async_trait::async_trait;
-use tracing::{info, debug};
+use nxc_protocols::NxcSession;
+use tracing::{debug, info};
 
 pub struct WmiEnumModule;
 
@@ -30,11 +30,15 @@ impl NxcModule for WmiEnumModule {
         &["wmi", "smb"]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         info!("WMI: Starting enumeration on {}", session.target());
 
         let mut output = String::new();
-        
+
         // 1. Enumerate Processes
         debug!("WMI: Querying Win32_Process...");
         output.push_str("[*] Processes:\n    - lsass.exe (PID: 780)\n");
@@ -48,7 +52,8 @@ impl NxcModule for WmiEnumModule {
         output.push_str("[*] Patches:\n    - KB5012345 (Installed: 2024-01-01)\n");
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output,
             data: serde_json::json!({
                 "processes": [{"name": "lsass.exe", "pid": 780}],

@@ -26,7 +26,11 @@ impl NxcModule for DockerEnum {
         &["docker"]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         let docker_sess = session
             .as_any()
             .downcast_ref::<DockerSession>()
@@ -36,7 +40,8 @@ impl NxcModule for DockerEnum {
         let info = protocol.enumerate(docker_sess).await?;
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: info.clone(),
             data: serde_json::json!({ "info": info }),
         })

@@ -283,7 +283,7 @@ impl NxcDb {
 
     pub fn get_stats_in(&self, workspace: &str) -> Result<WorkspaceStats> {
         let conn = self.pool.get()?;
-        
+
         let host_count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM nxc_hosts WHERE workspace = ?1",
             rusqlite::params![workspace],

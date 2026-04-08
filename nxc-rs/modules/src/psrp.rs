@@ -2,10 +2,10 @@
 //!
 //! Handles PowerShell Remoting Protocol (PSRP) over WinRM.
 
-use crate::{ModuleResult, NxcModule, ModuleOptions};
-use nxc_protocols::NxcSession;
+use crate::{ModuleOptions, ModuleResult, NxcModule};
 use anyhow::Result;
 use async_trait::async_trait;
+use nxc_protocols::NxcSession;
 use tracing::info;
 
 pub struct PsrpModule;
@@ -30,15 +30,20 @@ impl NxcModule for PsrpModule {
         &["winrm"]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         info!("WinRM: Starting PSRP session on {}", session.target());
 
         // 1. Create Shell
         // 2. Wrap/Unwrap PSRP Fragments
         // 3. Execute Pipeline
-        
+
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: "PSRP session initialized. Fragment parsing pending.".to_string(),
             data: serde_json::json!({
                 "session_id": "89BC86C4-34B7-48EE-9076-2917034E1D13"

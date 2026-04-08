@@ -34,14 +34,12 @@ impl NxcModule for MethodFuzz {
     }
 
     fn options(&self) -> Vec<ModuleOption> {
-        vec![
-            ModuleOption {
-                name: "PATH".to_string(),
-                description: "Endpoint path to fuzz (default /)".to_string(),
-                required: false,
-                default: Some("/".to_string()),
-            },
-        ]
+        vec![ModuleOption {
+            name: "PATH".to_string(),
+            description: "Endpoint path to fuzz (default /)".to_string(),
+            required: false,
+            default: Some("/".to_string()),
+        }]
     }
 
     async fn run(
@@ -56,8 +54,11 @@ impl NxcModule for MethodFuzz {
 
         let path = opts.get("PATH").map(|s| s.as_str()).unwrap_or("/");
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
-        let url = format!("{}://{}:{}{}", scheme, http_sess.target, http_sess.port, path);
-        
+        let url = format!(
+            "{}://{}:{}{}",
+            scheme, http_sess.target, http_sess.port, path
+        );
+
         info!("Starting HTTP Method Fuzzing against {}", url);
 
         let test_methods = vec![
@@ -77,7 +78,7 @@ impl NxcModule for MethodFuzz {
 
         for (name, method) in test_methods {
             let mut req = http_sess.client.request(method.clone(), &url);
-            
+
             if let Some(creds) = &http_sess.credentials {
                 if let Some(pw) = &creds.password {
                     req = req.basic_auth(&creds.username, Some(pw));
@@ -88,25 +89,37 @@ impl NxcModule for MethodFuzz {
 
             if let Ok(res) = req.send().await {
                 let status = res.status();
-                
+
                 // HTTP 405 Method Not Allowed naturally implies rejection
                 // HTTP 501 Not Implemented implies rejection
                 // If it isn't rejected, it is allowed or gracefully falls back
-                if status != reqwest::StatusCode::METHOD_NOT_ALLOWED && status != reqwest::StatusCode::NOT_IMPLEMENTED {
+                if status != reqwest::StatusCode::METHOD_NOT_ALLOWED
+                    && status != reqwest::StatusCode::NOT_IMPLEMENTED
+                {
                     allowed_methods.push(json!({
                         "method": name,
                         "status_code": status.as_u16(),
                     }));
-                    output.push_str(&format!("  [+] {} allowed! (Status: {})\n", name, status.as_str()));
-                    
+                    output.push_str(&format!(
+                        "  [+] {} allowed! (Status: {})\n",
+                        name,
+                        status.as_str()
+                    ));
+
                     if name == "TRACE" && status.is_success() {
-                        output.push_str("      -> CRITICAL: TRACE is enabled (Potential XST Vulnerability!)\n");
+                        output.push_str(
+                            "      -> CRITICAL: TRACE is enabled (Potential XST Vulnerability!)\n",
+                        );
                     }
                     if (name == "PUT" || name == "DELETE") && status.is_success() {
                         output.push_str(&format!("      -> HIGH: {} is functionally allowed! File modification may be possible.\n", name));
                     }
                 } else {
-                    output.push_str(&format!("  [-] {} cleanly rejected (Status: {}).\n", name, status.as_str()));
+                    output.push_str(&format!(
+                        "  [-] {} cleanly rejected (Status: {}).\n",
+                        name,
+                        status.as_str()
+                    ));
                 }
             }
         }

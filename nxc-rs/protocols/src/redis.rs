@@ -78,19 +78,28 @@ impl NxcProtocol for RedisProtocol {
         &["redis_enum", "redis_info"]
     }
 
-    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        _proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         let connection_info = format!("redis://{}:{}/", target, port);
         debug!("Redis: Connecting to {}", connection_info);
 
         let client = Client::open(connection_info)?;
-        let connect_fut = tokio::time::timeout(self.timeout, client.get_multiplexed_async_connection());
+        let connect_fut =
+            tokio::time::timeout(self.timeout, client.get_multiplexed_async_connection());
 
         match connect_fut.await {
             Ok(Ok(mut conn)) => {
                 info!("Redis: Connected to {}:{}", target, port);
                 // Check if it's unauthenticated
-                let is_unauth: bool = redis::cmd("INFO").query_async::<redis::Value>(&mut conn).await.is_ok();
-                
+                let is_unauth: bool = redis::cmd("INFO")
+                    .query_async::<redis::Value>(&mut conn)
+                    .await
+                    .is_ok();
+
                 Ok(Box::new(RedisSession {
                     target: target.to_string(),
                     port,
@@ -100,9 +109,11 @@ impl NxcProtocol for RedisProtocol {
             }
             Ok(Err(e)) => {
                 // If it requires auth, we might still be "connected" but unable to run commands
-                if e.to_string().contains("Authentication required") || e.to_string().contains("NOAUTH") {
-                     debug!("Redis: Connection established, but authentication required.");
-                     Ok(Box::new(RedisSession {
+                if e.to_string().contains("Authentication required")
+                    || e.to_string().contains("NOAUTH")
+                {
+                    debug!("Redis: Connection established, but authentication required.");
+                    Ok(Box::new(RedisSession {
                         target: target.to_string(),
                         port,
                         admin: false,
@@ -133,13 +144,20 @@ impl NxcProtocol for RedisProtocol {
 
         let password = creds.password.as_deref().unwrap_or_default();
         let connection_info = if creds.username.is_empty() {
-             format!("redis://:{}@{}:{}/", password, redis_sess.target, redis_sess.port)
+            format!(
+                "redis://:{}@{}:{}/",
+                password, redis_sess.target, redis_sess.port
+            )
         } else {
-             format!("redis://{}:{}@{}:{}/", creds.username, password, redis_sess.target, redis_sess.port)
+            format!(
+                "redis://{}:{}@{}:{}/",
+                creds.username, password, redis_sess.target, redis_sess.port
+            )
         };
 
         let client = Client::open(connection_info)?;
-        let connect_fut = tokio::time::timeout(self.timeout, client.get_multiplexed_async_connection());
+        let connect_fut =
+            tokio::time::timeout(self.timeout, client.get_multiplexed_async_connection());
 
         match connect_fut.await {
             Ok(Ok(mut _conn)) => {
@@ -169,7 +187,10 @@ impl RedisProtocol {
             if creds.username.is_empty() {
                 format!("redis://:{}@{}:{}/", password, session.target, session.port)
             } else {
-                format!("redis://{}:{}@{}:{}/", creds.username, password, session.target, session.port)
+                format!(
+                    "redis://{}:{}@{}:{}/",
+                    creds.username, password, session.target, session.port
+                )
             }
         } else {
             format!("redis://{}:{}/", session.target, session.port)
@@ -181,4 +202,3 @@ impl RedisProtocol {
         Ok(info)
     }
 }
-

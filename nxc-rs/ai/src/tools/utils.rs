@@ -2,8 +2,8 @@ use super::NxcTool;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use tokio::net::lookup_host;
 use std::time::Duration;
+use tokio::net::lookup_host;
 
 pub struct UtilityTool;
 
@@ -55,28 +55,33 @@ impl NxcTool for UtilityTool {
                     let start = std::time::Instant::now();
                     if let Ok(_) = tokio::time::timeout(
                         Duration::from_secs(2),
-                        tokio::net::TcpStream::connect(format!("{}:{}", target, port))
-                    ).await {
+                        tokio::net::TcpStream::connect(format!("{}:{}", target, port)),
+                    )
+                    .await
+                    {
                         success = true;
                         latency = Some(start.elapsed().as_millis());
                         break;
                     }
                 }
 
-                Ok(json!({ 
-                    "reachable": success, 
+                Ok(json!({
+                    "reachable": success,
                     "latency_ms": latency,
                     "method": "TCP connect (ports 80/443/22)"
                 }))
             }
             "geo_lookup" => {
-                let url = format!("http://ip-api.com/json/{}?fields=status,message,country,city,isp,query", target);
+                let url = format!(
+                    "http://ip-api.com/json/{}?fields=status,message,country,city,isp,query",
+                    target
+                );
                 let client = reqwest::Client::new();
                 let resp = client.get(url).send().await?;
                 let json: Value = resp.json().await?;
                 Ok(json)
             }
-            _ => Ok(json!({ "error": "Invalid action" }))
+            _ => Ok(json!({ "error": "Invalid action" })),
         }
     }
 }

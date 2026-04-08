@@ -3,8 +3,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_protocols::{ftp::FtpSession, NxcSession};
 use serde_json::json;
-use tracing::info;
 use suppaftp::tokio::AsyncFtpStream;
+use tracing::info;
 
 pub struct FtpAnon {}
 
@@ -72,13 +72,16 @@ impl NxcModule for FtpAnon {
                             files.push(item.trim().to_string());
                         }
                         if list.len() > 20 {
-                            output.push_str(&format!("         ... and {} more items.\n", list.len() - 20));
+                            output.push_str(&format!(
+                                "         ... and {} more items.\n",
+                                list.len() - 20
+                            ));
                         }
                     }
                 } else {
                     output.push_str("      [-] Anonymous login succeeded, but failed to list directory contents (Data channel blocked or permissions denied).\n");
                 }
-                
+
                 // Cleanup
                 let _ = ftp_stream.quit().await;
             } else {

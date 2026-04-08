@@ -7,14 +7,14 @@ use crate::{CommandOutput, NxcProtocol, NxcSession};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
+use rasn::{AsnType, Decode, Decoder, Encode, Encoder};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
-use tracing::{debug, info};
-use std::sync::Arc;
-use tokio_rustls::rustls::{self, ClientConfig, pki_types::ServerName};
+use tokio_rustls::rustls::{self, pki_types::ServerName, ClientConfig};
 use tokio_rustls::TlsConnector;
-use rasn::{AsnType, Decode, Encode, Encoder, Decoder};
+use tracing::{debug, info};
 
 #[derive(AsnType, Decode, Encode, Debug, Clone)]
 #[rasn(delegate)]
@@ -148,7 +148,12 @@ impl NxcProtocol for RdpProtocol {
         &["nla_screenshot", "screenshot", "rdp_sec_check"] // Standard RDP enumeration modules
     }
 
-    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        _proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         debug!("RDP: Connecting to {}", addr);
 
@@ -203,9 +208,12 @@ impl NxcProtocol for RdpProtocol {
         session: &mut dyn NxcSession,
         creds: &Credentials,
     ) -> Result<AuthResult> {
-        let rdp_sess = session.as_any().downcast_ref::<RdpSession>().ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
+        let rdp_sess = session
+            .as_any()
+            .downcast_ref::<RdpSession>()
+            .ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
         let addr = format!("{}:{}", rdp_sess.target, rdp_sess.port);
-        
+
         debug!("RDP: Authenticating {} via NLA on {}", creds.username, addr);
 
         // 1. Re-connect and perform X.224 negotiation to establish TLS
@@ -215,7 +223,7 @@ impl NxcProtocol for RdpProtocol {
             0x00, 0x03, 0x00, 0x00, 0x00,
         ];
         tcp.write_all(&x224_req).await?;
-        
+
         let mut resp = [0u8; 19];
         tokio::io::AsyncReadExt::read_exact(&mut tcp, &mut resp).await?;
 
@@ -224,10 +232,10 @@ impl NxcProtocol for RdpProtocol {
             .dangerous()
             .with_custom_certificate_verifier(Arc::new(NoCertificateVerification))
             .with_no_client_auth();
-        
+
         // Ensure we support TLS 1.2+ (standard for RDP)
         config.alpn_protocols = vec![b"rdp".to_vec()];
-        
+
         let connector = TlsConnector::from(Arc::new(config));
         let server_name = ServerName::try_from(rdp_sess.target.clone())
             .map_err(|_| anyhow!("Invalid server name: {}", rdp_sess.target))?;
@@ -239,16 +247,19 @@ impl NxcProtocol for RdpProtocol {
         // Send TsRequest with NTLM Negotiate
         let auth = nxc_auth::NtlmAuthenticator::new(creds.domain.as_deref());
         let t1_msg = auth.generate_type1();
-        
+
         let ts_req1 = TsRequest {
             version: 6, // CredSSP v6
-            nego_tokens: Some(vec![NegoData { nego_token: NegoToken(t1_msg) }]),
+            nego_tokens: Some(vec![NegoData {
+                nego_token: NegoToken(t1_msg),
+            }]),
             auth_info: None,
             pub_key_auth: None,
         };
 
-        let ts_req1_der = rasn::der::encode(&ts_req1).map_err(|e| anyhow!("ASN.1 encode error: {}", e))?;
-        
+        let ts_req1_der =
+            rasn::der::encode(&ts_req1).map_err(|e| anyhow!("ASN.1 encode error: {}", e))?;
+
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let (mut reader, mut writer) = tokio::io::split(_tls);
         writer.write_all(&ts_req1_der).await?;
@@ -256,9 +267,11 @@ impl NxcProtocol for RdpProtocol {
         // 4. Receive NTLM Challenge
         let mut resp_buf = vec![0u8; 4096];
         let n = reader.read(&mut resp_buf).await?;
-        let ts_resp: TsRequest = rasn::der::decode(&resp_buf[..n]).map_err(|e| anyhow!("ASN.1 decode error: {}", e))?;
-        
-        let t2_msg = ts_resp.nego_tokens
+        let ts_resp: TsRequest =
+            rasn::der::decode(&resp_buf[..n]).map_err(|e| anyhow!("ASN.1 decode error: {}", e))?;
+
+        let t2_msg = ts_resp
+            .nego_tokens
             .and_then(|tokens| tokens.first().cloned())
             .map(|tok| tok.nego_token.0)
             .ok_or_else(|| anyhow!("No NegoToken in TsRequest response"))?;
@@ -268,18 +281,24 @@ impl NxcProtocol for RdpProtocol {
         let t3_res = auth.generate_type3(creds, &challenge)?;
         let ts_req2 = TsRequest {
             version: 6,
-            nego_tokens: Some(vec![NegoData { nego_token: NegoToken(t3_res.message) }]),
+            nego_tokens: Some(vec![NegoData {
+                nego_token: NegoToken(t3_res.message),
+            }]),
             auth_info: None,
             pub_key_auth: None, // In real CredSSP we'd calculate public key auth here
         };
 
-        let ts_req2_der = rasn::der::encode(&ts_req2).map_err(|e| anyhow!("ASN.1 encode error: {}", e))?;
+        let ts_req2_der =
+            rasn::der::encode(&ts_req2).map_err(|e| anyhow!("ASN.1 encode error: {}", e))?;
         writer.write_all(&ts_req2_der).await?;
 
         // 6. Receive final response
         let n = reader.read(&mut resp_buf).await?;
         if n == 0 {
-             return Ok(AuthResult::failure("RDP NLA: Connection closed during authentication", None));
+            return Ok(AuthResult::failure(
+                "RDP NLA: Connection closed during authentication",
+                None,
+            ));
         }
 
         // Standard NLA check: If we don't get an error, and the connection remains open, it's typically a success.
@@ -295,4 +314,3 @@ impl NxcProtocol for RdpProtocol {
         ))
     }
 }
-

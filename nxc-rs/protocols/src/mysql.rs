@@ -78,7 +78,12 @@ impl NxcProtocol for MysqlProtocol {
         &["mysql_enum", "mysql_databases"]
     }
 
-    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        _proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         debug!("MySQL: Connecting to {}", addr);
 
@@ -138,11 +143,18 @@ impl NxcProtocol for MysqlProtocol {
                         debug!("MySQL: Authenticated as {}", current_user);
                     }
                 }
-                
+
                 // Check if we can list all users as a proxy for admin
-                if conn.query::<Row, _>("SELECT user FROM mysql.user LIMIT 1").await.is_ok() {
+                if conn
+                    .query::<Row, _>("SELECT user FROM mysql.user LIMIT 1")
+                    .await
+                    .is_ok()
+                {
                     is_admin = true;
-                    debug!("MySQL: User {} has administrative access (can read mysql.user)!", username);
+                    debug!(
+                        "MySQL: User {} has administrative access (can read mysql.user)!",
+                        username
+                    );
                 }
 
                 mysql_sess.admin = is_admin;
@@ -158,12 +170,15 @@ impl NxcProtocol for MysqlProtocol {
     }
 
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput> {
-         let mysql_sess = match session.protocol() {
+        let mysql_sess = match session.protocol() {
             "mysql" => unsafe { &*(session as *const dyn NxcSession as *const MysqlSession) },
             _ => return Err(anyhow!("Invalid session type")),
         };
 
-        let creds = mysql_sess.credentials.as_ref().ok_or_else(|| anyhow!("Not authenticated"))?;
+        let creds = mysql_sess
+            .credentials
+            .as_ref()
+            .ok_or_else(|| anyhow!("Not authenticated"))?;
         let opts = OptsBuilder::default()
             .ip_or_hostname(&mysql_sess.target)
             .tcp_port(mysql_sess.port)
@@ -174,10 +189,10 @@ impl NxcProtocol for MysqlProtocol {
         let pool = Pool::new(opts);
         let mut conn = pool.get_conn().await?;
 
-        // MySQL execution is typically SQL-based. 
+        // MySQL execution is typically SQL-based.
         // For OS command execution, it would involve UDF or FILE privilege (into outfile).
         // For now, we'll implement a simple "SQL execution" wrapper as a placeholder.
-        
+
         let mut stdout = String::new();
         match conn.query::<Row, _>(cmd).await {
             Ok(rows) => {
@@ -209,7 +224,10 @@ impl NxcProtocol for MysqlProtocol {
 impl MysqlProtocol {
     /// List all databases.
     pub async fn list_databases(&self, session: &MysqlSession) -> Result<Vec<String>> {
-         let creds = session.credentials.as_ref().ok_or_else(|| anyhow!("Not authenticated"))?;
+        let creds = session
+            .credentials
+            .as_ref()
+            .ok_or_else(|| anyhow!("Not authenticated"))?;
         let opts = OptsBuilder::default()
             .ip_or_hostname(&session.target)
             .tcp_port(session.port)
@@ -220,9 +238,11 @@ impl MysqlProtocol {
         let mut conn = pool.get_conn().await?;
 
         let rows = conn.query::<Row, _>("SHOW DATABASES").await?;
-        let dbs = rows.into_iter().map(|row| row.get(0).unwrap_or_default()).collect();
+        let dbs = rows
+            .into_iter()
+            .map(|row| row.get(0).unwrap_or_default())
+            .collect();
         let _ = conn.disconnect().await;
         Ok(dbs)
     }
 }
-

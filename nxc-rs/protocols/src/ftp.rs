@@ -81,7 +81,12 @@ impl NxcProtocol for FtpProtocol {
         &["ls", "get", "put", "ftp_anon"]
     }
 
-    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        _proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         debug!("FTP: Connecting to {}", addr);
 
@@ -126,7 +131,10 @@ impl NxcProtocol for FtpProtocol {
         let username = creds.username.clone();
         let password = creds.password.clone().unwrap_or_default();
 
-        let ftp_sess = session.as_any().downcast_ref::<FtpSession>().ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
+        let ftp_sess = session
+            .as_any()
+            .downcast_ref::<FtpSession>()
+            .ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
         let addr = format!("{}:{}", ftp_sess.target, ftp_sess.port);
 
         debug!("FTP: Authenticating {}@{}", username, addr);
@@ -137,8 +145,10 @@ impl NxcProtocol for FtpProtocol {
             Ok(_) => {
                 info!("FTP: Auth success for {}@{}", username, addr);
                 // Update session with successful credentials
-                let ftp_sess_mut =
-                    session.as_any_mut().downcast_mut::<FtpSession>().ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
+                let ftp_sess_mut = session
+                    .as_any_mut()
+                    .downcast_mut::<FtpSession>()
+                    .ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
                 ftp_sess_mut.credentials = creds.clone();
                 Ok(AuthResult::success(false)) // FTP doesn't really have "admin"
             }
@@ -156,15 +166,24 @@ impl NxcProtocol for FtpProtocol {
         Err(anyhow!("FTP does not support explicit command execution."))
     }
 
-    async fn read_file(&self, session: &dyn NxcSession, _share: &str, path: &str) -> Result<Vec<u8>> {
-        let ftp_sess = session.downcast_ref::<FtpSession>().ok_or_else(|| anyhow!("Invalid session"))?;
+    async fn read_file(
+        &self,
+        session: &dyn NxcSession,
+        _share: &str,
+        path: &str,
+    ) -> Result<Vec<u8>> {
+        let ftp_sess = session
+            .downcast_ref::<FtpSession>()
+            .ok_or_else(|| anyhow!("Invalid session"))?;
         let addr = format!("{}:{}", ftp_sess.target, ftp_sess.port);
         let mut ftp_stream = AsyncFtpStream::connect(&addr).await?;
-        
+
         let empty = String::new();
         let pass = ftp_sess.credentials.password.as_ref().unwrap_or(&empty);
-        ftp_stream.login(&ftp_sess.credentials.username, pass).await?;
-        
+        ftp_stream
+            .login(&ftp_sess.credentials.username, pass)
+            .await?;
+
         let mut reader = ftp_stream.retr_as_stream(path).await?;
         let mut buffer = Vec::new();
         reader.read_to_end(&mut buffer).await?;
@@ -172,15 +191,25 @@ impl NxcProtocol for FtpProtocol {
         Ok(buffer)
     }
 
-    async fn write_file(&self, session: &dyn NxcSession, _share: &str, path: &str, data: &[u8]) -> Result<()> {
-        let ftp_sess = session.downcast_ref::<FtpSession>().ok_or_else(|| anyhow!("Invalid session"))?;
+    async fn write_file(
+        &self,
+        session: &dyn NxcSession,
+        _share: &str,
+        path: &str,
+        data: &[u8],
+    ) -> Result<()> {
+        let ftp_sess = session
+            .downcast_ref::<FtpSession>()
+            .ok_or_else(|| anyhow!("Invalid session"))?;
         let addr = format!("{}:{}", ftp_sess.target, ftp_sess.port);
         let mut ftp_stream = AsyncFtpStream::connect(&addr).await?;
-        
+
         let empty = String::new();
         let pass = ftp_sess.credentials.password.as_ref().unwrap_or(&empty);
-        ftp_stream.login(&ftp_sess.credentials.username, pass).await?;
-        
+        ftp_stream
+            .login(&ftp_sess.credentials.username, pass)
+            .await?;
+
         let mut cursor = std::io::Cursor::new(data);
         ftp_stream.put_file(path, &mut cursor).await?;
         Ok(())
@@ -207,4 +236,3 @@ impl FtpProtocol {
         Ok(list)
     }
 }
-

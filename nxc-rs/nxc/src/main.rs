@@ -4,24 +4,23 @@
 //! Usage: `nxc <protocol> <targets> [options]`
 
 mod output;
-mod telegram;
 mod relay;
 mod reporting;
+mod telegram;
 
 use anyhow::{Context, Result};
-use clap::{Command, Arg, ArgAction};
 use chrono::Utc;
+use clap::{Arg, ArgAction, Command};
 use colored::Colorize;
 use nxc_auth::Credentials;
+use nxc_db::NxcDb;
 use nxc_modules::ModuleRegistry;
 use nxc_protocols::Protocol;
-use nxc_db::NxcDb;
 use nxc_targets::{parse_targets, ExecutionEngine, ExecutionOpts};
 use output::{NxcGlobalOutput, NxcOutput};
+use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
-use std::io::Write;
-
 
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) const CODENAME: &str = "Rusty-Reaper";
@@ -38,14 +37,25 @@ pub(crate) fn build_cli() -> Command {
          {} {} {}
            {}   {}
 "#,
-        ".".cyan().bold(), ".".cyan().bold(),
-        ".|".cyan().bold(), "|.".cyan().bold(),
-        "||".cyan().bold(), "||".cyan().bold(),
-        "\\\\".cyan().bold(), "//".cyan().bold(),
-        ".[".cyan().bold(), " ".white().bold(), "].".cyan().bold(),
-        "/ /".cyan().bold(), "˙-˙".yellow().bold(), "\\ \\".cyan().bold(),
-        "˙".cyan().bold(), "\\ /".yellow().bold(), "˙".cyan().bold(),
-        "˙".cyan().bold(), "˙".cyan().bold()
+        ".".cyan().bold(),
+        ".".cyan().bold(),
+        ".|".cyan().bold(),
+        "|.".cyan().bold(),
+        "||".cyan().bold(),
+        "||".cyan().bold(),
+        "\\\\".cyan().bold(),
+        "//".cyan().bold(),
+        ".[".cyan().bold(),
+        " ".white().bold(),
+        "].".cyan().bold(),
+        "/ /".cyan().bold(),
+        "˙-˙".yellow().bold(),
+        "\\ \\".cyan().bold(),
+        "˙".cyan().bold(),
+        "\\ /".yellow().bold(),
+        "˙".cyan().bold(),
+        "˙".cyan().bold(),
+        "˙".cyan().bold()
     );
 
     let text_block = format!(
@@ -593,7 +603,7 @@ pub(crate) fn build_cli() -> Command {
                 .help("Perform LLMNR host discovery")
                 .action(ArgAction::SetTrue),
         );
-    
+
     let redis_cmd = Command::new("redis")
         .about("Redis protocol (port 6379)")
         .args(&auth_args)
@@ -932,7 +942,9 @@ pub(crate) fn get_protocol_handler(
             )))
         }
         "redis" => Some(Arc::new(nxc_protocols::redis::RedisProtocol::new())),
-        "postgres" | "postgresql" => Some(Arc::new(nxc_protocols::postgresql::PostgresProtocol::new())),
+        "postgres" | "postgresql" => {
+            Some(Arc::new(nxc_protocols::postgresql::PostgresProtocol::new()))
+        }
         "mysql" => Some(Arc::new(nxc_protocols::mysql::MysqlProtocol::new())),
         "snmp" => Some(Arc::new(nxc_protocols::snmp::SnmpProtocol::new())),
         "docker" => Some(Arc::new(nxc_protocols::docker::DockerProtocol::new())),
@@ -978,18 +990,27 @@ async fn main() -> Result<()> {
             let initial_prompt = ai_matches.get_one::<String>("prompt").cloned();
             let provider_name = ai_matches.get_one::<String>("provider").unwrap();
             let model = ai_matches.get_one::<String>("model").cloned();
-            
+
             dotenvy::dotenv().ok();
-            
+
             let api_key = match provider_name.as_str() {
-                "gemini" => std::env::var("GEMINI_API_KEY").context("GEMINI_API_KEY not found in .env"),
-                "openai" => std::env::var("OPENAI_API_KEY").context("OPENAI_API_KEY not found in .env"),
-                "anthropic" => std::env::var("ANTHROPIC_API_KEY").context("ANTHROPIC_API_KEY not found in .env"),
+                "gemini" => {
+                    std::env::var("GEMINI_API_KEY").context("GEMINI_API_KEY not found in .env")
+                }
+                "openai" => {
+                    std::env::var("OPENAI_API_KEY").context("OPENAI_API_KEY not found in .env")
+                }
+                "anthropic" => std::env::var("ANTHROPIC_API_KEY")
+                    .context("ANTHROPIC_API_KEY not found in .env"),
                 _ => anyhow::bail!("Unsupported AI provider: {}", provider_name),
             }?;
 
-            println!("{} Initializing AI Automation Engine with provider: {}...", "◆".cyan().bold(), provider_name.yellow().bold());
-            
+            println!(
+                "{} Initializing AI Automation Engine with provider: {}...",
+                "◆".cyan().bold(),
+                provider_name.yellow().bold()
+            );
+
             // Initialize AI Agent
             let provider: Box<dyn nxc_ai::providers::AiProvider> = match provider_name.as_str() {
                 "gemini" => Box::new(nxc_ai::GeminiProvider::new(api_key, model)),
@@ -1008,8 +1029,9 @@ async fn main() -> Result<()> {
             registry.register(Box::new(nxc_ai::SearchModulesTool::new(registry_mod)));
             registry.register(Box::new(nxc_ai::UtilityTool));
 
-            let mut agent = nxc_ai::AiAgent::new(provider, registry, Box::new(nxc_ai::agent::CliFeedback));
-            
+            let mut agent =
+                nxc_ai::AiAgent::new(provider, registry, Box::new(nxc_ai::agent::CliFeedback));
+
             // If an initial prompt was provided on CLI, run it first
             if let Some(prompt) = initial_prompt {
                 println!("{} Goal: {}", "🛰️".green().bold(), prompt.green().bold());
@@ -1043,7 +1065,7 @@ async fn main() -> Result<()> {
                     }
                 }
             }
-            
+
             return Ok(());
         }
         Some((name, sub_m)) => (name, sub_m),
@@ -1151,45 +1173,47 @@ async fn main() -> Result<()> {
             if sub_matches.get_flag("screenshot") && !modules.contains(&"screenshot".to_string()) {
                 modules.push("screenshot".to_string());
             }
-        },
+        }
         "adb" => {
-            if sub_matches.get_flag("screenshot") && !modules.contains(&"adb_screenshot".to_string()) {
+            if sub_matches.get_flag("screenshot")
+                && !modules.contains(&"adb_screenshot".to_string())
+            {
                 modules.push("adb_screenshot".to_string());
             }
-        },
+        }
         "rdp" => {
             // rdp screenshot module pending
-        },
+        }
         "ldap" => {
             if sub_matches.get_flag("gmsa") && !modules.contains(&"gmsa".to_string()) {
                 modules.push("gmsa".to_string());
             }
-        },
+        }
         "redis" => {
             if sub_matches.get_flag("info") && !modules.contains(&"redis_info".to_string()) {
                 modules.push("redis_info".to_string());
             }
-        },
+        }
         "postgres" | "postgresql" => {
             if sub_matches.get_flag("dbs") && !modules.contains(&"pg_enum".to_string()) {
                 modules.push("pg_enum".to_string());
             }
-        },
+        }
         "mysql" => {
             if sub_matches.get_flag("dbs") && !modules.contains(&"mysql_enum".to_string()) {
                 modules.push("mysql_enum".to_string());
             }
-        },
+        }
         "snmp" => {
             if sub_matches.get_flag("enum") && !modules.contains(&"snmp_enum".to_string()) {
                 modules.push("snmp_enum".to_string());
             }
-        },
+        }
         "docker" => {
             if sub_matches.get_flag("enum") && !modules.contains(&"docker_enum".to_string()) {
                 modules.push("docker_enum".to_string());
             }
-        },
+        }
         _ => {}
     }
 
@@ -1215,16 +1239,21 @@ async fn main() -> Result<()> {
     };
 
     // ── Setup Database ──
-    let workspace = matches.get_one::<String>("workspace").map(|s| s.as_str()).unwrap_or("default");
-    
+    let workspace = matches
+        .get_one::<String>("workspace")
+        .map(|s| s.as_str())
+        .unwrap_or("default");
+
     // Ensure .nxc directory exists in home or current dir
-    let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).unwrap_or_else(|_| ".".to_string());
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
     let dot_nxc = std::path::PathBuf::from(home).join(".nxc");
     if !dot_nxc.exists() {
         let _ = std::fs::create_dir_all(&dot_nxc);
     }
     let db_path = dot_nxc.join("nxc.db");
-    
+
     let db = match NxcDb::new(&db_path, workspace) {
         Ok(d) => Some(Arc::new(d)),
         Err(e) => {
@@ -1234,17 +1263,27 @@ async fn main() -> Result<()> {
     };
 
     // ── Execution Header ──
-    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed());
+    println!(
+        "{}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed()
+    );
     NxcGlobalOutput::banner(VERSION, CODENAME);
     if let Some(ref d) = db {
-        NxcGlobalOutput::info(&format!("Workspace: {}", d.current_workspace().bold().cyan()));
+        NxcGlobalOutput::info(&format!(
+            "Workspace: {}",
+            d.current_workspace().bold().cyan()
+        ));
     }
     NxcGlobalOutput::info(&format!(
         "{} {} | {} {} | {} {} | {} {}",
-        "Protocol:".bold().cyan(), protocol_name.green(),
-        "Targets:".bold().cyan(), all_targets.len().to_string().yellow(),
-        "Credentials:".bold().cyan(), creds.len().to_string().yellow(),
-        "Threads:".bold().cyan(), threads.to_string().magenta()
+        "Protocol:".bold().cyan(),
+        protocol_name.green(),
+        "Targets:".bold().cyan(),
+        all_targets.len().to_string().yellow(),
+        "Credentials:".bold().cyan(),
+        creds.len().to_string().yellow(),
+        "Threads:".bold().cyan(),
+        threads.to_string().magenta()
     ));
 
     // ── Load Credentials from DB if requested ──
@@ -1263,9 +1302,14 @@ async fn main() -> Result<()> {
                         nxc_cred.aes_256_key = c.aes_256.clone();
                         creds.push(nxc_cred);
                     }
-                    NxcGlobalOutput::info(&format!("Loaded {} credentials from database", creds.len()));
+                    NxcGlobalOutput::info(&format!(
+                        "Loaded {} credentials from database",
+                        creds.len()
+                    ));
                 }
-                Err(e) => NxcGlobalOutput::warn(&format!("Failed to load credentials from DB: {}", e)),
+                Err(e) => {
+                    NxcGlobalOutput::warn(&format!("Failed to load credentials from DB: {}", e))
+                }
             }
         } else {
             NxcGlobalOutput::warn("Database not initialized, cannot load --db-creds");
@@ -1309,7 +1353,10 @@ async fn main() -> Result<()> {
     let admins = results.iter().filter(|r| r.admin).count();
 
     println!();
-    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed());
+    println!(
+        "{}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed()
+    );
     NxcGlobalOutput::info(&format!(
         "🕷 {} {} total, {} successful, {} admin",
         "Mission Result:".bold().cyan(),
@@ -1317,7 +1364,10 @@ async fn main() -> Result<()> {
         successes.to_string().green().bold(),
         admins.to_string().yellow().bold()
     ));
-    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed());
+    println!(
+        "{}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed()
+    );
 
     // ── Handle Exports ──
     let report = reporting::Report {
@@ -1329,7 +1379,11 @@ async fn main() -> Result<()> {
     // 1. Automatic Workspace Reporting
     let ws_reports_dir = dot_nxc.join("workspaces").join(workspace).join("reports");
     if let Ok(_) = std::fs::create_dir_all(&ws_reports_dir) {
-        let filename = format!("report_{}_{}.json", protocol_name, Utc::now().format("%Y%m%d_%H%M%S"));
+        let filename = format!(
+            "report_{}_{}.json",
+            protocol_name,
+            Utc::now().format("%Y%m%d_%H%M%S")
+        );
         let report_path = ws_reports_dir.join(filename);
         if let Ok(_) = reporting::export_json(report_path.to_str().unwrap(), &report) {
             // Silently saved to workspace
@@ -1338,11 +1392,14 @@ async fn main() -> Result<()> {
 
     // 2. User-requested Exports
     if let Some(format) = sub_matches.get_one::<String>("export") {
-        let mut path = sub_matches.get_one::<String>("export-path").unwrap().to_string();
+        let mut path = sub_matches
+            .get_one::<String>("export-path")
+            .unwrap()
+            .to_string();
         if !path.ends_with(format) {
             path = format!("{}.{}", path, format);
         }
-        
+
         let res = match format.as_str() {
             "json" => reporting::export_json(&path, &report),
             "csv" => reporting::export_csv(&path, &results),

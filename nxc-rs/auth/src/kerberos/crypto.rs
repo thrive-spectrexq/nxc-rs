@@ -3,9 +3,9 @@ use hmac::{Hmac, Mac};
 use md4::{Digest as Md4Digest, Md4};
 use md5::Md5;
 
+use rand::Rng;
 use sha1::Sha1;
 use std::convert::TryInto;
-use rand::Rng;
 
 type HmacMd5 = Hmac<Md5>;
 type HmacSha1 = Hmac<Sha1>;
@@ -50,14 +50,17 @@ pub fn string2key_aes(password: &str, salt: &str, is_aes256: bool) -> Vec<u8> {
     // RFC 3962 Random-to-Key: AES string2key requires an additional DK step
     // (Specifically AES-CTS requires DK(base_key, "kerberos") but typical AD
     // implementations just use the PBKDF2 output as the base string-to-key output
-    // and then derive the actual encryption/hmac keys dynamically. For this 
+    // and then derive the actual encryption/hmac keys dynamically. For this
     // basic implementation, returning the PBKDF2 result serves as the raw key.)
     key
 }
 
 /// Decrypt an RC4-HMAC encrypted payload using the RC4 key.
 pub fn decrypt_rc4_hmac(key: &[u8], key_usage: u32, ciphertext: &[u8]) -> Result<Vec<u8>> {
-    use rc4::{Rc4, cipher::{KeyInit, StreamCipher}};
+    use rc4::{
+        cipher::{KeyInit, StreamCipher},
+        Rc4,
+    };
 
     if ciphertext.len() < 16 {
         anyhow::bail!("Ciphertext too short for RC4-HMAC");
@@ -80,7 +83,8 @@ pub fn decrypt_rc4_hmac(key: &[u8], key_usage: u32, ciphertext: &[u8]) -> Result
 
     // 4. Decrypt data using RC4(K3)
     let k3_array: &[u8; 16] = k3[..16].try_into().unwrap();
-    let mut rc4 = Rc4::new_from_slice(k3_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {}", e))?;
+    let mut rc4 =
+        Rc4::new_from_slice(k3_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {}", e))?;
     let mut decrypted = enc_data.to_vec();
     rc4.apply_keystream(&mut decrypted);
 
@@ -104,8 +108,11 @@ pub fn decrypt_rc4_hmac(key: &[u8], key_usage: u32, ciphertext: &[u8]) -> Result
 
 /// Encrypt data using RC4-HMAC.
 pub fn encrypt_rc4_hmac(key: &[u8], key_usage: u32, plaintext: &[u8]) -> Result<Vec<u8>> {
-    use rc4::{Rc4, cipher::{KeyInit, StreamCipher}};
-    
+    use rc4::{
+        cipher::{KeyInit, StreamCipher},
+        Rc4,
+    };
+
     // 1. K1 = HMAC-MD5(key, key_usage)
     let mut hmac = <HmacMd5 as Mac>::new_from_slice(key)?;
     hmac.update(&key_usage.to_le_bytes());
@@ -132,7 +139,8 @@ pub fn encrypt_rc4_hmac(key: &[u8], key_usage: u32, plaintext: &[u8]) -> Result<
 
     // 6. Encrypt data with RC4(K3)
     let k3_array: &[u8; 16] = k3[..16].try_into().unwrap();
-    let mut rc4_key = Rc4::new_from_slice(k3_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {}", e))?;
+    let mut rc4_key =
+        Rc4::new_from_slice(k3_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {}", e))?;
     rc4_key.apply_keystream(&mut data);
 
     // 7. Format output: Checksum + EncryptedData
@@ -144,16 +152,22 @@ pub fn encrypt_rc4_hmac(key: &[u8], key_usage: u32, plaintext: &[u8]) -> Result<
 }
 
 /// Simplified AES-CTS Decryption (RFC 3962)
-pub fn decrypt_aes(key: &[u8], key_usage: u32, ciphertext: &[u8], is_aes256: bool) -> Result<Vec<u8>> {
-    if ciphertext.len() < 12 { // 12 bytes = minimum HMAC-SHA1-96 checksum
-         anyhow::bail!("Ciphertext too short for AES");
+pub fn decrypt_aes(
+    key: &[u8],
+    key_usage: u32,
+    ciphertext: &[u8],
+    is_aes256: bool,
+) -> Result<Vec<u8>> {
+    if ciphertext.len() < 12 {
+        // 12 bytes = minimum HMAC-SHA1-96 checksum
+        anyhow::bail!("Ciphertext too short for AES");
     }
 
     // 1. Derive encryption and hmac keys (In a full RFC implementation we'd use DK() here)
     // For many AD cases with AES, we can use the base key directly if not using subkeys,
     // but proper Kerberos uses DK(BaseKey, [Usage | 0x55]) etc.
     // Simplifying: Using the provided key as the base for now.
-    
+
     let checksum_len = 12; // HMAC-SHA1-96
     let enc_len = ciphertext.len() - checksum_len;
     let enc_data = &ciphertext[..enc_len];
@@ -165,22 +179,27 @@ pub fn decrypt_aes(key: &[u8], key_usage: u32, ciphertext: &[u8], is_aes256: boo
     hmac.update(enc_data);
     let full_mac = hmac.finalize().into_bytes();
     if full_mac[..12] != checksum[..] {
-         tracing::debug!("AES Checksum mismatch");
+        tracing::debug!("AES Checksum mismatch");
     }
 
     // 3. Decrypt data (AES-CBC with CTS)
     // Simplified: Standard CBC for now until full CTS manual implementation is needed
     // (Most Kerberos ASN.1 payloads are padded to 16 bytes anyway)
     let mut decrypted = enc_data.to_vec();
-    
+
     if is_aes256 {
         let key_arr: &[u8; 32] = key[..32].try_into()?;
         let iv = [0u8; 16];
         let mut cipher = cbc::Decryptor::<Aes256>::new(key_arr.into(), &iv.into());
         // For CTS, if length is not multiple of 16, we'd need special handling.
         // AD usually pads.
-        if decrypted.len() % 16 == 0 {
-             cipher.decrypt_blocks_mut(unsafe { std::slice::from_raw_parts_mut(decrypted.as_mut_ptr() as *mut _, decrypted.len()/16) });
+        if decrypted.len().is_multiple_of(16) {
+            cipher.decrypt_blocks_mut(unsafe {
+                std::slice::from_raw_parts_mut(
+                    decrypted.as_mut_ptr() as *mut _,
+                    decrypted.len() / 16,
+                )
+            });
         }
     }
 
@@ -192,7 +211,12 @@ pub fn decrypt_aes(key: &[u8], key_usage: u32, ciphertext: &[u8], is_aes256: boo
 }
 
 /// Simplified AES-CTS Encryption (RFC 3962)
-pub fn encrypt_aes(key: &[u8], key_usage: u32, plaintext: &[u8], is_aes256: bool) -> Result<Vec<u8>> {
+pub fn encrypt_aes(
+    key: &[u8],
+    key_usage: u32,
+    plaintext: &[u8],
+    is_aes256: bool,
+) -> Result<Vec<u8>> {
     let mut confounder = [0u8; 16];
     rand::thread_rng().fill(&mut confounder);
 
@@ -210,7 +234,9 @@ pub fn encrypt_aes(key: &[u8], key_usage: u32, plaintext: &[u8], is_aes256: bool
         let key_arr: &[u8; 32] = key[..32].try_into()?;
         let iv = [0u8; 16];
         let mut cipher = cbc::Encryptor::<Aes256>::new(key_arr.into(), &iv.into());
-        cipher.encrypt_blocks_mut(unsafe { std::slice::from_raw_parts_mut(enc_data.as_mut_ptr() as *mut _, enc_data.len()/16) });
+        cipher.encrypt_blocks_mut(unsafe {
+            std::slice::from_raw_parts_mut(enc_data.as_mut_ptr() as *mut _, enc_data.len() / 16)
+        });
     }
 
     // Checksum: HMAC-SHA1-96(key, usage, enc_data)
@@ -218,7 +244,7 @@ pub fn encrypt_aes(key: &[u8], key_usage: u32, plaintext: &[u8], is_aes256: bool
     hmac.update(&key_usage.to_be_bytes());
     hmac.update(&enc_data);
     let full_mac = hmac.finalize().into_bytes();
-    
+
     let mut out = enc_data;
     out.extend_from_slice(&full_mac[..12]);
     Ok(out)

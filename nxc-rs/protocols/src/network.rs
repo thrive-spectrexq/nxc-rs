@@ -197,50 +197,55 @@ impl NetworkProtocol {
 
     /// Perform mDNS discovery (service discovery)
     pub async fn discover_mdns(&self) -> Result<String> {
-        use tokio::net::UdpSocket;
         use std::net::SocketAddr;
-        
+        use tokio::net::UdpSocket;
+
         debug!("Network: Starting mDNS discovery on 224.0.0.251:5353");
-        
+
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.set_broadcast(true)?;
-        
+
         // DNS Service Discovery (PTR record for _services._dns-sd._udp.local)
         let query = vec![
             0x00, 0x00, // Transaction ID
             0x00, 0x00, // Flags
             0x00, 0x01, // Questions
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Answers, Authority, Additional
-            0x09, b'_', b's', b'e', b'r', b'v', b'i', b'c', b'e', b's',
-            0x07, b'_', b'd', b'n', b's', b'-', b's', b'd',
-            0x04, b'_', b'u', b'd', b'p',
-            0x05, b'l', b'o', b'c', b'a', b'l',
-            0x00, 
-            0x00, 0x0c, // Type PTR
+            0x09, b'_', b's', b'e', b'r', b'v', b'i', b'c', b'e', b's', 0x07, b'_', b'd', b'n',
+            b's', b'-', b's', b'd', 0x04, b'_', b'u', b'd', b'p', 0x05, b'l', b'o', b'c', b'a',
+            b'l', 0x00, 0x00, 0x0c, // Type PTR
             0x00, 0x01, // Class IN
         ];
-        
+
         let mcast_addr: SocketAddr = "224.0.0.251:5353".parse()?;
         socket.send_to(&query, mcast_addr).await?;
-        
+
         let mut buf = [0u8; 1024];
         let mut results = Vec::new();
-        
+
         // Listen for 2 seconds
         let timeout = tokio::time::Duration::from_secs(2);
         let start = tokio::time::Instant::now();
-        
+
         while start.elapsed() < timeout {
-            if let Ok(Ok((len, addr))) = tokio::time::timeout(tokio::time::Duration::from_millis(500), socket.recv_from(&mut buf)).await {
+            if let Ok(Ok((len, addr))) = tokio::time::timeout(
+                tokio::time::Duration::from_millis(500),
+                socket.recv_from(&mut buf),
+            )
+            .await
+            {
                 let parsed = parse_dns_response(&buf[..len]);
                 if !parsed.is_empty() {
                     results.push(format!("  {} -> {}", addr, parsed.join(", ")));
                 } else {
-                    results.push(format!("  {} responded with {} bytes (unknown format)", addr, len));
+                    results.push(format!(
+                        "  {} responded with {} bytes (unknown format)",
+                        addr, len
+                    ));
                 }
             }
         }
-        
+
         if results.is_empty() {
             Ok("No mDNS responders found.".to_string())
         } else {
@@ -250,44 +255,51 @@ impl NetworkProtocol {
 
     /// Perform LLMNR discovery (host discovery)
     pub async fn discover_llmnr(&self) -> Result<String> {
-        use tokio::net::UdpSocket;
         use std::net::SocketAddr;
-        
+        use tokio::net::UdpSocket;
+
         debug!("Network: Starting LLMNR discovery on 224.0.0.252:5355");
-        
+
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
-        
+
         // LLMNR Query for "*" (any)
         let query = vec![
             0xda, 0xda, // Transaction ID
             0x00, 0x00, // Flags
             0x00, 0x01, // Questions
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Answers, Authority, Additional
-            0x01, b'*', 0x00,
-            0x00, 0x01, // Type A
+            0x01, b'*', 0x00, 0x00, 0x01, // Type A
             0x00, 0x01, // Class IN
         ];
-        
+
         let mcast_addr: SocketAddr = "224.0.0.252:5355".parse()?;
         socket.send_to(&query, mcast_addr).await?;
-        
+
         let mut buf = [0u8; 1024];
         let mut results = Vec::new();
-        
+
         let timeout = tokio::time::Duration::from_secs(2);
         let start = tokio::time::Instant::now();
-        
+
         while start.elapsed() < timeout {
-            if let Ok(Ok((len, addr))) = tokio::time::timeout(tokio::time::Duration::from_millis(500), socket.recv_from(&mut buf)).await {
+            if let Ok(Ok((len, addr))) = tokio::time::timeout(
+                tokio::time::Duration::from_millis(500),
+                socket.recv_from(&mut buf),
+            )
+            .await
+            {
                 let parsed = parse_dns_response(&buf[..len]);
                 if !parsed.is_empty() {
                     results.push(format!("  {} -> {}", addr, parsed.join(", ")));
                 } else {
-                    results.push(format!("  {} responded with {} bytes (unknown format)", addr, len));
+                    results.push(format!(
+                        "  {} responded with {} bytes (unknown format)",
+                        addr, len
+                    ));
                 }
             }
         }
-        
+
         if results.is_empty() {
             Ok("No LLMNR responders found.".to_string())
         } else {
@@ -300,42 +312,52 @@ fn parse_dns_response(buf: &[u8]) -> Vec<String> {
     if buf.len() < 12 {
         return Vec::new();
     }
-    
+
     let answers_count = u16::from_be_bytes([buf[6], buf[7]]) as usize;
     if answers_count == 0 {
         return Vec::new();
     }
-    
+
     let mut names = Vec::new();
     let mut offset = 12;
-    
+
     let questions_count = u16::from_be_bytes([buf[4], buf[5]]) as usize;
     for _ in 0..questions_count {
         offset = skip_name(buf, offset);
         offset += 4;
-        if offset >= buf.len() { return names; }
+        if offset >= buf.len() {
+            return names;
+        }
     }
-    
+
     for _i in 0..answers_count {
-        if offset >= buf.len() { break; }
+        if offset >= buf.len() {
+            break;
+        }
         let (name, next_offset) = parse_name(buf, offset);
         offset = next_offset;
-        
-        if offset + 10 > buf.len() { break; }
-        let rtype = u16::from_be_bytes([buf[offset], buf[offset+1]]);
-        let rdlength = u16::from_be_bytes([buf[offset+8], buf[offset+9]]) as usize;
+
+        if offset + 10 > buf.len() {
+            break;
+        }
+        let rtype = u16::from_be_bytes([buf[offset], buf[offset + 1]]);
+        let rdlength = u16::from_be_bytes([buf[offset + 8], buf[offset + 9]]) as usize;
         offset += 10;
-        
-        if offset + rdlength > buf.len() { break; }
-        
+
+        if offset + rdlength > buf.len() {
+            break;
+        }
+
         match rtype {
-            0x000c => { // PTR
+            0x000c => {
+                // PTR
                 let (ptr_name, _) = parse_name(buf, offset);
                 if !ptr_name.is_empty() {
                     names.push(ptr_name);
                 }
             }
-            0x0001 => { // A
+            0x0001 => {
+                // A
                 if !name.is_empty() && name != "*" {
                     names.push(name.clone());
                 }
@@ -344,7 +366,7 @@ fn parse_dns_response(buf: &[u8]) -> Vec<String> {
         }
         offset += rdlength;
     }
-    
+
     names
 }
 
@@ -366,20 +388,24 @@ fn parse_name(buf: &[u8], mut offset: usize) -> (String, usize) {
     let mut name = String::new();
     let mut jumped = false;
     let mut final_next_offset = 0;
-    
+
     let mut safety = 0;
     while offset < buf.len() && safety < 10 {
         safety += 1;
         let len = buf[offset] as usize;
         if len == 0 {
-            if !jumped { final_next_offset = offset + 1; }
+            if !jumped {
+                final_next_offset = offset + 1;
+            }
             offset += 1;
             break;
         }
-        
+
         if (len & 0xc0) == 0xc0 {
-            if offset + 1 >= buf.len() { break; }
-            let ptr = (((len & 0x3f) as usize) << 8) | (buf[offset+1] as usize);
+            if offset + 1 >= buf.len() {
+                break;
+            }
+            let ptr = (((len & 0x3f) as usize) << 8) | (buf[offset + 1] as usize);
             if !jumped {
                 final_next_offset = offset + 2;
                 jumped = true;
@@ -387,14 +413,18 @@ fn parse_name(buf: &[u8], mut offset: usize) -> (String, usize) {
             offset = ptr;
             continue;
         }
-        
+
         offset += 1;
-        if offset + len > buf.len() { break; }
-        if !name.is_empty() { name.push('.'); }
-        name.push_str(&String::from_utf8_lossy(&buf[offset..offset+len]));
+        if offset + len > buf.len() {
+            break;
+        }
+        if !name.is_empty() {
+            name.push('.');
+        }
+        name.push_str(&String::from_utf8_lossy(&buf[offset..offset + len]));
         offset += len;
     }
-    
+
     let next_offset = if jumped { final_next_offset } else { offset };
     (name, next_offset)
 }
@@ -417,7 +447,12 @@ impl NxcProtocol for NetworkProtocol {
         &["net_discovery"]
     }
 
-    async fn connect(&self, target: &str, _port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        _port: u16,
+        _proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         // Since `network` actions generally interact with the host interface rather than
         // a remote TCP port, `connect` merely instantiates the session.
         Ok(Box::new(NetworkSession {
@@ -447,7 +482,9 @@ impl NxcProtocol for NetworkProtocol {
 
         if let Some(ref ssid) = self.connect {
             match self.connect_ssid(ssid).await {
-                Ok(out) => final_message.push_str(&format!("\n[Network Connect Result]\n{}\n", out)),
+                Ok(out) => {
+                    final_message.push_str(&format!("\n[Network Connect Result]\n{}\n", out))
+                }
                 Err(e) => {
                     success = false;
                     final_message.push_str(&format!("\n[Network Connect Error] {}\n", e));
@@ -490,7 +527,9 @@ impl NxcProtocol for NetworkProtocol {
 
         if self.mdns {
             match self.discover_mdns().await {
-                Ok(out) => final_message.push_str(&format!("\n[mDNS Discovery Results]\n{}\n", out)),
+                Ok(out) => {
+                    final_message.push_str(&format!("\n[mDNS Discovery Results]\n{}\n", out))
+                }
                 Err(e) => {
                     success = false;
                     final_message.push_str(&format!("\n[mDNS Error] {}\n", e));
@@ -500,7 +539,9 @@ impl NxcProtocol for NetworkProtocol {
 
         if self.llmnr {
             match self.discover_llmnr().await {
-                Ok(out) => final_message.push_str(&format!("\n[LLMNR Discovery Results]\n{}\n", out)),
+                Ok(out) => {
+                    final_message.push_str(&format!("\n[LLMNR Discovery Results]\n{}\n", out))
+                }
                 Err(e) => {
                     success = false;
                     final_message.push_str(&format!("\n[LLMNR Error] {}\n", e));
@@ -543,20 +584,16 @@ mod tests {
             0x00, 0x01, // Answers
             0x00, 0x00, 0x00, 0x00, // Auth, Add
             // Answer: _services._dns-sd._udp.local (PTR) -> _printer._tcp.local
-            0x09, b'_', b's', b'e', b'r', b'v', b'i', b'c', b'e', b's',
-            0x07, b'_', b'd', b'n', b's', b'-', b's', b'd',
-            0x04, b'_', b'u', b'd', b'p',
-            0x05, b'l', b'o', b'c', b'a', b'l',
-            0x00,
-            0x00, 0x0c, // Type PTR
+            0x09, b'_', b's', b'e', b'r', b'v', b'i', b'c', b'e', b's', 0x07, b'_', b'd', b'n',
+            b's', b'-', b's', b'd', 0x04, b'_', b'u', b'd', b'p', 0x05, b'l', b'o', b'c', b'a',
+            b'l', 0x00, 0x00, 0x0c, // Type PTR
             0x00, 0x01, // Class IN
             0x00, 0x00, 0x00, 0x3c, // TTL
             0x00, 0x10, // Data Length (16)
-            0x08, b'_', b'p', b'r', b'i', b'n', b't', b'e', b'r',
-            0x04, b'_', b't', b'c', b'p',
+            0x08, b'_', b'p', b'r', b'i', b'n', b't', b'e', b'r', 0x04, b'_', b't', b'c', b'p',
             0xc0, 0x23, // Pointer to "local" at offset 35
         ];
-        
+
         let result = parse_dns_response(&buf);
         assert!(!result.is_empty());
         assert!(result.contains(&"_printer._tcp.local".to_string()));

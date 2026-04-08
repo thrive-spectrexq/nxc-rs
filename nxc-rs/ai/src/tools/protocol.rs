@@ -45,9 +45,9 @@ impl NxcTool for ProtocolTool {
     async fn call(&self, args: Value) -> Result<Value> {
         let protocol_name = args["protocol"].as_str().context("Missing protocol")?;
         let targets_list = args["targets"].as_array().context("Missing targets list")?;
-        
+
         let protocol_enum = Protocol::from_str(protocol_name).context("Unsupported protocol")?;
-        
+
         let mut targets = Vec::new();
         for t in targets_list {
             if let Some(t_str) = t.as_str() {
@@ -78,17 +78,17 @@ impl NxcTool for ProtocolTool {
         }
 
         let engine = ExecutionEngine::new(opts);
-        
+
         // This is a bit tricky: we need to instantiate the protocol handler
         // Since we are in the ai crate, we might need a factory or registry from protocols/nxc.
         // For now, I'll assume we can get it from somewhere or create it.
         // Actually, let's create a factory in nxc-protocols or here.
-        
-        // Refactoring thought: NxcProtocol implementation usually lives in individual crates, 
+
+        // Refactoring thought: NxcProtocol implementation usually lives in individual crates,
         // but it's re-exported in nxc-rs.
-        
+
         // I'll implement a simple factory here for now, or use NxcProtocol::all() if available.
-        
+
         let protocol_handler: Arc<dyn nxc_protocols::NxcProtocol> = match protocol_enum {
             Protocol::Smb => Arc::new(nxc_protocols::smb::SmbProtocol::new()),
             Protocol::Ssh => Arc::new(nxc_protocols::ssh::SshProtocol::new()),
@@ -102,11 +102,14 @@ impl NxcTool for ProtocolTool {
             Protocol::Mysql => Arc::new(nxc_protocols::mysql::MysqlProtocol::new()),
             Protocol::Snmp => Arc::new(nxc_protocols::snmp::SnmpProtocol::new()),
             Protocol::Docker => Arc::new(nxc_protocols::docker::DockerProtocol::new()),
-            _ => anyhow::bail!("Protocol handler for {} not yet integrated into AI tool", protocol_name),
+            _ => anyhow::bail!(
+                "Protocol handler for {} not yet integrated into AI tool",
+                protocol_name
+            ),
         };
 
         let results = engine.run(protocol_handler, targets, creds).await;
-        
+
         Ok(json!({ "results": results }))
     }
 }

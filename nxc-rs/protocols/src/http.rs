@@ -78,10 +78,32 @@ impl NxcProtocol for HttpProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["iot_cam", "http_paths", "web_crawler", "web_fuzzer", "web_vuln", "vhost_enum", "cms_enum", "graphql_enum", "waf_detect", "web_auth_brute", "cors_vuln", "web_dav", "method_fuzz", "lfi_fuzzer", "ssrf_fuzzer", "jwt_audit"] 
+        &[
+            "iot_cam",
+            "http_paths",
+            "web_crawler",
+            "web_fuzzer",
+            "web_vuln",
+            "vhost_enum",
+            "cms_enum",
+            "graphql_enum",
+            "waf_detect",
+            "web_auth_brute",
+            "cors_vuln",
+            "web_dav",
+            "method_fuzz",
+            "lfi_fuzzer",
+            "ssrf_fuzzer",
+            "jwt_audit",
+        ]
     }
 
-    async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         let mut builder = Client::builder()
             .danger_accept_invalid_certs(!self.verify_ssl) // Option to bypass cert warnings common on IoT
             .user_agent(Self::get_random_user_agent())
@@ -92,8 +114,7 @@ impl NxcProtocol for HttpProtocol {
             builder = builder.proxy(proxy_obj);
         }
 
-        let client = builder.build()
-            .context("Failed to build HTTP client")?;
+        let client = builder.build().context("Failed to build HTTP client")?;
 
         Ok(Box::new(HttpSession {
             target: target.to_string(),
@@ -175,12 +196,22 @@ impl NxcProtocol for HttpProtocol {
 
 impl HttpProtocol {
     /// Enumerate a list of common paths on the target.
-    pub async fn enumerate_paths(&self, session: &HttpSession, paths: &[&str]) -> Result<Vec<(String, StatusCode)>> {
+    pub async fn enumerate_paths(
+        &self,
+        session: &HttpSession,
+        paths: &[&str],
+    ) -> Result<Vec<(String, StatusCode)>> {
         let mut results = Vec::new();
         let scheme = if self.use_ssl { "https" } else { "http" };
 
         for path in paths {
-            let url = format!("{}://{}:{}/{}", scheme, session.target, session.port, path.trim_start_matches('/'));
+            let url = format!(
+                "{}://{}:{}/{}",
+                scheme,
+                session.target,
+                session.port,
+                path.trim_start_matches('/')
+            );
             let resp = session.client.get(&url).send().await;
 
             if let Ok(r) = resp {
@@ -199,6 +230,8 @@ impl HttpProtocol {
             "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1.2 Mobile/15E148 Safari/604.1",
         ];
         use rand::seq::SliceRandom;
-        USER_AGENTS.choose(&mut rand::thread_rng()).unwrap_or(&USER_AGENTS[0])
+        USER_AGENTS
+            .choose(&mut rand::thread_rng())
+            .unwrap_or(&USER_AGENTS[0])
     }
 }

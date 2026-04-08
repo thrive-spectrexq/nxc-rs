@@ -158,7 +158,8 @@ impl NxcModule for EnumDns {
         }
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: output_lines.join("\n"),
             data: serde_json::Value::Object(all_records),
         })
@@ -239,7 +240,10 @@ fn parse_srv_record(data: &[u8]) -> String {
     let weight = u16::from_le_bytes([data[2], data[3]]);
     let port = u16::from_le_bytes([data[4], data[5]]);
     let target = parse_dns_name(&data[6..]);
-    format!("priority={} weight={} port={} target={}", priority, weight, port, target)
+    format!(
+        "priority={} weight={} port={} target={}",
+        priority, weight, port, target
+    )
 }
 
 /// AD DNS names are often compressed or encoded in a specific way.
@@ -252,7 +256,7 @@ fn parse_dns_name(data: &[u8]) -> String {
         if len == 0 {
             break;
         }
-        
+
         // Handle potential compression markers (simplified)
         if (len & 0xc0) == 0xc0 {
             // This is a pointer, but we don't have the full context here easily
@@ -296,7 +300,10 @@ mod tests {
         // 07 65 78 61 6d 70 6c 65 (example)
         // 03 63 6f 6d (com)
         // 00 (null)
-        let data = vec![0x0a, 0x00, 0x04, b'm', b'a', b'i', b'l', 0x07, b'e', b'x', b'a', b'm', b'p', b'l', b'e', 0x03, b'c', b'o', b'm', 0x00];
+        let data = vec![
+            0x0a, 0x00, 0x04, b'm', b'a', b'i', b'l', 0x07, b'e', b'x', b'a', b'm', b'p', b'l',
+            b'e', 0x03, b'c', b'o', b'm', 0x00,
+        ];
         let result = parse_mx_record(&data);
         assert_eq!(result, "priority=10 exchange=mail.example.com");
     }
@@ -304,8 +311,14 @@ mod tests {
     #[test]
     fn test_parse_srv() {
         // SRV: Priority 1, Weight 2, Port 389, Target: dc1.example.com
-        let data = vec![0x01, 0x00, 0x02, 0x00, 0x85, 0x01, 0x03, b'd', b'c', b'1', 0x07, b'e', b'x', b'a', b'm', b'p', b'l', b'e', 0x03, b'c', b'o', b'm', 0x00];
+        let data = vec![
+            0x01, 0x00, 0x02, 0x00, 0x85, 0x01, 0x03, b'd', b'c', b'1', 0x07, b'e', b'x', b'a',
+            b'm', b'p', b'l', b'e', 0x03, b'c', b'o', b'm', 0x00,
+        ];
         let result = parse_srv_record(&data);
-        assert_eq!(result, "priority=1 weight=2 port=389 target=dc1.example.com");
+        assert_eq!(
+            result,
+            "priority=1 weight=2 port=389 target=dc1.example.com"
+        );
     }
 }

@@ -3,9 +3,9 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_protocols::{rdp::RdpSession, NxcSession};
 use serde_json::json;
-use tracing::info;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use tracing::info;
 
 pub struct RdpSecCheck {}
 
@@ -59,20 +59,26 @@ impl NxcModule for RdpSecCheck {
         // X.224 Connection Request offering ONLY Standard RDP Security (0x00 flag)
         let x224_req_standard: [u8; 19] = [
             0x03, 0x00, 0x00, 0x13, 0x0e, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x08,
-            0x00, 0x00, // 0x00 = Standard RDP Security 
+            0x00, 0x00, // 0x00 = Standard RDP Security
             0x00, 0x00, 0x00,
         ];
 
-        if let Ok(mut stream) = tokio::time::timeout(std::time::Duration::from_secs(5), TcpStream::connect(&addr)).await? {
+        if let Ok(mut stream) =
+            tokio::time::timeout(std::time::Duration::from_secs(5), TcpStream::connect(&addr))
+                .await?
+        {
             if let Ok(_) = stream.write_all(&x224_req_standard).await {
                 let mut resp = [0u8; 19];
-                if let Ok(n) = tokio::time::timeout(std::time::Duration::from_secs(5), stream.read(&mut resp)).await? {
+                if let Ok(n) =
+                    tokio::time::timeout(std::time::Duration::from_secs(5), stream.read(&mut resp))
+                        .await?
+                {
                     if n >= 19 && resp[0] == 0x03 && resp[1] == 0x00 {
                         // Position 15 is the requested protocols selected by server
                         // If it responds with 0x00 and doesn't drop with SSL negotiation failure, fallback is allowed
                         if resp[15] == 0x00 {
-                             allows_fallback = true;
-                             nla_enforced = false;
+                            allows_fallback = true;
+                            nla_enforced = false;
                         }
                     } else if n > 0 && resp[0] == 0x03 {
                         // Check if it's an SSL Drop code or X.224 negotiation failure
@@ -88,7 +94,9 @@ impl NxcModule for RdpSecCheck {
             output.push_str("  [!] VULNERABLE: NLA is NOT strictly enforced.\n");
             output.push_str("      -> Target allows fallback to Standard RDP Security (susceptible to MITM & legacy exploits like BlueKeep).\n");
         } else {
-            output.push_str("  [+] SECURE: Network Level Authentication (NLA) is strictly enforced.\n");
+            output.push_str(
+                "  [+] SECURE: Network Level Authentication (NLA) is strictly enforced.\n",
+            );
             output.push_str("      -> Legacy Protocol fallback rejected.\n");
         }
 

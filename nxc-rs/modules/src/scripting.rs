@@ -6,7 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use nxc_protocols::NxcSession;
-use rhai::{Engine, AST, Dynamic, Map};
+use rhai::{Dynamic, Engine, Map, AST};
 use std::path::PathBuf;
 
 use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
@@ -22,7 +22,7 @@ pub struct ScriptModule {
 impl ScriptModule {
     pub fn new(name: String, path: PathBuf, engine: &Engine) -> Result<Self> {
         let ast = engine.compile_file(path.clone())?;
-        
+
         // Try to get description from script-level documentation or a specific function
         // For now, simpler: use filename
         let description = format!("Script module loaded from {}", path.display());
@@ -67,7 +67,7 @@ impl NxcModule for ScriptModule {
     ) -> Result<ModuleResult> {
         let engine = Engine::new();
         let mut scope = rhai::Scope::new();
-        
+
         // 1. Setup Context (as a Map)
         let mut context = Map::new();
         context.insert("protocol".into(), session.protocol().into());
@@ -85,7 +85,8 @@ impl NxcModule for ScriptModule {
         let result: Dynamic = engine.call_fn(&mut scope, &self.ast, "run", (context, options))?;
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: result.to_string(),
             data: serde_json::json!({
                 "script_path": self.path.to_string_lossy(),

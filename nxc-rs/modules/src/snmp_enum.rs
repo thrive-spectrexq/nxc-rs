@@ -26,7 +26,11 @@ impl NxcModule for SnmpEnum {
         &["snmp"]
     }
 
-    async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
+    async fn run(
+        &self,
+        session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
+    ) -> Result<ModuleResult> {
         let snmp_sess = session
             .as_any()
             .downcast_ref::<SnmpSession>()
@@ -36,7 +40,8 @@ impl NxcModule for SnmpEnum {
         let report = protocol.enumerate(snmp_sess).await?;
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: report.clone(),
             data: serde_json::json!({ "report": report }),
         })

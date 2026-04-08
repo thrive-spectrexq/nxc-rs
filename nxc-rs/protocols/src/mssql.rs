@@ -6,7 +6,7 @@
 use crate::{CommandOutput, NxcProtocol, NxcSession};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use nxc_auth::{AuthResult, Credentials, kerberos::KerberosClient};
+use nxc_auth::{kerberos::KerberosClient, AuthResult, Credentials};
 use std::time::Duration;
 use tiberius::{AuthMethod, Client, Config};
 use tokio_util::compat::TokioAsyncWriteCompatExt;
@@ -81,14 +81,28 @@ impl NxcProtocol for MssqlProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["enum_logins", "enum_databases", "mssql_enum", "mssql_privesc", "mssql_unc"]
+        &[
+            "enum_logins",
+            "enum_databases",
+            "mssql_enum",
+            "mssql_privesc",
+            "mssql_unc",
+        ]
     }
 
-    async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         debug!("MSSQL: Connecting to {} (proxy: {:?})", addr, proxy);
 
-        let timeout_fut = tokio::time::timeout(self.timeout, crate::connection::connect(target, port, proxy));
+        let timeout_fut = tokio::time::timeout(
+            self.timeout,
+            crate::connection::connect(target, port, proxy),
+        );
         match timeout_fut.await {
             Ok(Ok(_stream)) => {
                 info!("MSSQL: Connected to {}", addr);
@@ -135,21 +149,30 @@ impl NxcProtocol for MssqlProtocol {
         let mut config = Config::new();
         config.host(&target);
         config.port(port);
-        
+
         // Support NTLM auth if domain is provided or if simple auth fails
         if let Some(ref domain) = creds.domain {
             debug!("MSSQL: Using Windows auth for {}\\{}", domain, username);
             #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
-            config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, username), &password));
+            config.authentication(AuthMethod::windows(
+                &format!("{}\\{}", domain, username),
+                &password,
+            ));
             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
-            config.authentication(AuthMethod::sql_server(&format!("{}\\{}", domain, username), &password));
+            config.authentication(AuthMethod::sql_server(
+                &format!("{}\\{}", domain, username),
+                &password,
+            ));
         } else {
             config.authentication(AuthMethod::sql_server(&username, &password));
         }
-        
+
         config.trust_cert();
 
-        let tcp_fut = tokio::time::timeout(self.timeout, crate::connection::connect(&target, port, mssql_sess_mut.proxy.as_deref()));
+        let tcp_fut = tokio::time::timeout(
+            self.timeout,
+            crate::connection::connect(&target, port, mssql_sess_mut.proxy.as_deref()),
+        );
         let tcp = match tcp_fut.await {
             Ok(Ok(s)) => s,
             _ => return Ok(AuthResult::failure("Connection timeout during auth", None)),
@@ -208,22 +231,30 @@ impl NxcProtocol for MssqlProtocol {
         let mut config = Config::new();
         config.host(&mssql_sess.target);
         config.port(mssql_sess.port);
-        
+
         let user = &creds.username;
         let pass = creds.password.as_deref().unwrap_or_default();
-        
+
         if let Some(ref domain) = creds.domain {
             #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
             config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, user), pass));
             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
-            config.authentication(AuthMethod::sql_server(&format!("{}\\{}", domain, user), pass));
+            config.authentication(AuthMethod::sql_server(
+                &format!("{}\\{}", domain, user),
+                pass,
+            ));
         } else {
-             config.authentication(AuthMethod::sql_server(user, pass));
+            config.authentication(AuthMethod::sql_server(user, pass));
         }
-        
+
         config.trust_cert();
 
-        let tcp = crate::connection::connect(&mssql_sess.target, mssql_sess.port, mssql_sess.proxy.as_deref()).await?;
+        let tcp = crate::connection::connect(
+            &mssql_sess.target,
+            mssql_sess.port,
+            mssql_sess.proxy.as_deref(),
+        )
+        .await?;
         let mut client = Client::connect(config, tcp.compat_write()).await?;
 
         // 1. Ensure xp_cmdshell is enabled
@@ -257,16 +288,28 @@ impl NxcProtocol for MssqlProtocol {
         })
     }
 
-    async fn read_file(&self, session: &dyn NxcSession, _share: &str, path: &str) -> Result<Vec<u8>> {
+    async fn read_file(
+        &self,
+        session: &dyn NxcSession,
+        _share: &str,
+        path: &str,
+    ) -> Result<Vec<u8>> {
         let output = self.execute(session, &format!("type {}", path)).await?;
         Ok(output.stdout.into_bytes())
     }
 
-    async fn write_file(&self, session: &dyn NxcSession, _share: &str, path: &str, data: &[u8]) -> Result<()> {
+    async fn write_file(
+        &self,
+        session: &dyn NxcSession,
+        _share: &str,
+        path: &str,
+        data: &[u8],
+    ) -> Result<()> {
         let hex_data = hex::encode(data);
         // Using certutil to decode hex in case of binary data
         let cmd = format!("certutil -decodehex temp.hex {} && del temp.hex", path);
-        self.execute(session, &format!("echo {} > temp.hex", hex_data)).await?;
+        self.execute(session, &format!("echo {} > temp.hex", hex_data))
+            .await?;
         self.execute(session, &cmd).await?;
         Ok(())
     }
@@ -290,17 +333,22 @@ impl MssqlProtocol {
         let pass = creds.password.as_deref().unwrap_or_default();
 
         if let Some(ref domain) = creds.domain {
-             #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
-             config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, user), pass));
-             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
-             config.authentication(AuthMethod::sql_server(&format!("{}\\{}", domain, user), pass));
+            #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
+            config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, user), pass));
+            #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
+            config.authentication(AuthMethod::sql_server(
+                &format!("{}\\{}", domain, user),
+                pass,
+            ));
         } else {
-             config.authentication(AuthMethod::sql_server(user, pass));
+            config.authentication(AuthMethod::sql_server(user, pass));
         }
 
         config.trust_cert();
 
-        let tcp = crate::connection::connect(&session.target, session.port, session.proxy.as_deref()).await?;
+        let tcp =
+            crate::connection::connect(&session.target, session.port, session.proxy.as_deref())
+                .await?;
         let mut client = Client::connect(config, tcp.compat_write()).await?;
 
         let result = client.query(sql, &[]).await?;
@@ -334,38 +382,55 @@ impl MssqlProtocol {
     }
 
     /// Perform Kerberos authentication over MSSQL
-    async fn authenticate_kerberos(&self, mssql_sess: &mut MssqlSession, creds: &Credentials) -> Result<AuthResult> {
+    async fn authenticate_kerberos(
+        &self,
+        mssql_sess: &mut MssqlSession,
+        creds: &Credentials,
+    ) -> Result<AuthResult> {
         let domain = creds.domain.as_deref().unwrap_or("DOMAIN");
-        let kdc_ip = &mssql_sess.target; 
+        let kdc_ip = &mssql_sess.target;
 
         let krb_client = KerberosClient::new(domain, kdc_ip);
-        
+
         // 1. Request TGT
         let tgt = krb_client.request_tgt_with_creds(creds).await?;
-        
+
         // 2. Request TGS for MSSQL service
         let spn = format!("MSSQLSvc/{}:{}", mssql_sess.target, mssql_sess.port);
         let _tgs = krb_client.request_tgs(&tgt, &spn).await?;
-        
+
         // 3. Initiate Connection with Tiberius
         let mut config = Config::new();
         config.host(&mssql_sess.target);
         config.port(mssql_sess.port);
-        
+
         #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
-        config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, creds.username), creds.password.as_deref().unwrap_or_default()));
-        
+        config.authentication(AuthMethod::windows(
+            &format!("{}\\{}", domain, creds.username),
+            creds.password.as_deref().unwrap_or_default(),
+        ));
+
         config.trust_cert();
 
         #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
         {
-            return Ok(AuthResult::failure("Kerberos/Windows Auth not supported", None));
+            return Ok(AuthResult::failure(
+                "Kerberos/Windows Auth not supported",
+                None,
+            ));
         }
 
         #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
         {
-            let tcp = crate::connection::connect(&mssql_sess.target, mssql_sess.port, mssql_sess.proxy.as_deref()).await?;
-            match tokio::time::timeout(self.timeout, Client::connect(config, tcp.compat_write())).await {
+            let tcp = crate::connection::connect(
+                &mssql_sess.target,
+                mssql_sess.port,
+                mssql_sess.proxy.as_deref(),
+            )
+            .await?;
+            match tokio::time::timeout(self.timeout, Client::connect(config, tcp.compat_write()))
+                .await
+            {
                 Ok(Ok(_client)) => {
                     debug!("MSSQL: Kerberos Auth successful for {}", creds.username);
                     mssql_sess.credentials = Some(creds.clone());
@@ -377,4 +442,3 @@ impl MssqlProtocol {
         }
     }
 }
-

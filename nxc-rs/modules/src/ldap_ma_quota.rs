@@ -47,7 +47,10 @@ impl NxcModule for LdapMaQuota {
             .downcast_mut::<LdapSession>()
             .ok_or_else(|| anyhow!("Module requires an LDAP session"))?;
 
-        info!("Starting MachineAccountQuota enumeration on {}", ldap_sess.target);
+        info!(
+            "Starting MachineAccountQuota enumeration on {}",
+            ldap_sess.target
+        );
 
         let mut output = String::from("MachineAccountQuota Enumeration:\n");
         let mut maq_value = -1;
@@ -57,18 +60,24 @@ impl NxcModule for LdapMaQuota {
         let protocol = nxc_protocols::ldap::LdapProtocol::new();
         let search_base = match protocol.get_base_dn(ldap_sess).await {
             Ok(base) => base,
-            Err(_) => return Ok(ModuleResult {
-                success: false,
-                output: "  [-] Could not resolve defaultNamingContext to query MAQ.\n".to_string(),
-                data: json!({}),
-                credentials: vec![],
-            })
+            Err(_) => {
+                return Ok(ModuleResult {
+                    success: false,
+                    output: "  [-] Could not resolve defaultNamingContext to query MAQ.\n"
+                        .to_string(),
+                    data: json!({}),
+                    credentials: vec![],
+                })
+            }
         };
 
         let filter = "(objectClass=*)";
         let attrs = vec!["ms-DS-MachineAccountQuota"];
 
-        if let Ok(entries) = protocol.search(ldap_sess, &search_base, ldap3::Scope::Base, filter, attrs).await {
+        if let Ok(entries) = protocol
+            .search(ldap_sess, &search_base, ldap3::Scope::Base, filter, attrs)
+            .await
+        {
             if let Some(entry) = entries.first() {
                 if let Some(quota_strs) = entry.attrs.get("ms-DS-MachineAccountQuota") {
                     if let Some(quota_str) = quota_strs.first() {
@@ -84,7 +93,9 @@ impl NxcModule for LdapMaQuota {
         if maq_value >= 0 {
             output.push_str(&format!("  [!] ms-DS-MachineAccountQuota: {}\n", maq_value));
             if is_vulnerable {
-                output.push_str("      -> DANGER: Unprivileged users can join machines to the domain!\n");
+                output.push_str(
+                    "      -> DANGER: Unprivileged users can join machines to the domain!\n",
+                );
             } else {
                 output.push_str("      -> SECURE: Default machine account quota is restricted.\n");
             }

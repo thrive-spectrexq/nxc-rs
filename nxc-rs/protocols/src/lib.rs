@@ -17,6 +17,7 @@ pub mod http;
 pub mod ldap;
 pub mod mssql;
 pub mod mysql;
+pub mod network;
 pub mod nfs;
 pub mod obfuscation;
 pub mod postgresql;
@@ -25,12 +26,11 @@ pub mod redis;
 pub mod rpc;
 pub mod smb;
 pub mod snmp;
+pub mod socks;
 pub mod ssh;
 pub mod vnc;
-pub mod network;
 pub mod winrm;
 pub mod wmi;
-pub mod socks;
 
 // ─── Core Traits ────────────────────────────────────────────────
 
@@ -86,7 +86,12 @@ pub trait NxcProtocol: Send + Sync {
     }
 
     /// Connect to a target, returning a session handle.
-    async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<Box<dyn NxcSession>>;
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>>;
 
     /// Authenticate an existing session.
     async fn authenticate(
@@ -99,13 +104,26 @@ pub trait NxcProtocol: Send + Sync {
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput>;
 
     /// Read a file from the target.
-    async fn read_file(&self, _session: &dyn NxcSession, _share: &str, _path: &str) -> Result<Vec<u8>> {
+    async fn read_file(
+        &self,
+        _session: &dyn NxcSession,
+        _share: &str,
+        _path: &str,
+    ) -> Result<Vec<u8>> {
         Err(anyhow::anyhow!("File read not supported for this protocol"))
     }
 
     /// Write a file to the target.
-    async fn write_file(&self, _session: &dyn NxcSession, _share: &str, _path: &str, _data: &[u8]) -> Result<()> {
-        Err(anyhow::anyhow!("File write not supported for this protocol"))
+    async fn write_file(
+        &self,
+        _session: &dyn NxcSession,
+        _share: &str,
+        _path: &str,
+        _data: &[u8],
+    ) -> Result<()> {
+        Err(anyhow::anyhow!(
+            "File write not supported for this protocol"
+        ))
     }
 }
 

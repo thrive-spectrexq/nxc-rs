@@ -110,7 +110,8 @@ impl NxcModule for IotCam {
             Some(ep) => ep,
             None => {
                 return Ok(ModuleResult {
-                    credentials: vec![], success: false,
+                    credentials: vec![],
+                    success: false,
                     output: "No exposed camera snapshot endpoints found.".to_string(),
                     data: json!({}),
                 })
@@ -129,7 +130,8 @@ impl NxcModule for IotCam {
         );
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: success_msg,
             data: json!({
                 "camera_endpoint": target_url,

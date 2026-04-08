@@ -50,11 +50,12 @@ impl NxcModule for AdbShell {
         let cmd = opts
             .get("cmd")
             .ok_or_else(|| anyhow::anyhow!("The 'cmd' option is required for adb_shell module"))?;
-        
+
         let protocol = AdbProtocol::new();
         match protocol.execute(session, cmd).await {
             Ok(output) => Ok(ModuleResult {
-                credentials: vec![], success: true,
+                credentials: vec![],
+                success: true,
                 output: output.stdout.clone(),
                 data: json!({
                     "stdout": output.stdout,
@@ -63,7 +64,8 @@ impl NxcModule for AdbShell {
                 }),
             }),
             Err(e) => Ok(ModuleResult {
-                credentials: vec![], success: false,
+                credentials: vec![],
+                success: false,
                 output: format!("Failed to execute command: {}", e),
                 data: json!({ "error": format!("{}", e) }),
             }),

@@ -8,9 +8,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use nxc_protocols::NxcSession;
 use serde_json::json;
-use tracing::info;
 use std::time::Duration;
 use tokio::net::TcpStream;
+use tracing::info;
 
 pub struct NetDiscovery {}
 
@@ -55,18 +55,26 @@ impl NxcModule for NetDiscovery {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         info!("Network: Starting discovery...");
-        
+
         let _network_session = match session.protocol() {
-            "network" => session.downcast_mut::<nxc_protocols::network::NetworkSession>().unwrap(),
+            "network" => session
+                .downcast_mut::<nxc_protocols::network::NetworkSession>()
+                .unwrap(),
             _ => return Err(anyhow::anyhow!("Module only supports network")),
         };
 
         // We can't easily get the protocol instance here without a factory or passing it,
         // so we'll instantiate a temporary one for discovery actions.
-        let protocol = nxc_protocols::network::NetworkProtocol::new(false, None, false, false, false, true, true);
+        let protocol = nxc_protocols::network::NetworkProtocol::new(
+            false, None, false, false, false, true, true,
+        );
 
-        let port_str = opts.get("ports").cloned().unwrap_or_else(|| "22,80,443,445,135,5900,3389,5555".into());
-        let ports: Vec<(u16, &str)> = port_str.split(',')
+        let port_str = opts
+            .get("ports")
+            .cloned()
+            .unwrap_or_else(|| "22,80,443,445,135,5900,3389,5555".into());
+        let ports: Vec<(u16, &str)> = port_str
+            .split(',')
             .filter_map(|s| {
                 let p = s.trim().parse::<u16>().ok()?;
                 let name = match p {
@@ -120,14 +128,19 @@ impl NxcModule for NetDiscovery {
 
         for line in stdout.lines() {
             let line = line.trim();
-            if line.is_empty() || line.starts_with("Interface:") || line.starts_with("Internet Address") {
+            if line.is_empty()
+                || line.starts_with("Interface:")
+                || line.starts_with("Internet Address")
+            {
                 continue;
             }
 
             let parts: Vec<&str> = line.split_whitespace().collect();
             if !parts.is_empty() {
                 let ip = parts[0].trim();
-                if ip.chars().all(|c| c.is_ascii_digit() || c == '.') && ip.matches('.').count() == 3 {
+                if ip.chars().all(|c| c.is_ascii_digit() || c == '.')
+                    && ip.matches('.').count() == 3
+                {
                     if !ip.ends_with(".255") && !ip.starts_with("224.") && !ip.starts_with("239.") {
                         hosts.insert(ip.to_string());
                     }
@@ -136,10 +149,14 @@ impl NxcModule for NetDiscovery {
         }
 
         if hosts.is_empty() {
-             output_summary.push_str("[!] No additional hosts found via ARP sweep.\n");
+            output_summary.push_str("[!] No additional hosts found via ARP sweep.\n");
         } else {
-            output_summary.push_str(&format!("[*] ARP Sweep: {} potential hosts. Fingerprinting {} ports...\n", hosts.len(), ports.len()));
-            
+            output_summary.push_str(&format!(
+                "[*] ARP Sweep: {} potential hosts. Fingerprinting {} ports...\n",
+                hosts.len(),
+                ports.len()
+            ));
+
             let mut discovered_services = Vec::new();
             for ip in hosts {
                 let mut host_services = Vec::new();
@@ -147,7 +164,9 @@ impl NxcModule for NetDiscovery {
                     let addr = format!("{}:{}", ip, port);
                     let timeout = Duration::from_millis(400);
 
-                    if let Ok(Ok(_)) = tokio::time::timeout(timeout, TcpStream::connect(&addr)).await {
+                    if let Ok(Ok(_)) =
+                        tokio::time::timeout(timeout, TcpStream::connect(&addr)).await
+                    {
                         host_services.push(json!({ "port": port, "service": name }));
                         output_summary.push_str(&format!("  [+] {}:{} ({})\n", ip, port, name));
                     }
@@ -162,7 +181,8 @@ impl NxcModule for NetDiscovery {
         }
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: output_summary,
             data: json!({}),
         })

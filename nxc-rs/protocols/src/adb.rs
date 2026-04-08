@@ -171,7 +171,12 @@ impl NxcProtocol for AdbProtocol {
         &[]
     }
 
-    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        _proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         let addr = format!("{}:{}", target, port);
         debug!("ADB: Connecting to {}", addr);
 
@@ -297,16 +302,18 @@ impl AdbProtocol {
 
         // Execute `screencap -p` to get binary PNG data
         let output = self.execute(session, "screencap -p").await?;
-        
+
         if output.stdout.is_empty() {
-            return Err(anyhow!("ADB: screencap returned no data. Is the device screen off?"));
+            return Err(anyhow!(
+                "ADB: screencap returned no data. Is the device screen off?"
+            ));
         }
 
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)?
             .as_secs();
         let path = format!("screenshots/adb_{}_{}.png", target, timestamp);
-        
+
         std::fs::create_dir_all("screenshots")?;
         std::fs::write(&path, output.stdout.as_bytes())?;
 
