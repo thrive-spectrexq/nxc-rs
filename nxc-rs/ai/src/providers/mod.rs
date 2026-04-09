@@ -2,7 +2,15 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
+pub mod anthropic;
 pub mod gemini;
+pub mod ollama;
+pub mod openai;
+
+pub use anthropic::AnthropicProvider;
+pub use gemini::GeminiProvider;
+pub use ollama::OllamaProvider;
+pub use openai::OpenAiProvider;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolDefinition {

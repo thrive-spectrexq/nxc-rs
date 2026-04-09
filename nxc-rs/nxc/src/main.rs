@@ -50,17 +50,14 @@ async fn main() -> Result<()> {
     // ── Get the protocol subcommand ──
     let (protocol_name, sub_matches) = match matches.subcommand() {
         Some(("telegram", sub_m)) => {
-            // Set the token in env if provided via CLI override
-            if let Some(token) = sub_m.get_one::<String>("token") {
-                std::env::set_var("TELEGRAM_BOT_TOKEN", token);
-            }
-
-            telegram::start_bot().await?;
+            // Pass token directly instead of using set_var (unsafe in async context since Rust 1.81+)
+            let token = sub_m.get_one::<String>("token").cloned();
+            telegram::start_bot_with_token(token).await?;
             return Ok(());
         }
         Some(("ai", ai_matches)) => {
             let initial_prompt = ai_matches.get_one::<String>("prompt").cloned();
-            let provider_name = ai_matches.get_one::<String>("provider").unwrap();
+            let provider_name = ai_matches.get_one::<String>("provider").cloned();
             let model = ai_matches.get_one::<String>("model").cloned();
 
             handle_ai_mode(initial_prompt, provider_name, model).await?;
@@ -251,7 +248,9 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|_| ".".to_string());
     let dot_nxc = std::path::PathBuf::from(home).join(".nxc");
     if !dot_nxc.exists() {
-        let _ = std::fs::create_dir_all(&dot_nxc);
+        if let Err(e) = std::fs::create_dir_all(&dot_nxc) {
+            NxcGlobalOutput::warn(&format!("Failed to create .nxc directory: {}", e));
+        }
     }
     let db_path = dot_nxc.join("nxc.db");
 
@@ -379,15 +378,20 @@ async fn main() -> Result<()> {
 
     // 1. Automatic Workspace Reporting
     let ws_reports_dir = dot_nxc.join("workspaces").join(workspace).join("reports");
-    if let Ok(_) = std::fs::create_dir_all(&ws_reports_dir) {
-        let filename = format!(
-            "report_{}_{}.json",
-            protocol_name,
-            Utc::now().format("%Y%m%d_%H%M%S")
-        );
-        let report_path = ws_reports_dir.join(filename);
-        if let Ok(_) = reporting::export_json(report_path.to_str().unwrap(), &report) {
-            // Silently saved to workspace
+    match std::fs::create_dir_all(&ws_reports_dir) {
+        Ok(_) => {
+            let filename = format!(
+                "report_{}_{}.json",
+                protocol_name,
+                Utc::now().format("%Y%m%d_%H%M%S")
+            );
+            let report_path = ws_reports_dir.join(filename);
+            if let Err(e) = reporting::export_json(report_path.to_str().unwrap(), &report) {
+                NxcGlobalOutput::warn(&format!("Failed to save workspace report: {}", e));
+            }
+        }
+        Err(e) => {
+            NxcGlobalOutput::warn(&format!("Failed to create reports directory: {}", e));
         }
     }
 
@@ -395,7 +399,7 @@ async fn main() -> Result<()> {
     if let Some(format) = sub_matches.get_one::<String>("export") {
         let mut path = sub_matches
             .get_one::<String>("export-path")
-            .unwrap()
+            .ok_or_else(|| anyhow::anyhow!("--export-path is required when using --export"))?
             .to_string();
         if !path.ends_with(format) {
             path = format!("{}.{}", path, format);

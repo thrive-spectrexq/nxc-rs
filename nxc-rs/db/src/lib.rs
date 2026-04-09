@@ -116,6 +116,44 @@ pub struct WorkspaceStats {
     pub admin_access_count: i64,
 }
 
+// ─── Migration System ───────────────────────────────────────────
+
+/// Ordered list of schema migrations. Each entry is (version, sql).
+/// New migrations are appended; existing ones must NEVER be modified.
+const MIGRATIONS: &[(i64, &str)] = &[
+    (1, NXC_SCHEMA),
+    // Future migrations:
+    // (2, "ALTER TABLE nxc_hosts ADD COLUMN agent TEXT;"),
+];
+
+/// Run pending migrations against the database.
+fn run_migrations(conn: &rusqlite::Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS nxc_schema_version (
+            version INTEGER PRIMARY KEY,
+            applied_at INTEGER NOT NULL
+        )"
+    )?;
+
+    let current: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(version), 0) FROM nxc_schema_version",
+        [],
+        |row| row.get(0),
+    ).unwrap_or(0);
+
+    for (version, sql) in MIGRATIONS {
+        if *version > current {
+            conn.execute_batch(sql)?;
+            conn.execute(
+                "INSERT INTO nxc_schema_version (version, applied_at) VALUES (?1, ?2)",
+                rusqlite::params![version, chrono::Utc::now().timestamp()],
+            )?;
+            tracing::info!("Applied database migration v{}", version);
+        }
+    }
+    Ok(())
+}
+
 // ─── NxcDb Manager ──────────────────────────────────────────────
 
 /// Credential workspace database manager.
@@ -130,9 +168,9 @@ impl NxcDb {
         let manager = r2d2_sqlite::SqliteConnectionManager::file(db_path);
         let pool = r2d2::Pool::new(manager)?;
 
-        // Run schema migrations
+        // Run versioned migrations
         let conn = pool.get()?;
-        conn.execute_batch(NXC_SCHEMA)?;
+        run_migrations(&conn)?;
 
         Ok(Self {
             pool,
@@ -318,5 +356,41 @@ impl NxcDb {
             dc_count,
             admin_access_count,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_db_migration_and_upsert() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("nxc_test.db");
+        
+        let db = NxcDb::new(&db_path, "default").unwrap();
+        
+        // Test upserting a host
+        let host = HostInfo {
+            id: None,
+            workspace: "default".to_string(),
+            ip: "192.168.1.100".to_string(),
+            hostname: Some("win10".to_string()),
+            domain: Some("CORP".to_string()),
+            os: Some("Windows 10".to_string()),
+            smb_signing: true,
+            smb_v1: false,
+            null_session: false,
+            admin_access: true,
+        };
+        
+        let host_id = db.upsert_host(&host).unwrap();
+        assert!(host_id > 0);
+        
+        let hosts = db.list_hosts_in("default").unwrap();
+        assert_eq!(hosts.len(), 1);
+        assert_eq!(hosts[0].ip, "192.168.1.100");
+        assert_eq!(hosts[0].hostname.as_deref(), Some("win10"));
     }
 }

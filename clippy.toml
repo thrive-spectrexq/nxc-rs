@@ -1,0 +1,5 @@
+# Clippy configuration for nxc-rs
+# See: https://doc.rust-lang.org/clippy/lint_configuration.html
+msrv = "1.82.0"
+cognitive-complexity-threshold = 30
+too-many-arguments-threshold = 8

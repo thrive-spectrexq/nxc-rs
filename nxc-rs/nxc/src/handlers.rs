@@ -8,33 +8,46 @@ use nxc_modules::ModuleRegistry;
 
 pub async fn handle_ai_mode(
     initial_prompt: Option<String>,
-    provider_name: &str,
+    provider_name: Option<String>,
     model: Option<String>,
 ) -> Result<()> {
     dotenvy::dotenv().ok();
 
-    let api_key = match provider_name {
-        "gemini" => {
-            std::env::var("GEMINI_API_KEY").context("GEMINI_API_KEY not found in .env")
+    let (detected_provider, api_key) = match provider_name.as_deref() {
+        Some("gemini") => ("gemini".to_string(), std::env::var("GEMINI_API_KEY").context("GEMINI_API_KEY not found in .env")?),
+        Some("openai") => ("openai".to_string(), std::env::var("OPENAI_API_KEY").context("OPENAI_API_KEY not found in .env")?),
+        Some("anthropic") => ("anthropic".to_string(), std::env::var("ANTHROPIC_API_KEY").context("ANTHROPIC_API_KEY not found in .env")?),
+        Some("ollama") => ("ollama".to_string(), std::env::var("OLLAMA_API_BASE").unwrap_or_else(|_| "http://localhost:11434".to_string())),
+        Some(p) => anyhow::bail!("Unsupported AI provider: {}", p),
+        None => {
+            // Auto-detect based on env vars
+            if let Ok(k) = std::env::var("GEMINI_API_KEY") {
+                ("gemini".to_string(), k)
+            } else if let Ok(k) = std::env::var("OPENAI_API_KEY") {
+                ("openai".to_string(), k)
+            } else if let Ok(k) = std::env::var("ANTHROPIC_API_KEY") {
+                ("anthropic".to_string(), k)
+            } else if let Ok(k) = std::env::var("OLLAMA_API_BASE") {
+                ("ollama".to_string(), k)
+            } else {
+                anyhow::bail!("No AI provider specified and no API keys found in environment. Set GEMINI_API_KEY, OPENAI_API_KEY, etc.");
+            }
         }
-        "openai" => {
-            std::env::var("OPENAI_API_KEY").context("OPENAI_API_KEY not found in .env")
-        }
-        "anthropic" => std::env::var("ANTHROPIC_API_KEY")
-            .context("ANTHROPIC_API_KEY not found in .env"),
-        _ => anyhow::bail!("Unsupported AI provider: {}", provider_name),
-    }?;
+    };
 
     println!(
         "{} Initializing AI Automation Engine with provider: {}...",
         "◆".cyan().bold(),
-        provider_name.yellow().bold()
+        detected_provider.yellow().bold()
     );
 
     // Initialize AI Agent
-    let provider: Box<dyn nxc_ai::providers::AiProvider> = match provider_name {
-        "gemini" => Box::new(GeminiProvider::new(api_key, model)),
-        _ => anyhow::bail!("Provider {} is not yet fully implemented", provider_name),
+    let provider: Box<dyn nxc_ai::providers::AiProvider> = match detected_provider.as_str() {
+        "gemini" => Box::new(nxc_ai::providers::GeminiProvider::new(api_key, model)),
+        "openai" => Box::new(nxc_ai::providers::OpenAiProvider::new(api_key, model)),
+        "anthropic" => Box::new(nxc_ai::providers::AnthropicProvider::new(api_key, model)),
+        "ollama" => Box::new(nxc_ai::providers::OllamaProvider::new(api_key, model)),
+        _ => anyhow::bail!("Provider {} is not yet fully implemented", detected_provider),
     };
 
     // Initialize shared resources for AI tools
