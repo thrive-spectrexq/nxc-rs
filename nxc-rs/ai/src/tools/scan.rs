@@ -38,7 +38,7 @@ impl NxcTool for ScanTool {
         let mut results = Vec::new();
         for t in targets {
             results.push(json!({
-                "ip": t.ip.to_string(),
+                "ip": t.ip_string(),
                 "hostname": t.hostname,
             }));
         }

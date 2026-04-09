@@ -281,10 +281,18 @@ enum TelegramBotCommand {
 // --- 🛸 Main Dispatch Engine ---
 
 pub async fn start_bot() -> anyhow::Result<()> {
+    start_bot_with_token(None).await
+}
+
+pub async fn start_bot_with_token(cli_token: Option<String>) -> anyhow::Result<()> {
     init_security();
 
-    let token = std::env::var("TELEGRAM_BOT_TOKEN")
-        .context("CRITICAL: TELEGRAM_BOT_TOKEN not found in environment")?;
+    // Prefer CLI-provided token, fall back to environment variable
+    let token = match cli_token {
+        Some(t) => t,
+        None => std::env::var("TELEGRAM_BOT_TOKEN")
+            .context("CRITICAL: TELEGRAM_BOT_TOKEN not found in environment")?,
+    };
 
     // --- Render Health Check ---
     let port = std::env::var("PORT")
@@ -1584,23 +1592,39 @@ async fn engine_execute_ai(
     }
 
     dotenvy::dotenv().ok();
-    let api_key = match std::env::var("GEMINI_API_KEY") {
-        Ok(k) => k,
-        Err(_) => {
-            bot.send_message(
-                chat_id,
-                "❌ <b>AI ERROR</b>\nGEMINI_API_KEY not found in environment.",
-            )
-            .await?;
-            return Ok(());
-        }
+
+    let (detected_provider, api_key) = if let Ok(k) = std::env::var("GEMINI_API_KEY") {
+        ("gemini".to_string(), k)
+    } else if let Ok(k) = std::env::var("OPENAI_API_KEY") {
+        ("openai".to_string(), k)
+    } else if let Ok(k) = std::env::var("ANTHROPIC_API_KEY") {
+        ("anthropic".to_string(), k)
+    } else if let Ok(k) = std::env::var("OLLAMA_API_BASE") {
+        ("ollama".to_string(), k)
+    } else {
+        bot.send_message(
+            chat_id,
+            "❌ <b>AI ERROR</b>\nNo API keys found in environment. Set GEMINI_API_KEY, OPENAI_API_KEY, etc.",
+        )
+        .parse_mode(ParseMode::Html)
+        .await?;
+        return Ok(());
     };
 
-    bot.send_message(chat_id, "🌩️ <b>Initializing AI Automation Agent...</b>")
+    bot.send_message(chat_id, format!("🌩️ <b>Initializing AI Automation Agent...</b>\nDetected Provider: <code>{}</code>", detected_provider))
         .parse_mode(ParseMode::Html)
         .await?;
 
-    let provider = Box::new(nxc_ai::GeminiProvider::new(api_key, None));
+    let provider: Box<dyn nxc_ai::providers::AiProvider> = match detected_provider.as_str() {
+        "gemini" => Box::new(nxc_ai::providers::GeminiProvider::new(api_key, None)),
+        "openai" => Box::new(nxc_ai::providers::OpenAiProvider::new(api_key, None)),
+        "anthropic" => Box::new(nxc_ai::providers::AnthropicProvider::new(api_key, None)),
+        "ollama" => Box::new(nxc_ai::providers::OllamaProvider::new(api_key, None)),
+        _ => {
+            bot.send_message(chat_id, "❌ <b>AI ERROR</b>\nUnsupported AI provider fallback.").parse_mode(ParseMode::Html).await?;
+            return Ok(());
+        }
+    };
 
     // Initialize shared resources for AI tools
     let db_path = std::path::Path::new("nxc.db");

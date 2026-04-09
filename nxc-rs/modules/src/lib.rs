@@ -102,10 +102,13 @@ pub mod group_mem;
 pub mod subnets;
 pub mod pso;
 pub mod find_computer;
-pub mod phase2_remaining; // get_network, get_unixpassword, ldap_checker, obsolete, pre2k
+pub mod ldap_enumeration; // get_network, get_unixpassword, ldap_checker, obsolete, pre2k
 
 // ─── Phase 3-6: MSSQL, Cred Harvesting, Persistence, Advanced ──
-pub mod phase3_to_6;
+pub mod advanced_modules;
+
+// ─── Wireless Reconnaissance ────────────────────────────────────
+pub mod wifi_recon;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -439,50 +442,53 @@ impl ModuleRegistry {
         modules.insert("subnets".into(), Box::new(subnets::Subnets::new()));
         modules.insert("pso".into(), Box::new(pso::Pso::new()));
         modules.insert("find_computer".into(), Box::new(find_computer::FindComputer::new()));
-        modules.insert("get_network".into(), Box::new(phase2_remaining::GetNetwork::new()));
-        modules.insert("get_unixpassword".into(), Box::new(phase2_remaining::GetUnixPassword::new()));
-        modules.insert("ldap_checker".into(), Box::new(phase2_remaining::LdapChecker::new()));
-        modules.insert("obsolete".into(), Box::new(phase2_remaining::Obsolete::new()));
-        modules.insert("pre2k".into(), Box::new(phase2_remaining::Pre2k::new()));
+        modules.insert("get_network".into(), Box::new(ldap_enumeration::GetNetwork::new()));
+        modules.insert("get_unixpassword".into(), Box::new(ldap_enumeration::GetUnixPassword::new()));
+        modules.insert("ldap_checker".into(), Box::new(ldap_enumeration::LdapChecker::new()));
+        modules.insert("obsolete".into(), Box::new(ldap_enumeration::Obsolete::new()));
+        modules.insert("pre2k".into(), Box::new(ldap_enumeration::Pre2k::new()));
 
         // ─── Phase 3: MSSQL Modules (6 modules) ────────────────────
-        modules.insert("mssql_coerce".into(), Box::new(phase3_to_6::MssqlCoerce::new()));
-        modules.insert("mssql_dumper".into(), Box::new(phase3_to_6::MssqlDumper::new()));
-        modules.insert("mssql_cbt".into(), Box::new(phase3_to_6::MssqlCbt::new()));
-        modules.insert("enable_cmdshell".into(), Box::new(phase3_to_6::EnableCmdShell::new()));
-        modules.insert("enum_links".into(), Box::new(phase3_to_6::EnumLinks::new()));
-        modules.insert("enum_logins".into(), Box::new(phase3_to_6::EnumLogins::new()));
+        modules.insert("mssql_coerce".into(), Box::new(advanced_modules::MssqlCoerce::new()));
+        modules.insert("mssql_dumper".into(), Box::new(advanced_modules::MssqlDumper::new()));
+        modules.insert("mssql_cbt".into(), Box::new(advanced_modules::MssqlCbt::new()));
+        modules.insert("enable_cmdshell".into(), Box::new(advanced_modules::EnableCmdShell::new()));
+        modules.insert("enum_links".into(), Box::new(advanced_modules::EnumLinks::new()));
+        modules.insert("enum_logins".into(), Box::new(advanced_modules::EnumLogins::new()));
 
         // ─── Phase 4: Credential Harvesting (10 modules) ───────────
-        modules.insert("firefox".into(), Box::new(phase3_to_6::FirefoxCreds::new()));
-        modules.insert("winscp".into(), Box::new(phase3_to_6::WinscpCreds::new()));
-        modules.insert("keepass_discover".into(), Box::new(phase3_to_6::KeepassDiscover::new()));
-        modules.insert("keepass_trigger".into(), Box::new(phase3_to_6::KeepassTrigger::new()));
-        modules.insert("mremoteng".into(), Box::new(phase3_to_6::MremotengCreds::new()));
-        modules.insert("rdcman".into(), Box::new(phase3_to_6::RdcmanCreds::new()));
-        modules.insert("putty".into(), Box::new(phase3_to_6::PuttySessions::new()));
-        modules.insert("mobaxterm".into(), Box::new(phase3_to_6::MobaxtermCreds::new()));
-        modules.insert("aws_credentials".into(), Box::new(phase3_to_6::AwsCredentials::new()));
-        modules.insert("veeam".into(), Box::new(phase3_to_6::VeeamCreds::new()));
+        modules.insert("firefox".into(), Box::new(advanced_modules::FirefoxCreds::new()));
+        modules.insert("winscp".into(), Box::new(advanced_modules::WinscpCreds::new()));
+        modules.insert("keepass_discover".into(), Box::new(advanced_modules::KeepassDiscover::new()));
+        modules.insert("keepass_trigger".into(), Box::new(advanced_modules::KeepassTrigger::new()));
+        modules.insert("mremoteng".into(), Box::new(advanced_modules::MremotengCreds::new()));
+        modules.insert("rdcman".into(), Box::new(advanced_modules::RdcmanCreds::new()));
+        modules.insert("putty".into(), Box::new(advanced_modules::PuttySessions::new()));
+        modules.insert("mobaxterm".into(), Box::new(advanced_modules::MobaxtermCreds::new()));
+        modules.insert("aws_credentials".into(), Box::new(advanced_modules::AwsCredentials::new()));
+        modules.insert("veeam".into(), Box::new(advanced_modules::VeeamCreds::new()));
 
         // ─── Phase 5: Persistence & Lateral Movement (9 modules) ───
-        modules.insert("schtask_as".into(), Box::new(phase3_to_6::SchtaskAs::new()));
-        modules.insert("slinky".into(), Box::new(phase3_to_6::Slinky::new()));
-        modules.insert("scuffy".into(), Box::new(phase3_to_6::Scuffy::new()));
-        modules.insert("drop_sc".into(), Box::new(phase3_to_6::DropSc::new()));
-        modules.insert("drop_library_ms".into(), Box::new(phase3_to_6::DropLibraryMs::new()));
-        modules.insert("met_inject".into(), Box::new(phase3_to_6::MetInject::new()));
-        modules.insert("empire_exec".into(), Box::new(phase3_to_6::EmpireExec::new()));
-        modules.insert("web_delivery".into(), Box::new(phase3_to_6::WebDelivery::new()));
-        modules.insert("lockscreendoors".into(), Box::new(phase3_to_6::LockScreenDoors::new()));
+        modules.insert("schtask_as".into(), Box::new(advanced_modules::SchtaskAs::new()));
+        modules.insert("slinky".into(), Box::new(advanced_modules::Slinky::new()));
+        modules.insert("scuffy".into(), Box::new(advanced_modules::Scuffy::new()));
+        modules.insert("drop_sc".into(), Box::new(advanced_modules::DropSc::new()));
+        modules.insert("drop_library_ms".into(), Box::new(advanced_modules::DropLibraryMs::new()));
+        modules.insert("met_inject".into(), Box::new(advanced_modules::MetInject::new()));
+        modules.insert("empire_exec".into(), Box::new(advanced_modules::EmpireExec::new()));
+        modules.insert("web_delivery".into(), Box::new(advanced_modules::WebDelivery::new()));
+        modules.insert("lockscreendoors".into(), Box::new(advanced_modules::LockScreenDoors::new()));
 
         // ─── Phase 6: RS-Exclusive Advanced (6 modules) ────────────
-        modules.insert("amsi_bypass".into(), Box::new(phase3_to_6::AmsiBypass::new()));
-        modules.insert("bof_loader".into(), Box::new(phase3_to_6::BofLoader::new()));
-        modules.insert("pe_loader".into(), Box::new(phase3_to_6::PeLoader::new()));
-        modules.insert("etw_patcher".into(), Box::new(phase3_to_6::EtwPatcher::new()));
-        modules.insert("defender_enum".into(), Box::new(phase3_to_6::DefenderEnum::new()));
-        modules.insert("dpapi_masterkey".into(), Box::new(phase3_to_6::DpapiMasterkey::new()));
+        modules.insert("amsi_bypass".into(), Box::new(advanced_modules::AmsiBypass::new()));
+        modules.insert("bof_loader".into(), Box::new(advanced_modules::BofLoader::new()));
+        modules.insert("pe_loader".into(), Box::new(advanced_modules::PeLoader::new()));
+        modules.insert("etw_patcher".into(), Box::new(advanced_modules::EtwPatcher::new()));
+        modules.insert("defender_enum".into(), Box::new(advanced_modules::DefenderEnum::new()));
+        modules.insert("dpapi_masterkey".into(), Box::new(advanced_modules::DpapiMasterkey::new()));
+
+        // ─── Wireless Reconnaissance ────────────────────────────────
+        modules.insert("wifi_recon".into(), Box::new(wifi_recon::WifiRecon::new()));
 
         Self { modules }
     }

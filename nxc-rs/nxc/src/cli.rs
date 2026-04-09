@@ -805,8 +805,7 @@ pub fn build_cli() -> Command {
                 .arg(
                     Arg::new("provider")
                         .long("provider")
-                        .help("AI provider to use (gemini, openai, anthropic)")
-                        .default_value("gemini"),
+                        .help("AI provider to use (gemini, openai, anthropic, ollama). Auto-detected if omitted based on env vars."),
                 )
                 .arg(
                     Arg::new("model")

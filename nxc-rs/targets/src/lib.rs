@@ -17,10 +17,46 @@ use tokio::task::JoinHandle;
 
 // ─── Target Types ───────────────────────────────────────────────
 
+/// Address of a target — either a resolved IP or an unresolved hostname.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TargetAddr {
+    /// A resolved IP address.
+    Ip(IpAddr),
+    /// An unresolved hostname (DNS resolution happens at connect time).
+    Hostname(String),
+}
+
+impl TargetAddr {
+    /// Returns the IP if resolved, or None for unresolved hostnames.
+    pub fn ip(&self) -> Option<IpAddr> {
+        match self {
+            TargetAddr::Ip(ip) => Some(*ip),
+            TargetAddr::Hostname(_) => None,
+        }
+    }
+
+    /// Returns a connection string suitable for TCP connect.
+    pub fn to_connect_string(&self) -> String {
+        match self {
+            TargetAddr::Ip(ip) => ip.to_string(),
+            TargetAddr::Hostname(h) => h.clone(),
+        }
+    }
+}
+
+impl std::fmt::Display for TargetAddr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TargetAddr::Ip(ip) => write!(f, "{}", ip),
+            TargetAddr::Hostname(h) => write!(f, "{}", h),
+        }
+    }
+}
+
 /// A resolved target for protocol execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Target {
-    pub ip: IpAddr,
+    pub addr: TargetAddr,
     pub hostname: Option<String>,
     pub port: Option<u16>,
 }
@@ -28,8 +64,16 @@ pub struct Target {
 impl Target {
     pub fn new(ip: IpAddr) -> Self {
         Self {
-            ip,
+            addr: TargetAddr::Ip(ip),
             hostname: None,
+            port: None,
+        }
+    }
+
+    pub fn from_hostname(hostname: &str) -> Self {
+        Self {
+            addr: TargetAddr::Hostname(hostname.to_string()),
+            hostname: Some(hostname.to_string()),
             port: None,
         }
     }
@@ -44,12 +88,22 @@ impl Target {
         self
     }
 
+    /// The IP as a string. For hostnames, returns the hostname itself.
+    pub fn ip_string(&self) -> String {
+        self.addr.to_connect_string()
+    }
+
     /// Display string for output formatting.
     pub fn display(&self) -> String {
-        if let Some(ref hostname) = self.hostname {
-            format!("{} ({})", self.ip, hostname)
-        } else {
-            self.ip.to_string()
+        match &self.addr {
+            TargetAddr::Ip(ip) => {
+                if let Some(ref hostname) = self.hostname {
+                    format!("{} ({})", ip, hostname)
+                } else {
+                    ip.to_string()
+                }
+            }
+            TargetAddr::Hostname(h) => h.clone(),
         }
     }
 }
@@ -83,11 +137,7 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>> {
     }
 
     // Treat as hostname — DNS resolution will happen at connect time
-    Ok(vec![Target {
-        ip: "0.0.0.0".parse().unwrap(),
-        hostname: Some(spec.to_string()),
-        port: None,
-    }])
+    Ok(vec![Target::from_hostname(spec)])
 }
 
 /// Parse targets from a file (one per line).
@@ -330,7 +380,7 @@ impl ExecutionEngine {
                                         let h_id = db_p.upsert_host(&HostInfo {
                                             id: None,
                                             workspace: db_p.current_workspace().to_string(),
-                                            ip: t_p.ip.to_string(),
+                                            ip: t_p.ip_string(),
                                             hostname: t_p.hostname.clone(),
                                             domain: None,
                                             os: None,
@@ -513,7 +563,7 @@ mod tests {
     fn test_parse_single_ip() {
         let targets = parse_targets("192.168.1.10").unwrap();
         assert_eq!(targets.len(), 1);
-        assert_eq!(targets[0].ip.to_string(), "192.168.1.10");
+        assert_eq!(targets[0].ip_string(), "192.168.1.10");
     }
 
     #[test]

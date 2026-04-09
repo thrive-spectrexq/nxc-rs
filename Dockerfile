@@ -41,6 +41,7 @@ COPY --from=builder /app/target/release/nxc /usr/local/bin/nxc
 RUN useradd -ms /bin/bash nxcuser
 USER nxcuser
 
-# Use the telegram subcommand by default
+# Default: shows help. Override with: docker run nxc telegram
+# For telegram mode: docker run -e TELEGRAM_BOT_TOKEN=... nxc telegram
 EXPOSE 10000
-ENTRYPOINT ["nxc", "telegram"]
+ENTRYPOINT ["nxc"]

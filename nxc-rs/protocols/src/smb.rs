@@ -9,8 +9,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{kerberos::KerberosClient, AuthResult, Credentials};
 use rand;
-use std::io::{Read, Write};
-use std::net::TcpStream;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 use std::time::Duration;
 use tracing::debug;
 
@@ -35,7 +35,6 @@ pub struct SmbHostInfo {
 
 // ─── SMB2 Header ──────────────────────────────────────────────
 
-#[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 pub struct Smb2Header {
     pub protocol_id: [u8; 4],
@@ -100,6 +99,7 @@ pub struct SmbSession {
     pub host_info: SmbHostInfo,
     pub session_id: u64,
     pub tree_id: u32,
+    pub timeout: Duration,
     pub stream: tokio::sync::Mutex<Option<TcpStream>>,
 }
 
@@ -177,10 +177,10 @@ impl SmbProtocol {
         Self { timeout }
     }
 
-    pub fn negotiate(stream: &mut TcpStream) -> Result<SmbHostInfo> {
+    pub async fn negotiate(stream: &mut TcpStream, timeout: Duration) -> Result<SmbHostInfo> {
         let req = Self::build_smb2_negotiate_request();
-        Self::send_smb2_packet(stream, &req)?;
-        let resp = Self::recv_smb2_packet(stream)?;
+        Self::send_smb2_packet(stream, &req, timeout).await?;
+        let resp = Self::recv_smb2_packet(stream, timeout).await?;
         Self::parse_negotiate_response(&resp)
     }
 
@@ -298,8 +298,8 @@ impl SmbProtocol {
             let stream = lock
                 .as_mut()
                 .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
-            Self::send_smb2_packet(stream, &packet)?;
-            Self::recv_smb2_packet(stream)?
+            Self::send_smb2_packet(stream, &packet, session.timeout).await?;
+            Self::recv_smb2_packet(stream, session.timeout).await?
         };
 
         let _ = self.close_file(session, tree_id, &fid).await;
@@ -336,8 +336,8 @@ impl SmbProtocol {
             let stream = lock
                 .as_mut()
                 .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
-            Self::send_smb2_packet(stream, &packet)?;
-            Self::recv_smb2_packet(stream)?
+            Self::send_smb2_packet(stream, &packet, session.timeout).await?;
+            Self::recv_smb2_packet(stream, session.timeout).await?
         };
 
         let _ = self.close_file(session, tree_id, &fid).await;
@@ -392,8 +392,8 @@ impl SmbProtocol {
             let stream = lock
                 .as_mut()
                 .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
-            Self::send_smb2_packet(stream, &packet)?;
-            Self::recv_smb2_packet(stream)?
+            Self::send_smb2_packet(stream, &packet, session.timeout).await?;
+            Self::recv_smb2_packet(stream, session.timeout).await?
         };
 
         let status = u32::from_le_bytes(resp[8..12].try_into()?);
@@ -422,8 +422,8 @@ impl SmbProtocol {
             let stream = lock
                 .as_mut()
                 .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
-            Self::send_smb2_packet(stream, &packet)?;
-            Self::recv_smb2_packet(stream)?
+            Self::send_smb2_packet(stream, &packet, session.timeout).await?;
+            Self::recv_smb2_packet(stream, session.timeout).await?
         };
 
         let status = u32::from_le_bytes(resp[8..12].try_into()?);
@@ -452,8 +452,8 @@ impl SmbProtocol {
             let stream = lock
                 .as_mut()
                 .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
-            Self::send_smb2_packet(stream, &packet)?;
-            Self::recv_smb2_packet(stream)?
+            Self::send_smb2_packet(stream, &packet, session.timeout).await?;
+            Self::recv_smb2_packet(stream, session.timeout).await?
         };
 
         let status = u32::from_le_bytes(resp[8..12].try_into()?);
@@ -478,8 +478,8 @@ impl SmbProtocol {
             let stream = lock
                 .as_mut()
                 .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
-            Self::send_smb2_packet(stream, &packet)?;
-            Self::recv_smb2_packet(stream)?
+            Self::send_smb2_packet(stream, &packet, session.timeout).await?;
+            Self::recv_smb2_packet(stream, session.timeout).await?
         };
 
         let status = u32::from_le_bytes(resp[8..12].try_into()?);
@@ -503,8 +503,8 @@ impl SmbProtocol {
             let stream = lock
                 .as_mut()
                 .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
-            Self::send_smb2_packet(stream, &packet)?;
-            Self::recv_smb2_packet(stream)?
+            Self::send_smb2_packet(stream, &packet, session.timeout).await?;
+            Self::recv_smb2_packet(stream, session.timeout).await?
         };
 
         let status = u32::from_le_bytes(resp[8..12].try_into()?);
@@ -764,25 +764,30 @@ impl SmbProtocol {
         Ok(shares)
     }
 
-    fn send_smb2_packet(stream: &mut TcpStream, data: &[u8]) -> Result<()> {
+    async fn send_smb2_packet(stream: &mut TcpStream, data: &[u8], timeout: Duration) -> Result<()> {
         let mut packet = vec![NETBIOS_SESSION_MSG];
         let len = data.len() as u32;
         packet.push(((len >> 16) & 0xff) as u8);
         packet.push(((len >> 8) & 0xff) as u8);
         packet.push((len & 0xff) as u8);
         packet.extend_from_slice(data);
-        stream.write_all(&packet)?;
-        stream.flush()?;
+        tokio::time::timeout(timeout, async {
+            stream.write_all(&packet).await?;
+            stream.flush().await?;
+            Ok::<(), anyhow::Error>(())
+        }).await.map_err(|_| anyhow!("SMB send timeout"))??;
         Ok(())
     }
 
-    fn recv_smb2_packet(stream: &mut TcpStream) -> Result<Vec<u8>> {
-        let mut header = [0u8; 4];
-        stream.read_exact(&mut header)?;
-        let len = ((header[1] as usize) << 16) | ((header[2] as usize) << 8) | (header[3] as usize);
-        let mut resp = vec![0u8; len];
-        stream.read_exact(&mut resp)?;
-        Ok(resp)
+    async fn recv_smb2_packet(stream: &mut TcpStream, timeout: Duration) -> Result<Vec<u8>> {
+        tokio::time::timeout(timeout, async {
+            let mut header = [0u8; 4];
+            stream.read_exact(&mut header).await?;
+            let len = ((header[1] as usize) << 16) | ((header[2] as usize) << 8) | (header[3] as usize);
+            let mut resp = vec![0u8; len];
+            stream.read_exact(&mut resp).await?;
+            Ok::<Vec<u8>, anyhow::Error>(resp)
+        }).await.map_err(|_| anyhow!("SMB recv timeout"))?
     }
 
     async fn authenticate_kerberos(
@@ -813,8 +818,8 @@ impl SmbProtocol {
         let sid = {
             let mut lock = smb_sess.stream.lock().await;
             let stream = lock.as_mut().ok_or_else(|| anyhow::anyhow!("No stream"))?;
-            Self::send_smb2_packet(stream, &ap_req_pkt)?;
-            let resp = Self::recv_smb2_packet(stream)?;
+            Self::send_smb2_packet(stream, &ap_req_pkt, smb_sess.timeout).await?;
+            let resp = Self::recv_smb2_packet(stream, smb_sess.timeout).await?;
             u64::from_le_bytes(resp[40..48].try_into()?)
         };
 
@@ -926,12 +931,8 @@ impl NxcProtocol for SmbProtocol {
         port: u16,
         proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
-        let stream = crate::connection::connect(target, port, proxy)
-            .await?
-            .into_std()?;
-        stream.set_read_timeout(Some(self.timeout))?;
-        stream.set_write_timeout(Some(self.timeout))?;
-        let host_info = SmbProtocol::negotiate(&mut stream.try_clone()?).unwrap_or_default();
+        let mut stream = crate::connection::connect(target, port, proxy).await?;
+        let host_info = SmbProtocol::negotiate(&mut stream, self.timeout).await.unwrap_or_default();
         Ok(Box::new(SmbSession {
             target: target.to_string(),
             port,
@@ -939,6 +940,7 @@ impl NxcProtocol for SmbProtocol {
             host_info,
             session_id: 0,
             tree_id: 0,
+            timeout: self.timeout,
             stream: tokio::sync::Mutex::new(Some(stream)),
         }))
     }
@@ -971,8 +973,8 @@ impl NxcProtocol for SmbProtocol {
         let (sid, _challenge, t3_message) = {
             let mut lock = smb_sess.stream.lock().await;
             let stream = (*lock).as_mut().ok_or_else(|| anyhow!("No stream"))?;
-            Self::send_smb2_packet(stream, &pkt)?;
-            let resp = Self::recv_smb2_packet(stream)?;
+            Self::send_smb2_packet(stream, &pkt, smb_sess.timeout).await?;
+            let resp = Self::recv_smb2_packet(stream, smb_sess.timeout).await?;
 
             let sid = u64::from_le_bytes(resp[40..48].try_into()?);
             let t2 = &resp[u16::from_le_bytes(resp[64..66].try_into()?) as usize..];
@@ -990,8 +992,8 @@ impl NxcProtocol for SmbProtocol {
 
             let mut lock = smb_sess.stream.lock().await;
             let stream = (*lock).as_mut().ok_or_else(|| anyhow!("No stream"))?;
-            Self::send_smb2_packet(stream, &auth_pkt)?;
-            let final_resp = Self::recv_smb2_packet(stream)?;
+            Self::send_smb2_packet(stream, &auth_pkt, smb_sess.timeout).await?;
+            let final_resp = Self::recv_smb2_packet(stream, smb_sess.timeout).await?;
             u32::from_le_bytes(final_resp[8..12].try_into()?)
         };
 
@@ -1071,5 +1073,34 @@ impl SmbProtocol {
     async fn call_smbexec(&self, _session: &SmbSession, _command: &str) -> Result<String> {
         // Implementation of service-based execution...
         Ok("Executed via smbexec".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_smb2_header_build() {
+        let proto = SmbProtocol::new();
+        // 0x00 is Negotiate
+        let header = proto.build_smb2_header(0x00, 1, 0, 0);
+        
+        assert_eq!(header.len(), 64);
+        assert_eq!(&header[0..4], b"\xfeSMB");
+        assert_eq!(&header[12..14], &[0x00, 0x00]); // OP CODE
+        assert_eq!(&header[24..28], &[1,0,0,0]); // Message ID
+    }
+
+    #[test]
+    fn test_smb_session_setup_base() {
+        let proto = SmbProtocol::new();
+        let pkt = proto.build_session_setup_base();
+        
+        // 64-byte Header + 24-byte Session Setup Base
+        assert_eq!(pkt.len(), 64 + 24);
+        assert_eq!(&pkt[0..4], b"\xfeSMB");
+        // Opcode 0x01 is Session Setup
+        assert_eq!(&pkt[12..14], &[0x01, 0x00]); 
     }
 }

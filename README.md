@@ -121,6 +121,7 @@ NetExec-RS includes a built-in APEX-REAPER Telegram bot for remote management.
 2. Add your token to the `.env` file:
    ```env
    TELEGRAM_BOT_TOKEN="your_token_here"
+   TELEGRAM_ADMIN_USERS="your_user_id"
    ```
 
 **Start the Server**:
@@ -139,6 +140,13 @@ cargo run --package nxc -- telegram
 
 ### 5. AI Mission Control (CLI)
 The **Elite Reaper** AI orchestrator can be launched directly from the CLI for autonomous missions. It supports conversational multi-turn interaction.
+
+**Environment Setup**:
+Set one of the following environment variables (the engine will auto-detect which provider to use):
+- `GEMINI_API_KEY` (Default, recommended)
+- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `OLLAMA_API_BASE`
 
 **Launch an Initial Mission**:
 ```powershell
