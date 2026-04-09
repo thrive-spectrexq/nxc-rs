@@ -66,7 +66,7 @@ kerberos_constants = "0.0.9"
 pbkdf2 = { version = "0.12", features = ["hmac"] }
 rasn = "0.28"
 sha1 = "0.10"
-sha2 = "0.10"
+sha2 = "0.11"
 cbc = "0.1"
 cipher = { version = "0.4", features = ["alloc"] }
 pem = "3.0"
