@@ -1082,14 +1082,15 @@ mod tests {
 
     #[test]
     fn test_smb2_header_build() {
-        let proto = SmbProtocol::new();
         // 0x00 is Negotiate
-        let header = proto.build_smb2_header(0x00, 1, 0, 0);
+        let mut header_obj = Smb2Header::new(0x00);
+        header_obj.message_id = 1;
+        let header = header_obj.to_bytes();
         
         assert_eq!(header.len(), 64);
         assert_eq!(&header[0..4], b"\xfeSMB");
         assert_eq!(&header[12..14], &[0x00, 0x00]); // OP CODE
-        assert_eq!(&header[24..28], &[1,0,0,0]); // Message ID
+        assert_eq!(&header[24..32], &[1,0,0,0,0,0,0,0]); // Message ID (64-bit now)
     }
 
     #[test]

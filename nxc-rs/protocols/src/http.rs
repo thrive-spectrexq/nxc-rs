@@ -229,9 +229,9 @@ impl HttpProtocol {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0",
             "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1.2 Mobile/15E148 Safari/604.1",
         ];
-        use rand::seq::SliceRandom;
+        use rand::seq::IndexedRandom;
         USER_AGENTS
-            .choose(&mut rand::thread_rng())
+            .choose(&mut rand::rng())
             .unwrap_or(&USER_AGENTS[0])
     }
 }

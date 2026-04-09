@@ -139,7 +139,7 @@ impl NxcModule for SpiderPlus {
     }
 
     fn supported_protocols(&self) -> &[&str] {
-        &["smb"]
+        &["smb"].as_slice()
     }
 
     fn options(&self) -> Vec<ModuleOption> {
@@ -185,11 +185,9 @@ impl NxcModule for SpiderPlus {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let smb_session = match session.protocol() {
-            "smb" => unsafe {
-                &*(session as *const dyn NxcSession as *const nxc_protocols::smb::SmbSession)
-            },
-            _ => return Err(anyhow::anyhow!("Module only supports SMB")),
+        let smb_session = match session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>() {
+            Some(s) => s,
+            None => return Err(anyhow::anyhow!("Module only supports SMB")),
         };
 
         let download = opts

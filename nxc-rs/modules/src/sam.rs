@@ -30,7 +30,7 @@ impl NxcModule for SamModule {
         self.description
     }
     fn supported_protocols(&self) -> &[&str] {
-        &["smb"]
+        &["smb"].as_slice()
     }
 
     async fn run(

@@ -120,7 +120,7 @@ pub fn encrypt_rc4_hmac(key: &[u8], key_usage: u32, plaintext: &[u8]) -> Result<
 
     // 2. Generate random 8-byte confounder
     let mut confounder = [0u8; 8];
-    rand::thread_rng().fill(&mut confounder);
+    rand::rng().fill(&mut confounder);
 
     // 3. Prepare data to encrypt: confounder + plaintext
     let mut data = Vec::with_capacity(8 + plaintext.len());
@@ -218,7 +218,7 @@ pub fn encrypt_aes(
     is_aes256: bool,
 ) -> Result<Vec<u8>> {
     let mut confounder = [0u8; 16];
-    rand::thread_rng().fill(&mut confounder);
+    rand::rng().fill(&mut confounder);
 
     let mut data = Vec::with_capacity(16 + plaintext.len());
     data.extend_from_slice(&confounder);

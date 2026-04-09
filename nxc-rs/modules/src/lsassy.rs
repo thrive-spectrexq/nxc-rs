@@ -36,7 +36,7 @@ impl NxcModule for LsassyModule {
     }
 
     fn supported_protocols(&self) -> &[&str] {
-        &["wmi", "winrm", "smb", "mssql"]
+        &["wmi", "winrm", "smb", "mssql"].as_slice()
     }
 
     fn options(&self) -> Vec<ModuleOption> {

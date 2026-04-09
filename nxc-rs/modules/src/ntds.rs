@@ -29,7 +29,7 @@ impl NxcModule for Ntds {
     }
 
     fn supported_protocols(&self) -> &[&str] {
-        &["smb"]
+        &["smb"].as_slice()
     }
 
     fn options(&self) -> Vec<ModuleOption> {
