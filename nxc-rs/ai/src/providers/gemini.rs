@@ -38,8 +38,8 @@ impl AiProvider for GeminiProvider {
         tools: &[ToolDefinition],
     ) -> Result<AiResponse> {
         let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-            self.model, self.api_key
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
+            self.model
         );
 
         let mut contents = Vec::new();
@@ -119,7 +119,13 @@ impl AiProvider for GeminiProvider {
             body["tools"] = json!([{ "function_declarations": gemini_tools }]);
         }
 
-        let resp = self.client.post(&url).json(&body).send().await?;
+        let resp = self
+            .client
+            .post(&url)
+            .header("x-goog-api-key", &self.api_key)
+            .json(&body)
+            .send()
+            .await?;
         let status = resp.status();
         if !status.is_success() {
             let err_text = resp.text().await?;
@@ -130,7 +136,7 @@ impl AiProvider for GeminiProvider {
 
         let candidate = gemini_resp
             .candidates
-            .get(0)
+            .first()
             .context("No candidates in Gemini response")?;
         let mut text: Option<String> = None;
         let mut tool_calls = Vec::new();

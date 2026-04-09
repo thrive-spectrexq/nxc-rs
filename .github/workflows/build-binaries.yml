@@ -29,16 +29,21 @@ jobs:
             artifact_name: nxc.exe
             asset_name: nxc-windows-amd64.exe
 
+    permissions:
+      contents: read
+
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        persist-credentials: false
 
     - name: Set up Rust
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@1482e35b71db3f08d0e74f1d97743d8376e19196 # stable
       with:
         toolchain: stable
 
     - name: Rust Cache
-      uses: Swatinem/rust-cache@v2
+      uses: Swatinem/rust-cache@23bdee3ae5713ccdc2a1d56f157cc501ebd6e255 # v2.7.7
 
     - name: Install dependencies (Linux)
       if: matrix.os == 'ubuntu-latest'
@@ -50,7 +55,7 @@ jobs:
       run: cargo build --release --workspace
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@60a2d884210ac0493521021bc1283d197e64cc39 # v4.4.3
       with:
         name: ${{ matrix.asset_name }}
         path: target/release/${{ matrix.artifact_name }}

@@ -1465,6 +1465,7 @@ async fn engine_perform_task(argv: Vec<String>) -> anyhow::Result<String> {
         no_bruteforce: sub_m.get_flag("no-bruteforce"),
         modules,
         module_opts,
+        verify_ssl: matches.get_flag("verify-ssl"),
     };
 
     let mut engine = ExecutionEngine::new(opts);

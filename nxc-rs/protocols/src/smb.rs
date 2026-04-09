@@ -190,9 +190,10 @@ impl SmbProtocol {
         debug!("SMB: Enumerating shares on {} via SRVSVC", session.target);
         use crate::rpc::{srvsvc, DcerpcBind, DcerpcRequest, UUID_SRVSVC};
         let bind = DcerpcBind::new(UUID_SRVSVC, 3, 0);
-        if let Ok(_) = self
+        if self
             .call_rpc(session, "srvsvc", PacketType::Bind, 1, bind.to_bytes())
             .await
+            .is_ok()
         {
             let enum_req = self.build_srvsvc_net_share_enum_all(&session.target);
             let rpc_req = DcerpcRequest::new(srvsvc::NET_SHARE_ENUM_ALL, enum_req);
@@ -626,17 +627,15 @@ impl SmbProtocol {
 
     fn parse_negotiate_response(data: &[u8]) -> Result<SmbHostInfo> {
         let mut info = SmbHostInfo::default();
-        if data.len() >= 4 && &data[0..4] == SMB2_MAGIC {
-            if data.len() >= 72 {
-                let dialect = u16::from_le_bytes([data[70], data[71]]);
-                info.smb_dialect = match dialect {
-                    0x0202 => "SMB 2.0.2".into(),
-                    0x0210 => "SMB 2.1".into(),
-                    0x0300 => "SMB 3.0".into(),
-                    0x0311 => "SMB 3.1.1".into(),
-                    _ => format!("SMB 0x{:04x}", dialect),
-                };
-            }
+        if data.len() >= 4 && &data[0..4] == SMB2_MAGIC && data.len() >= 72 {
+            let dialect = u16::from_le_bytes([data[70], data[71]]);
+            info.smb_dialect = match dialect {
+                0x0202 => "SMB 2.0.2".into(),
+                0x0210 => "SMB 2.1".into(),
+                0x0300 => "SMB 3.0".into(),
+                0x0311 => "SMB 3.1.1".into(),
+                _ => format!("SMB 0x{:04x}", dialect),
+            };
         }
         Ok(info)
     }
@@ -748,7 +747,7 @@ impl SmbProtocol {
         let mut shares = Vec::new();
         let mut i = 0;
         while i + 4 < data.len() {
-            if i + 10 < data.len() && &data[i..i + 4] == &[0x43, 0x00, 0x24, 0x00] {
+            if i + 10 < data.len() && data[i..i + 4] == [0x43, 0x00, 0x24, 0x00] {
                 // C$
                 shares.push(ShareInfo {
                     name: "C$".into(),

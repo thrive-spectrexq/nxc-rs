@@ -155,7 +155,7 @@ impl NxcProtocol for MssqlProtocol {
             debug!("MSSQL: Using Windows auth for {}\\{}", domain, username);
             #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
             config.authentication(AuthMethod::windows(
-                &format!("{}\\{}", domain, username),
+                format!("{}\\{}", domain, username),
                 &password,
             ));
             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
@@ -237,7 +237,7 @@ impl NxcProtocol for MssqlProtocol {
 
         if let Some(ref domain) = creds.domain {
             #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
-            config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, user), pass));
+            config.authentication(AuthMethod::windows(format!("{}\\{}", domain, user), pass));
             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
             config.authentication(AuthMethod::sql_server(
                 &format!("{}\\{}", domain, user),
@@ -334,7 +334,7 @@ impl MssqlProtocol {
 
         if let Some(ref domain) = creds.domain {
             #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
-            config.authentication(AuthMethod::windows(&format!("{}\\{}", domain, user), pass));
+            config.authentication(AuthMethod::windows(format!("{}\\{}", domain, user), pass));
             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
             config.authentication(AuthMethod::sql_server(
                 &format!("{}\\{}", domain, user),
@@ -406,7 +406,7 @@ impl MssqlProtocol {
 
         #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
         config.authentication(AuthMethod::windows(
-            &format!("{}\\{}", domain, creds.username),
+            format!("{}\\{}", domain, creds.username),
             creds.password.as_deref().unwrap_or_default(),
         ));
 
