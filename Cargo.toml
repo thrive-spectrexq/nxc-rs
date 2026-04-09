@@ -36,7 +36,7 @@ tracing-subscriber = "0.3"
 indicatif = "0.17"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.11", features = ["v4", "serde"] }
-rand = "0.9"
+rand = "0.10"
 ssh2 = "0.9"
 hostname = "0.4"
 async-trait = "0.1"
