@@ -1,0 +1,30 @@
+name: "NetExec-RS CodeQL Config"
+
+disable-default-queries: false
+
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
+
+query-filters:
+  # The following rules are suppressed because this is a penetration testing tool.
+  # Offensive tools must implement legacy/insecure protocols (NTLM, DES, RC4)
+  # and often interact with self-signed SSL services or dump cleartext credentials.
+  - exclude:
+      id: rust/hardcoded-cryptographic-key
+  - exclude:
+      id: rust/hard-coded-cryptographic-value
+  - exclude:
+      id: rust/disabled-certificate-check
+  - exclude:
+      id: rust/insecure-tls
+  - exclude:
+      id: rust/insecure-tls-config
+  - exclude:
+      id: rust/cleartext-logging
+  - exclude:
+      id: rust/cleartext-transmission
+  - exclude:
+      id: rust/weak-crypto-algorithm
+  - exclude:
+      id: rust/weak-cryptographic-algorithm
