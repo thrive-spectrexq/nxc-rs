@@ -289,7 +289,7 @@ impl ExecutionEngine {
         let mut targets = targets;
         if self.opts.shuffle {
             use rand::seq::SliceRandom;
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             targets.shuffle(&mut rng);
         }
 
@@ -650,7 +650,7 @@ mod tests {
                 creds: &Credentials,
             ) -> Result<AuthResult> {
                 if creds.password.as_deref() == Some("DUMMY_PASSWORD") {
-                    Ok(AuthResult::success(true))
+                    Ok(AuthResult::success(creds.username == "admin"))
                 } else {
                     Ok(AuthResult::failure("Bad password", None))
                 }

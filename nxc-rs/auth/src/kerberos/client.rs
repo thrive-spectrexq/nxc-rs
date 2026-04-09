@@ -1,7 +1,7 @@
 use crate::Credentials;
 use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
-use rand::Rng;
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
