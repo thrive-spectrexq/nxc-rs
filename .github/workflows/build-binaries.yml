@@ -43,7 +43,7 @@ jobs:
         toolchain: stable
 
     - name: Rust Cache
-      uses: Swatinem/rust-cache@23bdee3ae5713ccdc2a1d56f157cc501ebd6e255 # v2.7.7
+      uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
 
     - name: Install dependencies (Linux)
       if: matrix.os == 'ubuntu-latest'
