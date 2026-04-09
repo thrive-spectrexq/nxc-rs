@@ -128,10 +128,10 @@ impl NxcProtocol for SnmpProtocol {
         let result: Result<bool, anyhow::Error> = tokio::task::spawn_blocking(move || {
             let mut sess = SyncSession::new(addr, community_clone.as_bytes(), Some(timeout), 0)
                 .map_err(|e| anyhow!("SNMP Session Error: {}", e))?;
-            let response = sess
+            let mut response = sess
                 .get(sys_descr_oid)
                 .map_err(|e| anyhow!("SNMP Get Error: {:?}", e))?;
-            Ok(response.varbinds.into_iter().next().is_some())
+            Ok(response.varbinds.next().is_some())
         })
         .await?;
 
@@ -177,8 +177,8 @@ impl SnmpProtocol {
                 .map_err(|e| anyhow!("SNMP Session Error: {}", e))?;
             let mut report = String::new();
             for (oid, name) in oids {
-                if let Ok(response) = sess.get(&oid) {
-                    if let Some(varbind) = response.varbinds.into_iter().next() {
+                if let Ok(mut response) = sess.get(&oid) {
+                    if let Some(varbind) = response.varbinds.next() {
                         report.push_str(&format!("{}: {:?}\n", name, varbind.1));
                     }
                 }

@@ -340,6 +340,9 @@ fn vnc_encrypt(password: &str, challenge: &[u8; 16]) -> [u8; 16] {
         }
     }
 
+    // SECURITY: VNC authentication MANDATES the use of the legacy DES algorithm
+    // for its standard challenge-response handshake. This is insecure but
+    // required for compatibility with standard VNC servers.
     use des::cipher::{BlockEncrypt, KeyInit};
     use des::Des;
 

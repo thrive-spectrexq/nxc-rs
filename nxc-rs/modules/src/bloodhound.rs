@@ -50,6 +50,12 @@ impl NxcModule for BloodhoundModule {
                 required: false,
                 default: None,
             },
+            ModuleOption {
+                name: "verify_ssl".to_string(),
+                description: "Verify BloodHound CE SSL certificate (default: false)".to_string(),
+                required: false,
+                default: Some("false".to_string()),
+            },
         ]
     }
 
@@ -104,9 +110,10 @@ impl NxcModule for BloodhoundModule {
         if let (Some(bh_uri), Some(bh_user), Some(bh_pass)) =
             (opts.get("bh_uri"), opts.get("bh_user"), opts.get("bh_pass"))
         {
+            let verify_ssl = opts.get("verify_ssl").map(|s| s == "true").unwrap_or(false);
             info!("BloodHound: Zipping and pushing data to {}...", bh_uri);
             if let Err(e) = self
-                .upload_to_bloodhound(bh_uri, bh_user, bh_pass, &payload)
+                .upload_to_bloodhound(bh_uri, bh_user, bh_pass, verify_ssl, &payload)
                 .await
             {
                 error!("BloodHound: Failed to upload data: {}", e);
@@ -144,10 +151,11 @@ impl BloodhoundModule {
         uri: &str,
         user: &str,
         pass: &str,
+        verify_ssl: bool,
         payload: &serde_json::Value,
     ) -> Result<()> {
         let client = Client::builder()
-            .danger_accept_invalid_certs(true)
+            .danger_accept_invalid_certs(!verify_ssl)
             .build()?;
 
         // 1. Authenticate with BloodHound CE API to get a session JWT

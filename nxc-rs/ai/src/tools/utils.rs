@@ -53,11 +53,12 @@ impl NxcTool for UtilityTool {
 
                 for port in ports {
                     let start = std::time::Instant::now();
-                    if let Ok(_) = tokio::time::timeout(
+                    if tokio::time::timeout(
                         Duration::from_secs(2),
                         tokio::net::TcpStream::connect(format!("{}:{}", target, port)),
                     )
                     .await
+                    .is_ok()
                     {
                         success = true;
                         latency = Some(start.elapsed().as_millis());

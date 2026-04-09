@@ -173,6 +173,7 @@ pub struct ExecutionOpts {
     pub no_bruteforce: bool,
     pub modules: Vec<String>,
     pub module_opts: std::collections::HashMap<String, String>,
+    pub verify_ssl: bool,
 }
 
 impl Default for ExecutionOpts {
@@ -187,6 +188,7 @@ impl Default for ExecutionOpts {
             no_bruteforce: false,
             modules: Vec::new(),
             module_opts: std::collections::HashMap::new(),
+            verify_ssl: false,
         }
     }
 }
@@ -241,41 +243,53 @@ impl ExecutionEngine {
             targets.shuffle(&mut rng);
         }
 
+        let total_tasks = targets.len() * creds.len();
+        let pb = if total_tasks > 1 {
+            let pb = indicatif::ProgressBar::new(total_tasks as u64);
+            pb.set_style(
+                indicatif::ProgressStyle::default_bar()
+                    .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+                    .unwrap()
+                    .progress_chars("#>-"),
+            );
+            pb.set_message("spidering...");
+            Some(pb)
+        } else {
+            None
+        };
+
         let semaphore = Arc::new(Semaphore::new(self.opts.threads));
         let mut join_handles: Vec<JoinHandle<ExecutionResult>> = Vec::new();
         let db = self.db.clone();
 
         for target in targets {
             for cred in creds.iter() {
-                // Apply jitter if specified
-                if let Some(jitter) = self.opts.jitter_ms {
-                    if jitter > 0 {
-                        tokio::time::sleep(Duration::from_millis(jitter)).await;
-                    }
-                }
-
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
                 let protocol_clone = protocol.clone();
                 let target_clone = target.clone();
                 let cred_clone = cred.clone();
-                let timeout_duration = self.opts.timeout;
-                let modules = self.opts.modules.clone();
-                let module_opts = self.opts.module_opts.clone();
-                let proxy_clone = self.opts.proxy.clone();
-
+                let opts_clone = self.opts.clone();
                 let db_clone = db.clone();
+                let pb_clone = pb.clone();
 
                 let handle = tokio::spawn(async move {
                     let start_time = std::time::Instant::now();
 
-                    let result = tokio::time::timeout(timeout_duration, async {
+                    // Apply jitter if specified (inside the task to not block submission)
+                    if let Some(jitter) = opts_clone.jitter_ms {
+                        if jitter > 0 {
+                            tokio::time::sleep(Duration::from_millis(jitter)).await;
+                        }
+                    }
+
+                    let result = tokio::time::timeout(opts_clone.timeout, async {
                         // Attempt connection
                         let target_str = target_clone.display();
                         let mut session = match protocol_clone
                             .connect(
                                 &target_str,
                                 protocol_clone.default_port(),
-                                proxy_clone.as_deref(),
+                                opts_clone.proxy.as_deref(),
                             )
                             .await
                         {
@@ -302,17 +316,23 @@ impl ExecutionEngine {
                             Ok(auth_res) => {
                                 let mut final_message = auth_res.message.clone();
 
-                                // Save to database if successful and DB available
+                                // Save to database if DB available (using spawn_blocking for synchronous SQLite)
                                 let mut host_id = None;
                                 if let Some(ref db_instance) = db_clone {
-                                    let now = Utc::now().timestamp();
-                                    host_id = db_instance
-                                        .upsert_host(&HostInfo {
+                                    let db_p = db_instance.clone();
+                                    let t_p = target_clone.clone();
+                                    let c_p = cred_clone.clone();
+                                    let a_p = auth_res.clone();
+                                    let proto_name = protocol_clone.name().to_string();
+
+                                    let db_res = tokio::task::spawn_blocking(move || -> anyhow::Result<Option<i64>> {
+                                        let now = Utc::now().timestamp();
+                                        let h_id = db_p.upsert_host(&HostInfo {
                                             id: None,
-                                            workspace: db_instance.current_workspace().to_string(),
-                                            ip: target_clone.ip.to_string(),
-                                            hostname: target_clone.hostname.clone(),
-                                            domain: None, // Could be extracted from protocol sessions if they provide it
+                                            workspace: db_p.current_workspace().to_string(),
+                                            ip: t_p.ip.to_string(),
+                                            hostname: t_p.hostname.clone(),
+                                            domain: None,
                                             os: None,
                                             os_version: None,
                                             smb_signing: None,
@@ -320,34 +340,37 @@ impl ExecutionEngine {
                                             is_dc: false,
                                             first_seen: now,
                                             last_seen: now,
-                                        })
-                                        .ok();
+                                        })?;
 
-                                    if auth_res.success {
-                                        let _ = db_instance.add_credential(&Credential {
-                                            id: None,
-                                            workspace: db_instance.current_workspace().to_string(),
-                                            domain: None,
-                                            username: cred_clone.username.clone(),
-                                            password: cred_clone.password.clone(),
-                                            nt_hash: cred_clone.nt_hash.clone(),
-                                            lm_hash: None,
-                                            aes_128: None,
-                                            aes_256: None,
-                                            source: Some(protocol_clone.name().to_string()),
-                                            host_id,
-                                            created_at: now,
-                                        });
-                                    }
+                                        if a_p.success {
+                                            let _ = db_p.add_credential(&Credential {
+                                                id: None,
+                                                workspace: db_p.current_workspace().to_string(),
+                                                domain: None,
+                                                username: c_p.username.clone(),
+                                                password: c_p.password.clone(),
+                                                nt_hash: c_p.nt_hash.clone(),
+                                                lm_hash: None,
+                                                aes_128: None,
+                                                aes_256: None,
+                                                source: Some(proto_name),
+                                                host_id: Some(h_id),
+                                                created_at: now,
+                                            })?;
+                                        }
+                                        Ok(Some(h_id))
+                                    }).await;
+                                    
+                                    host_id = db_res.ok().and_then(|r| r.ok()).flatten();
                                 }
 
                                 // Execute modules if requested
                                 let mut module_data = std::collections::HashMap::new();
-                                if auth_res.success && !modules.is_empty() {
+                                if auth_res.success && !opts_clone.modules.is_empty() {
                                     let registry = nxc_modules::ModuleRegistry::new();
-                                    for module_name in &modules {
+                                    for module_name in &opts_clone.modules {
                                         if let Some(module) = registry.get(module_name) {
-                                            match module.run(session.as_mut(), &module_opts).await {
+                                            match module.run(session.as_mut(), &opts_clone.module_opts).await {
                                                 Ok(mod_res) => {
                                                     if mod_res.success {
                                                         final_message.push_str(&format!(
@@ -361,47 +384,35 @@ impl ExecutionEngine {
 
                                                         // Save module-discovered credentials to DB
                                                         if let Some(ref db_instance) = db_clone {
-                                                            let now = Utc::now().timestamp();
-                                                            for m_cred in mod_res.credentials {
-                                                                let _ = db_instance
-                                                                    .upsert_credential(
+                                                            let db_p = db_instance.clone();
+                                                            let m_name = module_name.clone();
+                                                            let p_name = protocol_clone.name().to_string();
+                                                            let m_creds = mod_res.credentials.clone();
+                                                            let h_id = host_id;
+
+                                                            let _ = tokio::task::spawn_blocking(move || {
+                                                                let now = Utc::now().timestamp();
+                                                                for m_cred in m_creds {
+                                                                    let _ = db_p.upsert_credential(
                                                                         &Credential {
                                                                             id: None,
-                                                                            workspace: db_instance
+                                                                            workspace: db_p
                                                                                 .current_workspace()
                                                                                 .to_string(),
-                                                                            domain: m_cred
-                                                                                .domain
-                                                                                .clone(),
-                                                                            username: m_cred
-                                                                                .username
-                                                                                .clone(),
-                                                                            password: m_cred
-                                                                                .password
-                                                                                .clone(),
-                                                                            nt_hash: m_cred
-                                                                                .nt_hash
-                                                                                .clone(),
-                                                                            lm_hash: m_cred
-                                                                                .lm_hash
-                                                                                .clone(),
-                                                                            aes_128: m_cred
-                                                                                .aes_128_key
-                                                                                .clone(),
-                                                                            aes_256: m_cred
-                                                                                .aes_256_key
-                                                                                .clone(),
-                                                                            source: Some(format!(
-                                                                                "{}:{}",
-                                                                                protocol_clone
-                                                                                    .name(),
-                                                                                module_name
-                                                                            )),
-                                                                            host_id,
+                                                                            domain: m_cred.domain.clone(),
+                                                                            username: m_cred.username.clone(),
+                                                                            password: m_cred.password.clone(),
+                                                                            nt_hash: m_cred.nt_hash.clone(),
+                                                                            lm_hash: m_cred.lm_hash.clone(),
+                                                                            aes_128: m_cred.aes_128_key.clone(),
+                                                                            aes_256: m_cred.aes_256_key.clone(),
+                                                                            source: Some(format!("{}:{}", p_name, m_name)),
+                                                                            host_id: h_id,
                                                                             created_at: now,
                                                                         },
                                                                     );
-                                                            }
+                                                                }
+                                                            }).await;
                                                         }
                                                     } else {
                                                         final_message.push_str(&format!(
@@ -453,6 +464,9 @@ impl ExecutionEngine {
 
                     // Drop permit to allow next task
                     drop(permit);
+                    if let Some(ref p) = pb_clone {
+                        p.inc(1);
+                    }
 
                     match result {
                         Ok(exec_res) => exec_res,
@@ -480,8 +494,13 @@ impl ExecutionEngine {
             }
         }
 
+        if let Some(p) = pb {
+            p.finish_and_clear();
+        }
+
         results
     }
+
 }
 
 // ─── Tests ──────────────────────────────────────────────────────
@@ -580,7 +599,7 @@ mod tests {
                 _session: &mut dyn NxcSession,
                 creds: &Credentials,
             ) -> Result<AuthResult> {
-                if creds.password.as_deref() == Some("Password123!") {
+                if creds.password.as_deref() == Some("DUMMY_PASSWORD") {
                     Ok(AuthResult::success(true))
                 } else {
                     Ok(AuthResult::failure("Bad password", None))
@@ -606,6 +625,7 @@ mod tests {
             no_bruteforce: false,
             modules: Vec::new(),
             module_opts: std::collections::HashMap::new(),
+            verify_ssl: false,
         };
 
         let engine = ExecutionEngine::new(opts);
@@ -620,8 +640,8 @@ mod tests {
 
         let creds = vec![
             Credentials::password("admin", "wrong", None),
-            Credentials::password("admin", "Password123!", None),
-            Credentials::password("user", "pass", None),
+            Credentials::password("admin", "DUMMY_PASSWORD", None),
+            Credentials::password("user", "DUMMY_PASSWORD", None),
         ];
 
         // 4 targets * 3 creds = 12 total tasks

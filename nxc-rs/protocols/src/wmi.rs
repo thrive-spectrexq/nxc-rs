@@ -351,7 +351,7 @@ impl WmiProtocol {
         }
         buf.extend_from_slice(&0u16.to_le_bytes());
 
-        while buf.len() % 4 != 0 {
+        while !buf.len().is_multiple_of(4) {
             buf.push(0);
         }
     }

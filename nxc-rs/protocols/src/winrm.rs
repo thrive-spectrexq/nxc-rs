@@ -49,17 +49,25 @@ impl NxcSession for WinrmSession {
 
 pub struct WinrmProtocol {
     pub timeout: Duration,
+    pub verify_ssl: bool,
 }
 
 impl WinrmProtocol {
     pub fn new() -> Self {
         Self {
             timeout: Duration::from_secs(10),
+            verify_ssl: false,
         }
     }
 
-    pub fn with_timeout(timeout: Duration) -> Self {
-        Self { timeout }
+    pub fn with_verify_ssl(mut self, verify: bool) -> Self {
+        self.verify_ssl = verify;
+        self
+    }
+
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
     }
 
     fn build_url(&self, target: &str, port: u16) -> String {
@@ -71,7 +79,7 @@ impl WinrmProtocol {
     fn build_client(&self, proxy_str: Option<&str>) -> Result<Client> {
         let mut builder = Client::builder()
             .timeout(self.timeout)
-            .danger_accept_invalid_certs(true); // Required for internal network targets with self-signed certs
+            .danger_accept_invalid_certs(!self.verify_ssl); // Configurable certificate verification
 
         if let Some(p) = proxy_str {
             let proxy = reqwest::Proxy::all(p).map_err(|e| anyhow!("Invalid proxy URL: {}", e))?;

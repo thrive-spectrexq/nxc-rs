@@ -4,6 +4,13 @@
 //! including NTLMv2 authentication, session key derivation, and
 //! message signing/sealing for SMB3 channel security.
 
+// SECURITY: NTLM authentication and SMB signing MANDATE the use of legacy 
+// cryptographic algorithms including MD4 (for NT hashes), MD5 (for HMAC-MD5),
+// and RC4 (for session key derivation and sealing in SMB1/2). While these
+// algorithms are considered insecure for modern applications, they are 
+// SPECIFICATION-REQUIRED and functionally necessary for a pentesting 
+// framework to communicate with legacy Windows environments.
+
 use anyhow::Result;
 use hmac::{Hmac, Mac};
 use md4::{Digest, Md4};
@@ -547,6 +554,9 @@ pub fn calculate_lm_hash(password: &str) -> [u8; 16] {
     use des::cipher::KeyInit;
     use des::Des;
 
+    // SECURITY: The "KGS!@#$%" magic string and DES algorithm are MANDATORY 
+    // for the legacy LM authentication protocol. These are insecure by modern
+    // standards but required for protocol compatibility in a pentesting tool.
     let magic: &[u8; 8] = b"KGS!@#$%";
     let mut pass_bytes = [0u8; 14];
     let upper = password.to_uppercase();
@@ -702,7 +712,7 @@ mod tests {
     #[test]
     fn test_ntlmv2_full_flow() {
         let auth = NtlmAuthenticator::new(Some("TESTDOMAIN"));
-        let creds = Credentials::password("testuser", "Password123!", Some("TESTDOMAIN"));
+        let creds = Credentials::password("testuser", "DUMMY_PASSWORD", Some("TESTDOMAIN"));
         let t1 = auth.generate_type1();
         assert!(t1.starts_with(b"NTLMSSP\0"));
 
