@@ -50,16 +50,16 @@ jobs:
     - name: Build Release Binary
       run: cargo build --release --workspace
 
-    - name: Pre-Package Binary Rename
-      shell: bash
-      run: |
-        mv target/release/${{ matrix.artifact_name }} target/release/${{ matrix.asset_name }}
-
     - name: Build Debian Package (Linux only)
       if: matrix.os == 'ubuntu-latest'
       run: |
         cargo install cargo-deb
         cargo deb -p nxc --no-build -o target/release/nxc-rs-amd64.deb
+
+    - name: Pre-Package Binary Rename
+      shell: bash
+      run: |
+        mv target/release/${{ matrix.artifact_name }} target/release/${{ matrix.asset_name }}
 
     - name: Upload Binary to Release
       uses: softprops/action-gh-release@v2
