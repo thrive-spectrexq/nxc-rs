@@ -16,7 +16,6 @@ NetExec-RS is a massive monolithic offensive post-exploitation and orchestration
 section = "admin"
 priority = "optional"
 assets = [
-    ["../../target/release/nxc", "usr/bin/nxc", "755"],
     ["../../README.md", "usr/share/doc/nxc-rs/README.md", "644"],
 ]
 
