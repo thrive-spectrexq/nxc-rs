@@ -72,7 +72,7 @@ cipher = { version = "0.5", features = ["alloc"] }
 pem = "3.0"
 der-parser = "9.0"
 num-bigint = "0.4"
-digest = "0.10"
+digest = "0.11"
 ctap2-proto = "0.1"
 tempfile = "3.10"
 nt-hive = "0.3.0"
