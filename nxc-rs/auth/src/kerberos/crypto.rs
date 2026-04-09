@@ -3,7 +3,7 @@ use hmac::{Hmac, Mac};
 use md4::{Digest as Md4Digest, Md4};
 use md5::Md5;
 
-use rand::Rng;
+use rand::RngExt;
 use sha1::Sha1;
 use std::convert::TryInto;
 
