@@ -11,9 +11,13 @@ use serde::{Deserialize, Serialize};
 pub mod ad_setup;
 pub mod adb;
 pub mod connection;
+pub mod dns;
 pub mod docker;
 pub mod ftp;
 pub mod http;
+pub mod ilo;
+pub mod ipmi;
+pub mod kube;
 pub mod ldap;
 pub mod mssql;
 pub mod mysql;
@@ -150,6 +154,10 @@ pub enum Protocol {
     Mysql,
     Snmp,
     Docker,
+    Dns,
+    Ipmi,
+    Ilo,
+    Kube,
 }
 
 impl Protocol {
@@ -173,6 +181,10 @@ impl Protocol {
             Protocol::Mysql => "mysql",
             Protocol::Snmp => "snmp",
             Protocol::Docker => "docker",
+            Protocol::Dns => "dns",
+            Protocol::Ipmi => "ipmi",
+            Protocol::Ilo => "ilo",
+            Protocol::Kube => "kube",
         }
     }
 
@@ -196,6 +208,10 @@ impl Protocol {
             Protocol::Mysql => 3306,
             Protocol::Snmp => 161,
             Protocol::Docker => 2375,
+            Protocol::Dns => 53,
+            Protocol::Ipmi => 623,
+            Protocol::Ilo => 443,
+            Protocol::Kube => 6443,
         }
     }
 
@@ -221,6 +237,10 @@ impl Protocol {
             "mysql" => Some(Protocol::Mysql),
             "snmp" => Some(Protocol::Snmp),
             "docker" => Some(Protocol::Docker),
+            "dns" => Some(Protocol::Dns),
+            "ipmi" => Some(Protocol::Ipmi),
+            "ilo" | "idrac" | "bmc" => Some(Protocol::Ilo),
+            "kube" | "kubernetes" | "k8s" => Some(Protocol::Kube),
             _ => None,
         }
     }
@@ -246,6 +266,10 @@ impl Protocol {
             Protocol::Mysql,
             Protocol::Snmp,
             Protocol::Docker,
+            Protocol::Dns,
+            Protocol::Ipmi,
+            Protocol::Ilo,
+            Protocol::Kube,
         ]
     }
 }
