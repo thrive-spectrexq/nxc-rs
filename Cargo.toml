@@ -49,7 +49,7 @@ socks = "0.3"
 once_cell = "1.18"
 
 # NetExec-RS dependencies
-md4 = "0.10"
+md4 = "0.11"
 hmac = "0.12"
 md-5 = "0.10"
 rc4 = "0.2"
