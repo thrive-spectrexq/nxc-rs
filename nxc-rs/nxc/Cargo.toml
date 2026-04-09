@@ -3,6 +3,22 @@ name = "nxc"
 version.workspace = true
 edition.workspace = true
 description = "NetExec-RS — Network Execution Tool"
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.deb]
+maintainer = "Antigravity <open_source@antigravity>"
+copyright = "2026, Antigravity"
+license-file = ["../../LICENSE", "4"]
+extended-description = """
+NetExec-RS is a massive monolithic offensive post-exploitation and orchestration network tool.
+"""
+section = "admin"
+priority = "optional"
+assets = [
+    ["../../target/release/nxc", "usr/bin/nxc", "755"],
+    ["../../README.md", "usr/share/doc/nxc-rs/README.md", "644"],
+]
 
 [[bin]]
 name = "nxc"

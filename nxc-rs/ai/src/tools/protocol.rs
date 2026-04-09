@@ -25,7 +25,7 @@ impl NxcTool for ProtocolTool {
             "properties": {
                 "protocol": {
                     "type": "string",
-                    "enum": ["smb", "ssh", "winrm", "ldap", "mssql", "rdp", "http", "redis", "postgres", "mysql", "snmp", "docker"],
+                    "enum": ["smb", "ssh", "winrm", "ldap", "mssql", "rdp", "http", "redis", "postgres", "mysql", "snmp", "docker", "dns", "ipmi", "ilo", "kube"],
                     "description": "The protocol to run"
                 },
                 "targets": {
@@ -102,6 +102,10 @@ impl NxcTool for ProtocolTool {
             Protocol::Mysql => Arc::new(nxc_protocols::mysql::MysqlProtocol::new()),
             Protocol::Snmp => Arc::new(nxc_protocols::snmp::SnmpProtocol::new()),
             Protocol::Docker => Arc::new(nxc_protocols::docker::DockerProtocol::new()),
+            Protocol::Dns => Arc::new(nxc_protocols::dns::DnsProtocol::new()),
+            Protocol::Ipmi => Arc::new(nxc_protocols::ipmi::IpmiProtocol::new()),
+            Protocol::Ilo => Arc::new(nxc_protocols::ilo::IloProtocol::new()),
+            Protocol::Kube => Arc::new(nxc_protocols::kube::KubeProtocol::new()),
             _ => anyhow::bail!(
                 "Protocol handler for {} not yet integrated into AI tool",
                 protocol_name

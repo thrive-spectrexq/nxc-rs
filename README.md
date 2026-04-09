@@ -1,8 +1,9 @@
 # ◈ NetExec-RS (nxc-rs) ◈
 
+[![Rust](https://img.shields.io/badge/rustc-1.94.0+-orange.svg?style=flat-square)](https://www.rust-lang.org/)
 [![Release](https://img.shields.io/github/v/release/thrive-spectrexq/nxc-rs?color=blue&style=flat-square)](https://github.com/thrive-spectrexq/nxc-rs/releases)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/thrive-spectrexq/nxc-rs/build-binaries.yml?branch=master&style=flat-square)](https://github.com/thrive-spectrexq/nxc-rs/actions)
-[![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/license-BSD--2--Clause-blue.svg?style=flat-square)](LICENSE)
 
 ---
 
@@ -19,7 +20,7 @@
 
 ## Protocols & Capabilities
 
-NetExec-RS supports **18 protocols** and **32 modules** for complete cross-protocol exploitation.
+NetExec-RS supports **22 protocols** and **135 modules** for complete cross-protocol exploitation.
 
 | Protocol | Status | Capabilities |
 | :--- | :--- | :--- |
@@ -34,6 +35,10 @@ NetExec-RS supports **18 protocols** and **32 modules** for complete cross-proto
 | **VNC** | ✅ Active | Authentication, Screenshotting |
 | **FTP/NFS**| ✅ Active | Directory listing, Export/Share enumeration |
 | **HTTP** | ✅ Active | Web reconnaissance, SSL/TLS validation |
+| **DNS** | ✅ Active | AXFR, Record enumeration, Insecure update detection |
+| **IPMI** | ✅ Active | BMC probing, **RAKP Hash dumping** |
+| **iLO / iDRAC** | ✅ Active | Redfish API testing, Management interface fingerprinting |
+| **Kube** | ✅ Active | Kubernetes API server auth testing, Pod/Secret enumeration |
 
 ---
 
@@ -52,6 +57,10 @@ iex (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercont
 ```
 
 ### Building from Source Manually
+
+**Requirement:** `rustc 1.94.0` or newer.
+
+
 ```bash
 # Clone the repository
 git clone https://github.com/thrive-spectrexq/nxc-rs.git
@@ -168,7 +177,7 @@ NetExec-RS is designed with a layered approach for maximum maintainability:
 
 ## License & Disclaimer
 
-Distributed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE) for more information.
+Distributed under the **BSD 2-Clause License**. See [LICENSE](LICENSE) for more information.
 
 ### Legal Disclaimer
 **NetExec-RS is for educational purposes and authorized security testing only.** Use of this tool for attacking targets without prior mutual consent is illegal. It is the end user's responsibility to obey all applicable local, state, and federal laws. Developers assume no liability and are not responsible for any misuse or damage caused by this program.
