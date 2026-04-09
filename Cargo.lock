@@ -2888,7 +2888,7 @@ dependencies = [
  "bytes",
  "cbc",
  "chrono",
- "cipher 0.4.4",
+ "cipher 0.5.1",
  "des",
  "digest 0.10.7",
  "hex",
