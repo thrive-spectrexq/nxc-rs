@@ -379,10 +379,12 @@ mod tests {
             hostname: Some("win10".to_string()),
             domain: Some("CORP".to_string()),
             os: Some("Windows 10".to_string()),
-            smb_signing: true,
-            smb_v1: false,
-            null_session: false,
-            admin_access: true,
+            os_version: None,
+            smb_signing: Some(true),
+            signing_required: Some(false),
+            is_dc: false,
+            first_seen: 0,
+            last_seen: 0,
         };
         
         let host_id = db.upsert_host(&host).unwrap();

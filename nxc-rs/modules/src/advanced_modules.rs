@@ -14,7 +14,7 @@ impl Default for MssqlCoerce { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for MssqlCoerce {
     fn name(&self) -> &'static str { "mssql_coerce" }
     fn description(&self) -> &'static str { "MSSQL auth coercion via xp_dirtree/xp_fileexist UNC paths" }
-    fn supported_protocols(&self) -> &[&str] { &["mssql"] }
+    fn supported_protocols(&self) -> &[&str] { &["mssql"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![ModuleOption { name: "LISTENER".into(), description: "UNC listener IP".into(), required: true, default: None }] }
     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let mssql_sess = session.as_any().downcast_ref::<nxc_protocols::mssql::MssqlSession>().ok_or_else(|| anyhow!("MSSQL session required"))?;
@@ -33,7 +33,7 @@ impl Default for MssqlDumper { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for MssqlDumper {
     fn name(&self) -> &'static str { "mssql_dumper" }
     fn description(&self) -> &'static str { "Dump MSSQL database tables, schemas, and data" }
-    fn supported_protocols(&self) -> &[&str] { &["mssql"] }
+    fn supported_protocols(&self) -> &[&str] { &["mssql"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![ModuleOption { name: "DB".into(), description: "Database to dump".into(), required: false, default: Some("master".into()) }] }
     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let mssql_sess = session.as_any().downcast_ref::<nxc_protocols::mssql::MssqlSession>().ok_or_else(|| anyhow!("MSSQL session required"))?;
@@ -52,7 +52,7 @@ impl Default for MssqlCbt { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for MssqlCbt {
     fn name(&self) -> &'static str { "mssql_cbt" }
     fn description(&self) -> &'static str { "Check MSSQL channel binding token configuration" }
-    fn supported_protocols(&self) -> &[&str] { &["mssql"] }
+    fn supported_protocols(&self) -> &[&str] { &["mssql"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let mssql_sess = session.as_any().downcast_ref::<nxc_protocols::mssql::MssqlSession>().ok_or_else(|| anyhow!("MSSQL session required"))?;
         let output = format!("MSSQL Channel Binding Token check on {}:\n  [*] Checking Extended Protection for Authentication\n", mssql_sess.target);
@@ -66,7 +66,7 @@ impl Default for EnableCmdShell { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for EnableCmdShell {
     fn name(&self) -> &'static str { "enable_cmdshell" }
     fn description(&self) -> &'static str { "Enable/disable xp_cmdshell via sp_configure" }
-    fn supported_protocols(&self) -> &[&str] { &["mssql"] }
+    fn supported_protocols(&self) -> &[&str] { &["mssql"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![ModuleOption { name: "ACTION".into(), description: "enable or disable".into(), required: false, default: Some("enable".into()) }] }
     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let mssql_sess = session.as_any().downcast_ref::<nxc_protocols::mssql::MssqlSession>().ok_or_else(|| anyhow!("MSSQL session required"))?;
@@ -89,7 +89,7 @@ impl Default for EnumLinks { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for EnumLinks {
     fn name(&self) -> &'static str { "enum_links" }
     fn description(&self) -> &'static str { "Enumerate MSSQL linked servers for lateral movement" }
-    fn supported_protocols(&self) -> &[&str] { &["mssql"] }
+    fn supported_protocols(&self) -> &[&str] { &["mssql"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let mssql_sess = session.as_any().downcast_ref::<nxc_protocols::mssql::MssqlSession>().ok_or_else(|| anyhow!("MSSQL session required"))?;
         let proto = nxc_protocols::mssql::MssqlProtocol::new();
@@ -105,7 +105,7 @@ impl Default for EnumLogins { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for EnumLogins {
     fn name(&self) -> &'static str { "enum_logins" }
     fn description(&self) -> &'static str { "Enumerate MSSQL logins and server roles" }
-    fn supported_protocols(&self) -> &[&str] { &["mssql"] }
+    fn supported_protocols(&self) -> &[&str] { &["mssql"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let mssql_sess = session.as_any().downcast_ref::<nxc_protocols::mssql::MssqlSession>().ok_or_else(|| anyhow!("MSSQL session required"))?;
         let proto = nxc_protocols::mssql::MssqlProtocol::new();
@@ -123,7 +123,7 @@ impl Default for FirefoxCreds { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for FirefoxCreds {
     fn name(&self) -> &'static str { "firefox" }
     fn description(&self) -> &'static str { "Extract saved credentials from Firefox profiles via SMB" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
         let mut output = format!("Firefox Credential Search on {}:\n", smb.target);
@@ -139,7 +139,7 @@ impl Default for WinscpCreds { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for WinscpCreds {
     fn name(&self) -> &'static str { "winscp" }
     fn description(&self) -> &'static str { "Decode WinSCP saved sessions from registry" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
         let mut output = format!("WinSCP Credential Search on {}:\n", smb.target);
@@ -155,7 +155,7 @@ impl Default for KeepassDiscover { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for KeepassDiscover {
     fn name(&self) -> &'static str { "keepass_discover" }
     fn description(&self) -> &'static str { "Locate KeePass .kdbx files on SMB shares" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
         let output = format!("KeePass Discovery on {}:\n  [*] Searching shares for *.kdbx files\n", smb.target);
@@ -169,7 +169,7 @@ impl Default for KeepassTrigger { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for KeepassTrigger {
     fn name(&self) -> &'static str { "keepass_trigger" }
     fn description(&self) -> &'static str { "Plant KeePass trigger for master key extraction" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![ModuleOption { name: "ACTION".into(), description: "add, remove, or check".into(), required: false, default: Some("check".into()) }] }
     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
@@ -185,7 +185,7 @@ impl Default for MremotengCreds { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for MremotengCreds {
     fn name(&self) -> &'static str { "mremoteng" }
     fn description(&self) -> &'static str { "Decrypt mRemoteNG connection files" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
         let output = format!("mRemoteNG Credential Search on {}:\n  [*] Looking for confCons.xml\n  [*] Default key: mR3m\n", smb.target);
@@ -199,7 +199,7 @@ impl Default for RdcmanCreds { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for RdcmanCreds {
     fn name(&self) -> &'static str { "rdcman" }
     fn description(&self) -> &'static str { "Extract Remote Desktop Connection Manager credentials" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
         let output = format!("RDCMan Credential Search on {}:\n  [*] Looking for .rdg files\n", smb.target);
@@ -213,7 +213,7 @@ impl Default for PuttySessions { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for PuttySessions {
     fn name(&self) -> &'static str { "putty" }
     fn description(&self) -> &'static str { "Extract PuTTY/Pageant session and proxy credentials" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
         let output = format!("PuTTY Session Search on {}:\n  [*] Checking HKCU\\Software\\SimonTatham\\PuTTY\\Sessions\n  [*] Checking for .ppk private keys\n", smb.target);
@@ -227,7 +227,7 @@ impl Default for MobaxtermCreds { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for MobaxtermCreds {
     fn name(&self) -> &'static str { "mobaxterm" }
     fn description(&self) -> &'static str { "Decrypt MobaXterm saved sessions" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
         let output = format!("MobaXterm Credential Search on {}:\n  [*] Looking for MobaXterm.ini\n", smb.target);
@@ -241,7 +241,7 @@ impl Default for AwsCredentials { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for AwsCredentials {
     fn name(&self) -> &'static str { "aws_credentials" }
     fn description(&self) -> &'static str { "Search for AWS credential files on SMB shares" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
         let output = format!("AWS Credential Search on {}:\n  [*] Checking .aws/credentials, .aws/config\n  [*] Searching for environment files with AWS keys\n", smb.target);
@@ -255,7 +255,7 @@ impl Default for VeeamCreds { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for VeeamCreds {
     fn name(&self) -> &'static str { "veeam" }
     fn description(&self) -> &'static str { "Extract Veeam Backup & Replication saved credentials" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
         let output = format!("Veeam Credential Search on {}:\n  [*] Checking Veeam registry and SQL CE database\n  [*] Looking for VeeamBackup DB credentials\n", smb.target);
@@ -271,7 +271,7 @@ impl Default for SchtaskAs { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for SchtaskAs {
     fn name(&self) -> &'static str { "schtask_as" }
     fn description(&self) -> &'static str { "Create scheduled tasks running as a different user" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![
         ModuleOption { name: "CMD".into(), description: "Command to execute".into(), required: true, default: None },
         ModuleOption { name: "USER".into(), description: "Run as user".into(), required: false, default: Some("SYSTEM".into()) },
@@ -291,7 +291,7 @@ impl Default for Slinky { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for Slinky {
     fn name(&self) -> &'static str { "slinky" }
     fn description(&self) -> &'static str { "Drop malicious .lnk files on writable shares for hash capture" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![
         ModuleOption { name: "SERVER".into(), description: "UNC listener for icon path".into(), required: true, default: None },
         ModuleOption { name: "NAME".into(), description: "LNK file name".into(), required: false, default: Some("desktop.lnk".into()) },
@@ -311,7 +311,7 @@ impl Default for Scuffy { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for Scuffy {
     fn name(&self) -> &'static str { "scuffy" }
     fn description(&self) -> &'static str { "Drop .scf files on writable shares for NTLM hash capture" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![ModuleOption { name: "SERVER".into(), description: "UNC listener IP".into(), required: true, default: None }] }
     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
@@ -327,7 +327,7 @@ impl Default for DropSc { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for DropSc {
     fn name(&self) -> &'static str { "drop_sc" }
     fn description(&self) -> &'static str { "Drop .searchConnector-ms files on shares for credential harvesting" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![ModuleOption { name: "URL".into(), description: "URL for search connector".into(), required: true, default: None }] }
     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
@@ -343,7 +343,7 @@ impl Default for DropLibraryMs { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for DropLibraryMs {
     fn name(&self) -> &'static str { "drop_library_ms" }
     fn description(&self) -> &'static str { "Drop .library-ms files for credential harvesting" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![ModuleOption { name: "SERVER".into(), description: "UNC listener IP".into(), required: true, default: None }] }
     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
@@ -359,7 +359,7 @@ impl Default for MetInject { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for MetInject {
     fn name(&self) -> &'static str { "met_inject" }
     fn description(&self) -> &'static str { "Inject Meterpreter stager via remote process injection" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![
         ModuleOption { name: "LHOST".into(), description: "Metasploit listener host".into(), required: true, default: None },
         ModuleOption { name: "LPORT".into(), description: "Metasploit listener port".into(), required: true, default: None },
@@ -379,7 +379,7 @@ impl Default for EmpireExec { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for EmpireExec {
     fn name(&self) -> &'static str { "empire_exec" }
     fn description(&self) -> &'static str { "Execute Empire PowerShell stager on targets" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![ModuleOption { name: "LAUNCHER".into(), description: "Empire launcher string".into(), required: true, default: None }] }
     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
@@ -395,7 +395,7 @@ impl Default for WebDelivery { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for WebDelivery {
     fn name(&self) -> &'static str { "web_delivery" }
     fn description(&self) -> &'static str { "Execute payloads via web delivery (PowerShell, Python, Regsvr32)" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![ModuleOption { name: "URL".into(), description: "Web delivery URL".into(), required: true, default: None }] }
     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
@@ -411,7 +411,7 @@ impl Default for LockScreenDoors { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for LockScreenDoors {
     fn name(&self) -> &'static str { "lockscreendoors" }
     fn description(&self) -> &'static str { "Enable Sticky Keys or Utilman backdoor for RDP persistence" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![ModuleOption { name: "ACTION".into(), description: "check, enable, or disable".into(), required: false, default: Some("check".into()) }] }
     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
@@ -429,7 +429,7 @@ impl Default for AmsiBypass { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for AmsiBypass {
     fn name(&self) -> &'static str { "amsi_bypass" }
     fn description(&self) -> &'static str { "Patch AMSI in-memory before command execution" }
-    fn supported_protocols(&self) -> &[&str] { &["smb", "winrm"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb", "winrm"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let target = session.target().to_string();
         let output = format!("AMSI Bypass on {}:\n  [*] Patching amsi.dll!AmsiScanBuffer in target process\n  [*] Method: In-memory patch via RPC\n", target);
@@ -443,7 +443,7 @@ impl Default for BofLoader { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for BofLoader {
     fn name(&self) -> &'static str { "bof_loader" }
     fn description(&self) -> &'static str { "Execute Cobalt Strike BOF files natively in Rust" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![ModuleOption { name: "BOF_PATH".into(), description: "Path to BOF .o file".into(), required: true, default: None }] }
     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let target = session.target().to_string();
@@ -459,7 +459,7 @@ impl Default for PeLoader { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for PeLoader {
     fn name(&self) -> &'static str { "pe_loader" }
     fn description(&self) -> &'static str { "Load and execute PE files in remote process memory" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     fn options(&self) -> Vec<ModuleOption> { vec![ModuleOption { name: "PE_PATH".into(), description: "Path to PE file".into(), required: true, default: None }] }
     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
         let target = session.target().to_string();
@@ -475,7 +475,7 @@ impl Default for EtwPatcher { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for EtwPatcher {
     fn name(&self) -> &'static str { "etw_patcher" }
     fn description(&self) -> &'static str { "Patch Event Tracing for Windows to evade detection" }
-    fn supported_protocols(&self) -> &[&str] { &["smb", "winrm"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb", "winrm"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let target = session.target().to_string();
         let output = format!("ETW Patcher on {}:\n  [*] Patching ntdll!EtwEventWrite\n  [*] Disabling .NET ETW provider\n", target);
@@ -489,7 +489,7 @@ impl Default for DefenderEnum { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for DefenderEnum {
     fn name(&self) -> &'static str { "defender_enum" }
     fn description(&self) -> &'static str { "Full Windows Defender configuration enumeration (exclusions, ASR rules, etc.)" }
-    fn supported_protocols(&self) -> &[&str] { &["smb", "wmi"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb", "wmi"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let target = session.target().to_string();
         let mut output = format!("Defender Enumeration on {}:\n", target);
@@ -507,7 +507,7 @@ impl Default for DpapiMasterkey { fn default() -> Self { Self::new() } }
 #[async_trait] impl NxcModule for DpapiMasterkey {
     fn name(&self) -> &'static str { "dpapi_masterkey" }
     fn description(&self) -> &'static str { "Extract DPAPI master keys for credential decryption" }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] { &["smb"].as_slice() }
     async fn run(&self, session: &mut dyn NxcSession, _opts: &ModuleOptions) -> Result<ModuleResult> {
         let smb = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow!("SMB required"))?;
         let mut output = format!("DPAPI Masterkey Extraction on {}:\n", smb.target);

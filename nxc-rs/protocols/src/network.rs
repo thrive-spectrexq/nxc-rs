@@ -444,7 +444,7 @@ impl NxcProtocol for NetworkProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["net_discovery"]
+        &["net_discovery"].as_slice()
     }
 
     async fn connect(

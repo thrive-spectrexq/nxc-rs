@@ -471,31 +471,32 @@ impl NtlmSessionSecurity {
     pub fn client_signing_key(&self) -> [u8; 16] {
         let mut md5 = <Md5 as Digest>::new();
         md5.update(&self.exported_session_key);
-        md5.update(b"session key to client-to-server signing key magic constant\0");
+        let sign_magic = b"session key to client-to-server signing key magic constant\0".as_slice();
+        md5.update(sign_magic);
         md5.finalize().into()
     }
 
     /// Derive the client sealing key.
     pub fn client_sealing_key(&self) -> [u8; 16] {
         let mut md5 = <Md5 as Digest>::new();
-        md5.update(&self.exported_session_key);
-        md5.update(b"session key to client-to-server sealing key magic constant\0");
+        let seal_magic = b"session key to client-to-server sealing key magic constant\0".as_slice();
+        md5.update(seal_magic);
         md5.finalize().into()
     }
 
     /// Derive the server signing key.
     pub fn server_signing_key(&self) -> [u8; 16] {
         let mut md5 = <Md5 as Digest>::new();
-        md5.update(&self.exported_session_key);
-        md5.update(b"session key to server-to-client signing key magic constant\0");
+        let sign_magic = b"session key to server-to-client signing key magic constant\0".as_slice();
+        md5.update(sign_magic);
         md5.finalize().into()
     }
 
     /// Derive the server sealing key.
     pub fn server_sealing_key(&self) -> [u8; 16] {
         let mut md5 = <Md5 as Digest>::new();
-        md5.update(&self.exported_session_key);
-        md5.update(b"session key to server-to-client sealing key magic constant\0");
+        let seal_magic = b"session key to server-to-client sealing key magic constant\0".as_slice();
+        md5.update(seal_magic);
         md5.finalize().into()
     }
 

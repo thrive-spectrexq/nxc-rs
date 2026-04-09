@@ -116,15 +116,15 @@ impl KerberosClient {
 
         let req_body = KdcReqBody {
             kdc_options: rasn::types::BitString::from_slice(&[0x40, 0x81, 0x00, 0x00]),
-            cname: Some(PrincipalName::new(1, &[username])), // NT-PRINCIPAL
+            cname: Some(PrincipalName::new(1, &[username].as_slice())), // NT-PRINCIPAL
             realm: Realm::new(&domain_realm),
-            sname: Some(PrincipalName::new(2, &["krbtgt", &domain_realm])), // NT-SRV-INST
+            sname: Some(PrincipalName::new(2, &["krbtgt", &domain_realm].as_slice())), // NT-SRV-INST
             from: None,
             till: GeneralizedTime::from(chrono::Utc::now() + chrono::Duration::hours(10)),
             rtime: Some(GeneralizedTime::from(
                 chrono::Utc::now() + chrono::Duration::days(1),
             )),
-            nonce: rand::thread_rng().gen::<u32>() & 0x7FFFFFFF,
+            nonce: rand::rng().random::<u32>() & 0x7FFFFFFF,
             etype: vec![18, 17, 23], // AES256, AES128, RC4
             addresses: None,
             enc_authorization_data: None,
@@ -209,7 +209,7 @@ impl KerberosClient {
             rtime: Some(GeneralizedTime::from(
                 chrono::Utc::now() + chrono::Duration::days(1),
             )),
-            nonce: rand::thread_rng().gen::<u32>() & 0x7FFFFFFF,
+            nonce: rand::rng().random::<u32>() & 0x7FFFFFFF,
             etype: vec![18, 17, 23],
             addresses: None,
             enc_authorization_data: None,
@@ -259,7 +259,7 @@ impl KerberosClient {
         let authenticator = Authenticator {
             authenticator_vno: 5,
             crealm: Realm::new(&tgt.client_realm),
-            cname: PrincipalName::new(1, &[&tgt.client_name]), // NT-PRINCIPAL
+            cname: PrincipalName::new(1, &[tgt.client_name.as_str()].as_slice()), // NT-PRINCIPAL
             cksum: None,
             cusec: 0,
             ctime: now,
