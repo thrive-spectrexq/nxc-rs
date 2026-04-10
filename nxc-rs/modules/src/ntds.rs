@@ -29,7 +29,7 @@ impl NxcModule for Ntds {
     }
 
     fn supported_protocols(&self) -> &[&str] {
-        &["smb"].as_slice()
+        ["smb"].as_slice()
     }
 
     fn options(&self) -> Vec<ModuleOption> {
@@ -50,17 +50,11 @@ impl NxcModule for Ntds {
             "smb" => unsafe {
                 &*(session as *const dyn NxcSession as *const nxc_protocols::smb::SmbSession)
             },
-            _ => {
-                return Err(anyhow::anyhow!(
-                    "Module only supports SMB (DRSUAPI over RPC)"
-                ))
-            }
+            _ => return Err(anyhow::anyhow!("Module only supports SMB (DRSUAPI over RPC)")),
         };
 
         if !smb_session.admin {
-            return Err(anyhow::anyhow!(
-                "Admin/DRS privileges required for NTDS dumping"
-            ));
+            return Err(anyhow::anyhow!("Admin/DRS privileges required for NTDS dumping"));
         }
 
         tracing::info!("NTDS: Binding to DRSUAPI on {}", smb_session.target);

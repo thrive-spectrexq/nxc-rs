@@ -66,7 +66,7 @@ impl NxcModule for AdbShell {
             Err(e) => Ok(ModuleResult {
                 credentials: vec![],
                 success: false,
-                output: format!("Failed to execute command: {}", e),
+                output: format!("Failed to execute command: {e}"),
                 data: json!({ "error": format!("{}", e) }),
             }),
         }

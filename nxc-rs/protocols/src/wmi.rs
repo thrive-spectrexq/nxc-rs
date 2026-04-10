@@ -44,9 +44,7 @@ pub struct WmiProtocol {
 
 impl WmiProtocol {
     pub fn new() -> Self {
-        Self {
-            timeout: Duration::from_secs(10),
-        }
+        Self { timeout: Duration::from_secs(10) }
     }
 
     pub fn with_timeout(timeout: Duration) -> Self {
@@ -84,20 +82,15 @@ impl NxcProtocol for WmiProtocol {
         port: u16,
         proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
-        let addr = format!("{}:{}", target, port);
-        debug!(
-            "WMI: Connecting RPC Endpoint Mapper on {} (proxy: {:?})",
-            addr, proxy
-        );
+        let addr = format!("{target}:{port}");
+        debug!("WMI: Connecting RPC Endpoint Mapper on {} (proxy: {:?})", addr, proxy);
 
-        let timeout_fut = tokio::time::timeout(
-            self.timeout,
-            crate::connection::connect(target, port, proxy),
-        );
+        let timeout_fut =
+            tokio::time::timeout(self.timeout, crate::connection::connect(target, port, proxy));
         let mut stream = match timeout_fut.await {
             Ok(Ok(s)) => s,
-            Ok(Err(e)) => return Err(anyhow!("Connection error: {}", e)),
-            Err(_) => return Err(anyhow!("Connection timeout to {}", addr)),
+            Ok(Err(e)) => return Err(anyhow!("Connection error: {e}")),
+            Err(_) => return Err(anyhow!("Connection timeout to {addr}")),
         };
 
         // Issue a basic DCERPC Bind Request for the Endpoint Mapper (epm)
@@ -137,10 +130,7 @@ impl NxcProtocol for WmiProtocol {
         let addr = format!("{}:{}", wmi_sess.target, wmi_sess.port);
 
         if creds.use_kerberos {
-            debug!(
-                "WMI: Authenticating {} via Kerberos (RPC 0x10)",
-                creds.username
-            );
+            debug!("WMI: Authenticating {} via Kerberos (RPC 0x10)", creds.username);
             return self.authenticate_kerberos(wmi_sess, creds).await;
         }
 
@@ -204,10 +194,7 @@ impl NxcProtocol for WmiProtocol {
 
         if resp_header[2] == 15 {
             // AlterContextResp
-            info!(
-                "WMI: NTLM authentication successful for {} on {}",
-                creds.username, addr
-            );
+            info!("WMI: NTLM authentication successful for {} on {}", creds.username, addr);
             wmi_sess.admin = true; // Simplification: if it worked, assume success
             Ok(AuthResult::success(true))
         } else {
@@ -264,10 +251,7 @@ impl NxcProtocol for WmiProtocol {
         req_pkt.extend_from_slice(&req_bytes);
         stream.write_all(&req_pkt).await?;
 
-        info!(
-            "WMI: Executed command '{}' via Win32_Process.Create on {}",
-            cmd, addr
-        );
+        info!("WMI: Executed command '{}' via Win32_Process.Create on {}", cmd, addr);
 
         Ok(CommandOutput {
             stdout: "Command injection triggered via Win32_Process.Create. Output is not returned via WMI natively.".to_string(),
@@ -351,7 +335,7 @@ impl WmiProtocol {
         }
         buf.extend_from_slice(&0u16.to_le_bytes());
 
-        while !buf.len().is_multiple_of(4) {
+        while buf.len() % 4 != 0 {
             buf.push(0);
         }
     }

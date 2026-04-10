@@ -6,6 +6,12 @@ use nxc_protocols::NxcSession;
 
 pub struct RedisInfo;
 
+impl Default for RedisInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RedisInfo {
     pub fn new() -> Self {
         Self

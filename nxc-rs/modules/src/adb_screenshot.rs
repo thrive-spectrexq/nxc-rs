@@ -51,13 +51,13 @@ impl NxcModule for AdbScreenshot {
             Ok(path) => Ok(ModuleResult {
                 credentials: vec![],
                 success: true,
-                output: format!("Screenshot saved to {}", path),
+                output: format!("Screenshot saved to {path}"),
                 data: serde_json::json!({ "path": path }),
             }),
             Err(e) => Ok(ModuleResult {
                 credentials: vec![],
                 success: false,
-                output: format!("Failed to capture screenshot: {}", e),
+                output: format!("Failed to capture screenshot: {e}"),
                 data: serde_json::json!({ "error": e.to_string() }),
             }),
         }

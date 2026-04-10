@@ -72,14 +72,10 @@ impl NxcModule for VhostEnum {
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         let base_url = format!("{}://{}:{}", scheme, http_sess.target, http_sess.port);
 
-        let domain = opts
-            .get("DOMAIN")
-            .ok_or_else(|| anyhow!("DOMAIN is required for vhost enum"))?;
+        let domain =
+            opts.get("DOMAIN").ok_or_else(|| anyhow!("DOMAIN is required for vhost enum"))?;
         let wordlist = opts.get("WORDLIST").map(|s| s.as_str()).unwrap_or("common");
-        let threads = opts
-            .get("THREADS")
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(50);
+        let threads = opts.get("THREADS").and_then(|s| s.parse::<usize>().ok()).unwrap_or(50);
 
         let basic_words = vec![
             "www",
@@ -120,7 +116,7 @@ impl NxcModule for VhostEnum {
                 Err(_) => {
                     return Ok(ModuleResult {
                         success: false,
-                        output: format!("Failed to read wordlist at {}", wordlist),
+                        output: format!("Failed to read wordlist at {wordlist}"),
                         data: json!({}),
                         credentials: vec![],
                     });
@@ -136,17 +132,11 @@ impl NxcModule for VhostEnum {
         );
 
         // First establish baseline response size for an invalid vHost
-        let baseline_host = format!("nonexistent123randomizerxyz.{}", domain);
+        let baseline_host = format!("nonexistent123randomizerxyz.{domain}");
         let mut baseline_len = 0;
         let mut baseline_status = 0;
 
-        if let Ok(res) = http_sess
-            .client
-            .get(&base_url)
-            .header(HOST, baseline_host)
-            .send()
-            .await
-        {
+        if let Ok(res) = http_sess.client.get(&base_url).header(HOST, baseline_host).send().await {
             baseline_status = res.status().as_u16();
             baseline_len = res.content_length().unwrap_or(0);
         }
@@ -158,7 +148,7 @@ impl NxcModule for VhostEnum {
             let permit = sem.clone().acquire_owned().await.unwrap();
             let url = base_url.clone();
             let client = http_sess.client.clone();
-            let vhost = format!("{}.{}", sub, domain);
+            let vhost = format!("{sub}.{domain}");
             let creds = http_sess.credentials.clone();
 
             tasks.push(tokio::spawn(async move {
@@ -203,8 +193,7 @@ impl NxcModule for VhostEnum {
         for task in tasks {
             if let Ok(Some((vhost, status, len))) = task.await {
                 output.push_str(&format!(
-                    "  [+] {:<30} [Status: {}, Size: {} bytes]\n",
-                    vhost, status, len
+                    "  [+] {vhost:<30} [Status: {status}, Size: {len} bytes]\n"
                 ));
                 found_list.push(json!({ "vhost": vhost, "status": status, "size": len }));
             }

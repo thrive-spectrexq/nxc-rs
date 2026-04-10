@@ -32,9 +32,7 @@ fn magic(command: u32) -> u32 {
 
 /// Calculate the sum of all bytes in a payload.
 fn checksum(payload: &[u8]) -> u32 {
-    payload
-        .iter()
-        .fold(0u32, |acc, &b| acc.wrapping_add(b as u32))
+    payload.iter().fold(0u32, |acc, &b| acc.wrapping_add(b as u32))
 }
 
 /// Helper to serialize a standard 24-byte ADB message header.
@@ -87,9 +85,7 @@ pub struct AdbProtocol {
 
 impl AdbProtocol {
     pub fn new() -> Self {
-        Self {
-            timeout: Duration::from_secs(10),
-        }
+        Self { timeout: Duration::from_secs(10) }
     }
 
     pub fn with_timeout(timeout: Duration) -> Self {
@@ -133,16 +129,14 @@ impl AdbProtocol {
         }
 
         if cmd != A_CNXN {
-            return Err(anyhow!("Expected ADB CNXN response, got 0x{:08x}", cmd));
+            return Err(anyhow!("Expected ADB CNXN response, got 0x{cmd:08x}"));
         }
 
         // Read the host connection string
         let mut string_buf = vec![0u8; payload_len as usize];
         stream.read_exact(&mut string_buf).await?;
 
-        let conn_str = String::from_utf8_lossy(&string_buf)
-            .trim_end_matches('\0')
-            .to_string();
+        let conn_str = String::from_utf8_lossy(&string_buf).trim_end_matches('\0').to_string();
         Ok(conn_str)
     }
 }
@@ -177,21 +171,21 @@ impl NxcProtocol for AdbProtocol {
         port: u16,
         _proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
-        let addr = format!("{}:{}", target, port);
+        let addr = format!("{target}:{port}");
         debug!("ADB: Connecting to {}", addr);
 
         let timeout_fut = tokio::time::timeout(self.timeout, TcpStream::connect(&addr));
         let mut stream = match timeout_fut.await {
             Ok(Ok(s)) => s,
-            Ok(Err(e)) => return Err(anyhow!("Connection refused or unreachable: {}", e)),
-            Err(_) => return Err(anyhow!("Connection timeout to {}", addr)),
+            Ok(Err(e)) => return Err(anyhow!("Connection refused or unreachable: {e}")),
+            Err(_) => return Err(anyhow!("Connection timeout to {addr}")),
         };
 
         // Try standard handshake
         let conn_string =
             match tokio::time::timeout(self.timeout, Self::perform_handshake(&mut stream)).await {
                 Ok(Ok(s)) => s,
-                Ok(Err(e)) => return Err(anyhow!("ADB Handshake Error: {}", e)),
+                Ok(Err(e)) => return Err(anyhow!("ADB Handshake Error: {e}")),
                 Err(_) => return Err(anyhow!("Timeout waiting for ADB handshake response")),
             };
 
@@ -225,7 +219,7 @@ impl NxcProtocol for AdbProtocol {
         // but `execute` only provides an immutable `&dyn NxcSession`.
         // Standard ADB port is 5555, so we use it directly as there's no easy immutable downcasting.
         let port = 5555;
-        let addr = format!("{}:{}", target, port);
+        let addr = format!("{target}:{port}");
 
         let mut stream = TcpStream::connect(&addr).await?;
 
@@ -233,7 +227,7 @@ impl NxcProtocol for AdbProtocol {
         Self::perform_handshake(&mut stream).await?;
 
         // 2. Open `shell:` stream
-        let shell_req = format!("shell:{}\0", command);
+        let shell_req = format!("shell:{command}\0");
         let shell_bytes = shell_req.as_bytes();
         let local_id = 1; // Arbitrary local stream identifier
 
@@ -244,10 +238,7 @@ impl NxcProtocol for AdbProtocol {
         // 3. Wait for OKAY to confirm stream opened
         let (cmd, remote_id, _, _, _, _) = Self::read_packet_header(&mut stream).await?;
         if cmd != A_OKAY {
-            return Err(anyhow!(
-                "ADB did not return OKAY for shell request. Got: 0x{:08x}",
-                cmd
-            ));
+            return Err(anyhow!("ADB did not return OKAY for shell request. Got: 0x{cmd:08x}"));
         }
 
         // 4. Read WRTE packets until CLSE, gathering stdout
@@ -304,15 +295,13 @@ impl AdbProtocol {
         let output = self.execute(session, "screencap -p").await?;
 
         if output.stdout.is_empty() {
-            return Err(anyhow!(
-                "ADB: screencap returned no data. Is the device screen off?"
-            ));
+            return Err(anyhow!("ADB: screencap returned no data. Is the device screen off?"));
         }
 
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)?
             .as_secs();
-        let path = format!("screenshots/adb_{}_{}.png", target, timestamp);
+        let path = format!("screenshots/adb_{target}_{timestamp}.png");
 
         std::fs::create_dir_all("screenshots")?;
         std::fs::write(&path, output.stdout.as_bytes())?;

@@ -29,7 +29,7 @@ impl NxcModule for Zerologon {
     }
 
     fn supported_protocols(&self) -> &[&str] {
-        &["smb"].as_slice()
+        ["smb"].as_slice()
     }
 
     fn options(&self) -> Vec<ModuleOption> {
@@ -45,17 +45,10 @@ impl NxcModule for Zerologon {
             "smb" => unsafe {
                 &*(session as *const dyn NxcSession as *const nxc_protocols::smb::SmbSession)
             },
-            _ => {
-                return Err(anyhow::anyhow!(
-                    "Module only supports SMB (Netlogon over RPC)"
-                ))
-            }
+            _ => return Err(anyhow::anyhow!("Module only supports SMB (Netlogon over RPC)")),
         };
 
-        tracing::info!(
-            "ZeroLogon: Checking {} for CVE-2020-1472",
-            smb_session.target
-        );
+        tracing::info!("ZeroLogon: Checking {} for CVE-2020-1472", smb_session.target);
 
         // 1. Connect to \netlogon
         // 2. Bind to MS-NRPC (Netlogon Remote Protocol) UUID: 12345678-1234-abcd-ef00-01234567cffb

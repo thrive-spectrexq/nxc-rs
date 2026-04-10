@@ -52,10 +52,7 @@ impl Default for HttpProtocol {
 
 impl HttpProtocol {
     pub fn new(use_ssl: bool, verify_ssl: bool) -> Self {
-        Self {
-            use_ssl,
-            verify_ssl,
-        }
+        Self { use_ssl, verify_ssl }
     }
 }
 
@@ -153,44 +150,31 @@ impl NxcProtocol for HttpProtocol {
 
         let resp = match req.send().await {
             Ok(r) => r,
-            Err(e) => return Ok(AuthResult::failure(&format!("HTTP Error: {}", e), None)),
+            Err(e) => return Ok(AuthResult::failure(&format!("HTTP Error: {e}"), None)),
         };
 
         let status = resp.status();
-        let server_header = resp
-            .headers()
-            .get("Server")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("Unknown Server");
+        let server_header =
+            resp.headers().get("Server").and_then(|v| v.to_str().ok()).unwrap_or("Unknown Server");
 
-        let msg = format!("HTTP {} - Server: {}", status, server_header);
+        let msg = format!("HTTP {status} - Server: {server_header}");
 
         if status.is_success() || status == StatusCode::NOT_FOUND {
             // Unauthenticated public servers might return 404 on the root, but it means
             // we connected and the creds (if any) didn't cause a 401.
             // Truly valid authentication to a protected route will typically return 200.
-            Ok(AuthResult {
-                success: true,
-                admin: false,
-                message: msg,
-                error_code: None,
-            })
+            Ok(AuthResult { success: true, admin: false, message: msg, error_code: None })
         } else if status == StatusCode::UNAUTHORIZED {
             // 401 Unauthorized means the credentials failed
             Ok(AuthResult::failure(&msg, Some("HTTP_401")))
         } else {
             // Other errors (500, etc) usually mean we didn't firmly authenticate
-            Ok(AuthResult::failure(
-                &msg,
-                Some(&status.as_u16().to_string()),
-            ))
+            Ok(AuthResult::failure(&msg, Some(&status.as_u16().to_string())))
         }
     }
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
-        Err(anyhow::anyhow!(
-            "Command execution not supported on HTTP protocol natively."
-        ))
+        Err(anyhow::anyhow!("Command execution not supported on HTTP protocol natively."))
     }
 }
 
@@ -230,8 +214,6 @@ impl HttpProtocol {
             "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1.2 Mobile/15E148 Safari/604.1",
         ];
         use rand::seq::IndexedRandom;
-        USER_AGENTS
-            .choose(&mut rand::rng())
-            .unwrap_or(&USER_AGENTS[0])
+        USER_AGENTS.choose(&mut rand::rng()).unwrap_or(&USER_AGENTS[0])
     }
 }

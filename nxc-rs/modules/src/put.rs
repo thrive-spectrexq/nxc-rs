@@ -58,12 +58,9 @@ impl NxcModule for PutModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let local = opts
-            .get("LOCAL")
-            .ok_or_else(|| anyhow::anyhow!("LOCAL option is required"))?;
-        let remote = opts
-            .get("REMOTE")
-            .ok_or_else(|| anyhow::anyhow!("REMOTE option is required"))?;
+        let local = opts.get("LOCAL").ok_or_else(|| anyhow::anyhow!("LOCAL option is required"))?;
+        let remote =
+            opts.get("REMOTE").ok_or_else(|| anyhow::anyhow!("REMOTE option is required"))?;
 
         match session.protocol() {
             "smb" => self.run_smb(session, local, remote).await,
@@ -91,25 +88,19 @@ impl PutModule {
             .ok_or_else(|| anyhow::anyhow!("REMOTE must be in format SHARE\\path"))?;
 
         let data = std::fs::read(local)?;
-        info!(
-            "Put: Uploading {} to {}\\{} on {}",
-            local,
-            share,
-            path,
-            session.target()
-        );
+        info!("Put: Uploading {} to {}\\{} on {}", local, share, path, session.target());
 
         match protocol.upload_file(smb_sess, share, path, &data).await {
             Ok(_) => Ok(ModuleResult {
                 credentials: vec![],
                 success: true,
-                output: format!("[+] Successfully uploaded {} to {}", local, remote_full),
+                output: format!("[+] Successfully uploaded {local} to {remote_full}"),
                 data: serde_json::json!({ "remote_path": remote_full, "size": data.len() }),
             }),
             Err(e) => Ok(ModuleResult {
                 credentials: vec![],
                 success: false,
-                output: format!("[-] Failed to upload: {}", e),
+                output: format!("[-] Failed to upload: {e}"),
                 data: serde_json::Value::Null,
             }),
         }

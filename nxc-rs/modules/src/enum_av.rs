@@ -58,20 +58,28 @@ static AV_SIGNATURES: &[(&str, &[&str], &[&str])] = &[
 pub struct EnumAv;
 
 impl EnumAv {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for EnumAv {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl NxcModule for EnumAv {
-    fn name(&self) -> &'static str { "enum_av" }
+    fn name(&self) -> &'static str {
+        "enum_av"
+    }
     fn description(&self) -> &'static str {
         "Enumerate installed AV/EDR products via SMB service/pipe checks"
     }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] {
+        &["smb"]
+    }
 
     async fn run(
         &self,
@@ -91,9 +99,7 @@ impl NxcModule for EnumAv {
         // Check services via SCManager RPC pipe
         let svcs_to_check: Vec<(&str, &str)> = AV_SIGNATURES
             .iter()
-            .flat_map(|(product, services, _)| {
-                services.iter().map(move |svc| (*product, *svc))
-            })
+            .flat_map(|(product, services, _)| services.iter().map(move |svc| (*product, *svc)))
             .collect();
 
         for (product, svc_name) in &svcs_to_check {
@@ -106,9 +112,7 @@ impl NxcModule for EnumAv {
         // Check named pipes
         let pipes_to_check: Vec<(&str, &str)> = AV_SIGNATURES
             .iter()
-            .flat_map(|(product, _, pipes)| {
-                pipes.iter().map(move |pipe| (*product, *pipe))
-            })
+            .flat_map(|(product, _, pipes)| pipes.iter().map(move |pipe| (*product, *pipe)))
             .collect();
 
         for (product, pipe_name) in &pipes_to_check {
@@ -128,7 +132,7 @@ impl NxcModule for EnumAv {
             output.push_str("  [*] Note: Requires admin access for full service enumeration\n");
         } else {
             for item in &detected {
-                output.push_str(&format!("  [!] Detected: {}\n", item));
+                output.push_str(&format!("  [!] Detected: {item}\n"));
             }
         }
 

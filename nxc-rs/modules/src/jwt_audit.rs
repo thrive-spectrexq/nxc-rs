@@ -55,10 +55,7 @@ impl NxcModule for JwtAudit {
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         let base_path = opts.get("PATH").map(|s| s.as_str()).unwrap_or("/");
-        let url = format!(
-            "{}://{}:{}{}",
-            scheme, http_sess.target, http_sess.port, base_path
-        );
+        let url = format!("{}://{}:{}{}", scheme, http_sess.target, http_sess.port, base_path);
 
         info!("Starting JWT Audit against {}", url);
 
@@ -96,10 +93,7 @@ impl NxcModule for JwtAudit {
             jwts_found.sort();
             jwts_found.dedup();
 
-            output.push_str(&format!(
-                "  [!] Found {} distinct JWT(s):\n",
-                jwts_found.len()
-            ));
+            output.push_str(&format!("  [!] Found {} distinct JWT(s):\n", jwts_found.len()));
 
             for jwt in &jwts_found {
                 let parts: Vec<&str> = jwt.split('.').collect();
@@ -108,12 +102,9 @@ impl NxcModule for JwtAudit {
                     let payload = decode_jwt_part(parts[1]);
 
                     output.push_str("      ---------------------------\n");
-                    output.push_str(&format!(
-                        "      Token  : {}...\n",
-                        &jwt[0..15.min(jwt.len())]
-                    ));
-                    output.push_str(&format!("      Header : {}\n", header));
-                    output.push_str(&format!("      Payload: {}\n", payload));
+                    output.push_str(&format!("      Token  : {}...\n", &jwt[0..15.min(jwt.len())]));
+                    output.push_str(&format!("      Header : {header}\n"));
+                    output.push_str(&format!("      Payload: {payload}\n"));
 
                     if header.contains("\"none\"") || header.contains("\"NONE\"") {
                         output.push_str("      [!] CRITICAL: JWT Algorithm is set to 'none'!\n");
@@ -133,9 +124,7 @@ impl NxcModule for JwtAudit {
 
 // Very basic JWT regex-like extraction (eyJh... string)
 fn extract_jwts(text: &str, found: &mut Vec<String>) {
-    let parts: Vec<&str> = text
-        .split(&[' ', '"', '\'', '\n', '\r', ',', '\\'][..])
-        .collect();
+    let parts: Vec<&str> = text.split(&[' ', '"', '\'', '\n', '\r', ',', '\\'][..]).collect();
     for part in parts {
         if part.starts_with("eyJ") && part.chars().filter(|&c| c == '.').count() == 2 {
             found.push(part.to_string());

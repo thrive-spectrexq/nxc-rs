@@ -48,18 +48,14 @@ impl NxcModule for Gmsa {
             None => return Err(anyhow!("Invalid session type for LDAP")),
         };
 
-        info!(
-            "GMSA: Enumerating gMSA passwords on {}",
-            ldap_session.target
-        );
+        info!("GMSA: Enumerating gMSA passwords on {}", ldap_session.target);
 
         let base_dn = protocol.get_base_dn(ldap_session).await?;
         let filter = "(&(objectClass=msDS-GroupManagedServiceAccount)(msDS-ManagedPassword=*))";
         let attrs = vec!["sAMAccountName", "msDS-ManagedPassword"];
 
-        let entries = protocol
-            .search(ldap_session, &base_dn, ldap3::Scope::Subtree, filter, attrs)
-            .await?;
+        let entries =
+            protocol.search(ldap_session, &base_dn, ldap3::Scope::Subtree, filter, attrs).await?;
 
         let mut output = String::new();
         let mut gmsa_data = Vec::new();
@@ -74,7 +70,7 @@ impl NxcModule for Gmsa {
             // msDS-ManagedPassword is a blob (MS-SAMR 2.2.14.2)
             // For MVP, we'll just indicate it was found.
             // Full implementation would involve parsing the BLOB to get the NT hash.
-            output.push_str(&format!("Found gMSA: {} (Password blob extracted)\n", name));
+            output.push_str(&format!("Found gMSA: {name} (Password blob extracted)\n"));
             gmsa_data.push(serde_json::json!({
                 "account": name,
                 "status": "extracted"

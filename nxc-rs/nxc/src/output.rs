@@ -154,7 +154,7 @@ impl NxcGlobalOutput {
             "@thrive-spectrexq".yellow().bold()
         );
 
-        println!("{}{}", spider, text);
+        println!("{spider}{text}");
     }
 
     pub fn info(msg: &str) {

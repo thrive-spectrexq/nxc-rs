@@ -63,20 +63,15 @@ impl NxcModule for EnumShares {
         let shares = protocol.list_shares(smb_session).await?;
 
         let mut output_lines = Vec::new();
-        output_lines.push(format!(
-            "{:<15} {:<10} {:<10} {}",
-            "Share", "Read", "Write", "Remark"
-        ));
+        output_lines.push(format!("{:<15} {:<10} {:<10} {}", "Share", "Read", "Write", "Remark"));
         output_lines.push("-".repeat(50));
 
         let mut share_data = Vec::new();
         for share in shares {
             let read = if share.read_access { "READ" } else { "" };
             let write = if share.write_access { "WRITE" } else { "" };
-            output_lines.push(format!(
-                "{:<15} {:<10} {:<10} {}",
-                share.name, read, write, share.remark
-            ));
+            output_lines
+                .push(format!("{:<15} {:<10} {:<10} {}", share.name, read, write, share.remark));
 
             share_data.push(serde_json::json!({
                 "name": share.name,

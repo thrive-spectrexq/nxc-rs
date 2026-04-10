@@ -54,10 +54,7 @@ pub struct WinrmProtocol {
 
 impl WinrmProtocol {
     pub fn new() -> Self {
-        Self {
-            timeout: Duration::from_secs(10),
-            verify_ssl: false,
-        }
+        Self { timeout: Duration::from_secs(10), verify_ssl: false }
     }
 
     pub fn with_verify_ssl(mut self, verify: bool) -> Self {
@@ -72,23 +69,20 @@ impl WinrmProtocol {
 
     fn build_url(&self, target: &str, port: u16) -> String {
         let scheme = if port == 5986 { "https" } else { "http" };
-        format!("{}://{}:{}/wsman", scheme, target, port)
+        format!("{scheme}://{target}:{port}/wsman")
     }
 
     /// Build a reqwest client configured for WinRM communication (ignoring rigorous cert checks for now, similar to NXC)
     fn build_client(&self, proxy_str: Option<&str>) -> Result<Client> {
-        let mut builder = Client::builder()
-            .timeout(self.timeout)
-            .danger_accept_invalid_certs(!self.verify_ssl); // Configurable certificate verification
+        let mut builder =
+            Client::builder().timeout(self.timeout).danger_accept_invalid_certs(!self.verify_ssl); // Configurable certificate verification
 
         if let Some(p) = proxy_str {
-            let proxy = reqwest::Proxy::all(p).map_err(|e| anyhow!("Invalid proxy URL: {}", e))?;
+            let proxy = reqwest::Proxy::all(p).map_err(|e| anyhow!("Invalid proxy URL: {e}"))?;
             builder = builder.proxy(proxy);
         }
 
-        builder
-            .build()
-            .map_err(|e| anyhow!("Failed to build HTTP client: {}", e))
+        builder.build().map_err(|e| anyhow!("Failed to build HTTP client: {e}"))
     }
 }
 
@@ -137,12 +131,12 @@ impl NxcProtocol for WinrmProtocol {
             .header("Content-Length", "0")
             .header("Content-Type", "application/soap+xml;charset=UTF-8")
             .header("User-Agent", "Microsoft WinRM Client")
-            .header("Authorization", format!("Negotiate {}", ntlm_type1))
+            .header("Authorization", format!("Negotiate {ntlm_type1}"))
             .body("");
 
         let response = match request.send().await {
             Ok(resp) => resp,
-            Err(e) => return Err(anyhow!("Connection failed to WinRM service: {}", e)),
+            Err(e) => return Err(anyhow!("Connection failed to WinRM service: {e}")),
         };
 
         debug!("WinRM: Received response code: {}", response.status());
@@ -177,10 +171,7 @@ impl NxcProtocol for WinrmProtocol {
                 proxy: proxy.map(|s| s.to_string()),
             }))
         } else if response.status() == 200 {
-            info!(
-                "WinRM: Connected to {} (Unauthenticated access or pre-auth)",
-                url
-            );
+            info!("WinRM: Connected to {} (Unauthenticated access or pre-auth)", url);
             Ok(Box::new(WinrmSession {
                 target: target.to_string(),
                 port,
@@ -190,10 +181,7 @@ impl NxcProtocol for WinrmProtocol {
                 proxy: proxy.map(|s| s.to_string()),
             }))
         } else {
-            Err(anyhow!(
-                "Failed to get NTLM challenge from target. Status: {}",
-                response.status()
-            ))
+            Err(anyhow!("Failed to get NTLM challenge from target. Status: {}", response.status()))
         }
     }
 
@@ -212,10 +200,7 @@ impl NxcProtocol for WinrmProtocol {
         debug!("WinRM: Authenticating {}@{}", creds.username, url);
 
         if creds.use_kerberos {
-            debug!(
-                "WinRM: Authenticating {} via Kerberos (Negotiate)",
-                creds.username
-            );
+            debug!("WinRM: Authenticating {} via Kerberos (Negotiate)", creds.username);
             return self.authenticate_kerberos(winrm_sess, creds).await;
         }
 
@@ -228,23 +213,17 @@ impl NxcProtocol for WinrmProtocol {
 
         let resp = client
             .post(&url)
-            .header("Authorization", format!("Negotiate {}", t1_base64))
+            .header("Authorization", format!("Negotiate {t1_base64}"))
             .header("Content-Length", "0")
             .send()
             .await?;
 
         if resp.status() != reqwest::StatusCode::UNAUTHORIZED {
-            return Ok(AuthResult::failure(
-                "Server did not challenge with 401",
-                None,
-            ));
+            return Ok(AuthResult::failure("Server did not challenge with 401", None));
         }
 
-        let www_auth = resp
-            .headers()
-            .get("WWW-Authenticate")
-            .and_then(|h| h.to_str().ok())
-            .unwrap_or("");
+        let www_auth =
+            resp.headers().get("WWW-Authenticate").and_then(|h| h.to_str().ok()).unwrap_or("");
         let t2_base64 = www_auth
             .strip_prefix("Negotiate ")
             .or(www_auth.strip_prefix("NTLM "))
@@ -259,7 +238,7 @@ impl NxcProtocol for WinrmProtocol {
         // Final Auth check with a dummy header or small SOAP probe
         let probe_resp = client
             .post(&url)
-            .header("Authorization", format!("Negotiate {}", t3_base64))
+            .header("Authorization", format!("Negotiate {t3_base64}"))
             .header("Content-Type", "application/soap+xml;charset=UTF-8")
             .body(self.build_create_shell_soap())
             .send()
@@ -354,11 +333,7 @@ impl NxcProtocol for WinrmProtocol {
             .send()
             .await?;
 
-        Ok(CommandOutput {
-            stdout,
-            stderr,
-            exit_code: Some(0),
-        })
+        Ok(CommandOutput { stdout, stderr, exit_code: Some(0) })
     }
 }
 
@@ -441,8 +416,8 @@ impl WinrmProtocol {
     }
 
     fn extract_xml_tag(&self, xml: &str, tag: &str) -> Option<String> {
-        let start_tag = format!("<{}", tag);
-        let end_tag = format!("</{}", tag);
+        let start_tag = format!("<{tag}");
+        let end_tag = format!("</{tag}");
 
         if let Some(start_pos) = xml.find(&start_tag) {
             if let Some(content_start) = xml[start_pos..].find('>') {
@@ -500,12 +475,9 @@ $k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
 
         // Wrap original cmd. If it was `powershell -c "some script"`, we insert the bypass first.
         let original = cmd.trim_start_matches("powershell").trim();
-        let original = original
-            .trim_start_matches("-c")
-            .trim_start_matches("-Command")
-            .trim();
+        let original = original.trim_start_matches("-c").trim_start_matches("-Command").trim();
 
-        format!("powershell -c \"{}; {}\"", bypass_inline, original)
+        format!("powershell -c \"{bypass_inline}; {original}\"")
     }
 
     /// Perform Kerberos authentication over WinRM (HTTP Negotiate)
@@ -539,16 +511,13 @@ $k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
             .header("Content-Length", "0")
             .header("Content-Type", "application/soap+xml;charset=UTF-8")
             .header("User-Agent", "Microsoft WinRM Client")
-            .header("Authorization", format!("Negotiate {}", token))
+            .header("Authorization", format!("Negotiate {token}"))
             .body("");
 
         let response = match request.send().await {
             Ok(resp) => resp,
             Err(e) => {
-                return Ok(AuthResult::failure(
-                    &format!("HTTP connection failed: {}", e),
-                    None,
-                ))
+                return Ok(AuthResult::failure(&format!("HTTP connection failed: {e}"), None))
             }
         };
 
@@ -557,15 +526,9 @@ $k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
             debug!("WinRM: Kerberos Auth successful for {}", creds.username);
             Ok(AuthResult::success(true))
         } else if response.status().as_u16() == 401 {
-            Ok(AuthResult::failure(
-                "Kerberos authentication failed (401 Unauthorized)",
-                None,
-            ))
+            Ok(AuthResult::failure("Kerberos authentication failed (401 Unauthorized)", None))
         } else {
-            Ok(AuthResult::failure(
-                &format!("Unexpected status code: {}", response.status()),
-                None,
-            ))
+            Ok(AuthResult::failure(&format!("Unexpected status code: {}", response.status()), None))
         }
     }
 }

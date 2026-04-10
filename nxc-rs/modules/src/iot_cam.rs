@@ -56,27 +56,18 @@ impl NxcModule for IotCam {
         let scheme = "http"; // In a full implementation, detect if parsing from port 443
         let base_url = format!("{}://{}:{}", scheme, http_sess.target, http_sess.port);
 
-        println!(
-            "[*] (HTTP API) Probing {} for exposed camera endpoints...",
-            base_url
-        );
+        println!("[*] (HTTP API) Probing {base_url} for exposed camera endpoints...");
 
         // Common image extraction targets for rusty-secure/esp32/generic IP cams
-        let endpoints = vec![
-            "/capture",
-            "/image",
-            "/jpg",
-            "/snapshot.cgi",
-            "/api/picture",
-            "/cam-hi.jpg",
-        ];
+        let endpoints =
+            vec!["/capture", "/image", "/jpg", "/snapshot.cgi", "/api/picture", "/cam-hi.jpg"];
 
         let mut hit_endpoint = None;
         let mut image_bytes = bytes::Bytes::new();
 
         // Iterating through targets
         for ep in endpoints {
-            let target_url = format!("{}{}", base_url, ep);
+            let target_url = format!("{base_url}{ep}");
             let mut req = http_sess.client.get(&target_url);
 
             // Bring along credentials if they were matched natively by the engine initially
@@ -125,8 +116,7 @@ impl NxcModule for IotCam {
         std::fs::write(&file_name, &image_bytes)?;
 
         let success_msg = format!(
-            "Extracted snapshot from {} (Saved securely locally to: {})",
-            target_url, file_name
+            "Extracted snapshot from {target_url} (Saved securely locally to: {file_name})"
         );
 
         Ok(ModuleResult {

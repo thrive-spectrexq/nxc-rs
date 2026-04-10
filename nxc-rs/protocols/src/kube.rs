@@ -20,11 +20,21 @@ pub struct KubeSession {
 }
 
 impl NxcSession for KubeSession {
-    fn protocol(&self) -> &'static str { "kube" }
-    fn target(&self) -> &str { &self.target }
-    fn is_admin(&self) -> bool { self.admin }
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    fn protocol(&self) -> &'static str {
+        "kube"
+    }
+    fn target(&self) -> &str {
+        &self.target
+    }
+    fn is_admin(&self) -> bool {
+        self.admin
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 // ─── Kubernetes Protocol ────────────────────────────────────────
@@ -32,20 +42,35 @@ impl NxcSession for KubeSession {
 pub struct KubeProtocol;
 
 impl KubeProtocol {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for KubeProtocol {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl NxcProtocol for KubeProtocol {
-    fn name(&self) -> &'static str { "kube" }
-    fn default_port(&self) -> u16 { 6443 }
-    fn supports_exec(&self) -> bool { true }
+    fn name(&self) -> &'static str {
+        "kube"
+    }
+    fn default_port(&self) -> u16 {
+        6443
+    }
+    fn supports_exec(&self) -> bool {
+        true
+    }
 
-    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        _proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         info!("Kube: Probing API server at {}:{}", target, port);
 
         let client = reqwest::Client::builder()
@@ -56,14 +81,14 @@ impl NxcProtocol for KubeProtocol {
         let mut server_version = None;
 
         // Check /version endpoint (usually accessible without auth)
-        let version_url = format!("https://{}:{}/version", target, port);
+        let version_url = format!("https://{target}:{port}/version");
         if let Ok(resp) = client.get(&version_url).send().await {
             if resp.status().is_success() {
                 if let Ok(body) = resp.text().await {
                     if let Ok(v) = serde_json::from_str::<serde_json::Value>(&body) {
                         let major = v.get("major").and_then(|m| m.as_str()).unwrap_or("?");
                         let minor = v.get("minor").and_then(|m| m.as_str()).unwrap_or("?");
-                        server_version = Some(format!("v{}.{}", major, minor));
+                        server_version = Some(format!("v{major}.{minor}"));
                     }
                 }
             }
@@ -71,7 +96,7 @@ impl NxcProtocol for KubeProtocol {
 
         // Also try HTTP (port 8080/8443)
         if server_version.is_none() {
-            let http_url = format!("http://{}:{}/version", target, port);
+            let http_url = format!("http://{target}:{port}/version");
             if let Ok(resp) = client.get(&http_url).send().await {
                 if let Ok(body) = resp.text().await {
                     if body.contains("gitVersion") {
@@ -90,8 +115,14 @@ impl NxcProtocol for KubeProtocol {
         }))
     }
 
-    async fn authenticate(&self, session: &mut dyn NxcSession, creds: &Credentials) -> Result<AuthResult> {
-        let kube_sess = session.as_any_mut().downcast_mut::<KubeSession>()
+    async fn authenticate(
+        &self,
+        session: &mut dyn NxcSession,
+        creds: &Credentials,
+    ) -> Result<AuthResult> {
+        let kube_sess = session
+            .as_any_mut()
+            .downcast_mut::<KubeSession>()
             .ok_or_else(|| anyhow!("Invalid session type"))?;
 
         info!("Kube: Authenticating on {}", kube_sess.target);
@@ -122,22 +153,27 @@ impl NxcProtocol for KubeProtocol {
                     // Authenticated but not authorized for this resource
                     Ok(AuthResult::success(false))
                 } else {
-                    Ok(AuthResult::failure("Kubernetes authentication failed", Some(&status.to_string())))
+                    Ok(AuthResult::failure(
+                        "Kubernetes authentication failed",
+                        Some(&status.to_string()),
+                    ))
                 }
             }
-            Err(e) => Ok(AuthResult::failure(&format!("Connection error: {}", e), None)),
+            Err(e) => Ok(AuthResult::failure(&format!("Connection error: {e}"), None)),
         }
     }
 
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput> {
-        let kube_sess = session.as_any().downcast_ref::<KubeSession>()
+        let kube_sess = session
+            .as_any()
+            .downcast_ref::<KubeSession>()
             .ok_or_else(|| anyhow!("Invalid session type"))?;
 
         // Execute command via Kubernetes exec API (simplified)
         info!("Kube: Executing '{}' on {}", cmd, kube_sess.target);
 
         Ok(CommandOutput {
-            stdout: format!("Kube exec not yet implemented for: {}", cmd),
+            stdout: format!("Kube exec not yet implemented for: {cmd}"),
             stderr: String::new(),
             exit_code: Some(0),
         })
@@ -147,12 +183,11 @@ impl NxcProtocol for KubeProtocol {
 impl KubeProtocol {
     /// Enumerate service accounts and secrets.
     pub async fn list_secrets(&self, session: &KubeSession) -> Result<Vec<serde_json::Value>> {
-        let client = reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()?;
+        let client = reqwest::Client::builder().danger_accept_invalid_certs(true).build()?;
 
         let ns = session.namespace.as_deref().unwrap_or("default");
-        let url = format!("https://{}:{}/api/v1/namespaces/{}/secrets", session.target, session.port, ns);
+        let url =
+            format!("https://{}:{}/api/v1/namespaces/{}/secrets", session.target, session.port, ns);
 
         let resp = client.get(&url).send().await?;
         if resp.status().is_success() {
@@ -166,12 +201,11 @@ impl KubeProtocol {
 
     /// List pods in a namespace.
     pub async fn list_pods(&self, session: &KubeSession) -> Result<Vec<serde_json::Value>> {
-        let client = reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()?;
+        let client = reqwest::Client::builder().danger_accept_invalid_certs(true).build()?;
 
         let ns = session.namespace.as_deref().unwrap_or("default");
-        let url = format!("https://{}:{}/api/v1/namespaces/{}/pods", session.target, session.port, ns);
+        let url =
+            format!("https://{}:{}/api/v1/namespaces/{}/pods", session.target, session.port, ns);
 
         let resp = client.get(&url).send().await?;
         if resp.status().is_success() {

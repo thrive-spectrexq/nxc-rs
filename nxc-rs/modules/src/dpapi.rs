@@ -49,9 +49,7 @@ impl NxcModule for Dpapi {
         };
 
         if !smb_session.admin {
-            return Err(anyhow::anyhow!(
-                "Admin/LSA privileges required for DPAPI dumping"
-            ));
+            return Err(anyhow::anyhow!("Admin/LSA privileges required for DPAPI dumping"));
         }
 
         tracing::info!("DPAPI: Extracting master keys from {}", smb_session.target);
@@ -62,7 +60,7 @@ impl NxcModule for Dpapi {
 
         Ok(ModuleResult {
             success: true,
-            output: format!("[+] Extracted LSA Secret (DPAPI Master Key): 3f2a1b0c..."),
+            output: "[+] Extracted LSA Secret (DPAPI Master Key): 3f2a1b0c...".to_string(),
             data: serde_json::json!({"master_key": "3f2a1b0c..."}),
             credentials: vec![],
         })

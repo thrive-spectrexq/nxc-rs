@@ -50,9 +50,7 @@ pub struct MssqlProtocol {
 
 impl MssqlProtocol {
     pub fn new() -> Self {
-        Self {
-            timeout: Duration::from_secs(10),
-        }
+        Self { timeout: Duration::from_secs(10) }
     }
 
     pub fn with_timeout(timeout: Duration) -> Self {
@@ -81,13 +79,7 @@ impl NxcProtocol for MssqlProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &[
-            "enum_logins",
-            "enum_databases",
-            "mssql_enum",
-            "mssql_privesc",
-            "mssql_unc",
-        ]
+        &["enum_logins", "enum_databases", "mssql_enum", "mssql_privesc", "mssql_unc"]
     }
 
     async fn connect(
@@ -96,13 +88,11 @@ impl NxcProtocol for MssqlProtocol {
         port: u16,
         proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
-        let addr = format!("{}:{}", target, port);
+        let addr = format!("{target}:{port}");
         debug!("MSSQL: Connecting to {} (proxy: {:?})", addr, proxy);
 
-        let timeout_fut = tokio::time::timeout(
-            self.timeout,
-            crate::connection::connect(target, port, proxy),
-        );
+        let timeout_fut =
+            tokio::time::timeout(self.timeout, crate::connection::connect(target, port, proxy));
         match timeout_fut.await {
             Ok(Ok(_stream)) => {
                 info!("MSSQL: Connected to {}", addr);
@@ -114,8 +104,8 @@ impl NxcProtocol for MssqlProtocol {
                     proxy: proxy.map(|s| s.to_string()),
                 }))
             }
-            Ok(Err(e)) => Err(anyhow!("Connection refused or unreachable: {}", e)),
-            Err(_) => Err(anyhow!("Connection timeout to {}", addr)),
+            Ok(Err(e)) => Err(anyhow!("Connection refused or unreachable: {e}")),
+            Err(_) => Err(anyhow!("Connection timeout to {addr}")),
         }
     }
 
@@ -143,7 +133,7 @@ impl NxcProtocol for MssqlProtocol {
         let target = mssql_sess_mut.target.clone();
         let port = mssql_sess_mut.port;
 
-        let addr = format!("{}:{}", target, port);
+        let addr = format!("{target}:{port}");
         debug!("MSSQL: Authenticating {}@{}", username, addr);
 
         let mut config = Config::new();
@@ -160,7 +150,7 @@ impl NxcProtocol for MssqlProtocol {
             ));
             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
             config.authentication(AuthMethod::sql_server(
-                &format!("{}\\{}", domain, username),
+                format!("{domain}\\{username}"),
                 &password,
             ));
         } else {
@@ -210,7 +200,7 @@ impl NxcProtocol for MssqlProtocol {
                 Ok(AuthResult::success(is_admin))
             }
             Ok(Err(e)) => {
-                let msg = format!("Auth error: {}", e);
+                let msg = format!("Auth error: {e}");
                 debug!("MSSQL: Auth failed for {}: {}", username, msg);
                 Ok(AuthResult::failure(&msg, None))
             }
@@ -224,10 +214,8 @@ impl NxcProtocol for MssqlProtocol {
             .downcast_ref::<MssqlSession>()
             .ok_or_else(|| anyhow!("Invalid session type"))?;
 
-        let creds = mssql_sess
-            .credentials
-            .as_ref()
-            .ok_or_else(|| anyhow!("Session not authenticated"))?;
+        let creds =
+            mssql_sess.credentials.as_ref().ok_or_else(|| anyhow!("Session not authenticated"))?;
         let mut config = Config::new();
         config.host(&mssql_sess.target);
         config.port(mssql_sess.port);
@@ -239,10 +227,7 @@ impl NxcProtocol for MssqlProtocol {
             #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
             config.authentication(AuthMethod::windows(format!("{}\\{}", domain, user), pass));
             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
-            config.authentication(AuthMethod::sql_server(
-                &format!("{}\\{}", domain, user),
-                pass,
-            ));
+            config.authentication(AuthMethod::sql_server(format!("{domain}\\{user}"), pass));
         } else {
             config.authentication(AuthMethod::sql_server(user, pass));
         }
@@ -258,15 +243,9 @@ impl NxcProtocol for MssqlProtocol {
         let mut client = Client::connect(config, tcp.compat_write()).await?;
 
         // 1. Ensure xp_cmdshell is enabled
-        let _ = client
-            .execute(
-                "EXEC sp_configure 'show advanced options', 1; RECONFIGURE;",
-                &[],
-            )
-            .await;
-        let _ = client
-            .execute("EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;", &[])
-            .await;
+        let _ =
+            client.execute("EXEC sp_configure 'show advanced options', 1; RECONFIGURE;", &[]).await;
+        let _ = client.execute("EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;", &[]).await;
 
         let sql = format!("EXEC xp_cmdshell '{}'", cmd.replace('\'', "''"));
         let result = client.query(sql, &[]).await?;
@@ -281,11 +260,7 @@ impl NxcProtocol for MssqlProtocol {
         }
 
         let _ = client.close().await;
-        Ok(CommandOutput {
-            stdout,
-            stderr: String::new(),
-            exit_code: Some(0),
-        })
+        Ok(CommandOutput { stdout, stderr: String::new(), exit_code: Some(0) })
     }
 
     async fn read_file(
@@ -294,7 +269,7 @@ impl NxcProtocol for MssqlProtocol {
         _share: &str,
         path: &str,
     ) -> Result<Vec<u8>> {
-        let output = self.execute(session, &format!("type {}", path)).await?;
+        let output = self.execute(session, &format!("type {path}")).await?;
         Ok(output.stdout.into_bytes())
     }
 
@@ -307,9 +282,8 @@ impl NxcProtocol for MssqlProtocol {
     ) -> Result<()> {
         let hex_data = hex::encode(data);
         // Using certutil to decode hex in case of binary data
-        let cmd = format!("certutil -decodehex temp.hex {} && del temp.hex", path);
-        self.execute(session, &format!("echo {} > temp.hex", hex_data))
-            .await?;
+        let cmd = format!("certutil -decodehex temp.hex {path} && del temp.hex");
+        self.execute(session, &format!("echo {hex_data} > temp.hex")).await?;
         self.execute(session, &cmd).await?;
         Ok(())
     }
@@ -321,10 +295,8 @@ impl MssqlProtocol {
         session: &MssqlSession,
         sql: &str,
     ) -> Result<Vec<serde_json::Value>> {
-        let creds = session
-            .credentials
-            .as_ref()
-            .ok_or_else(|| anyhow!("Session not authenticated"))?;
+        let creds =
+            session.credentials.as_ref().ok_or_else(|| anyhow!("Session not authenticated"))?;
         let mut config = Config::new();
         config.host(&session.target);
         config.port(session.port);
@@ -336,10 +308,7 @@ impl MssqlProtocol {
             #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
             config.authentication(AuthMethod::windows(format!("{}\\{}", domain, user), pass));
             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
-            config.authentication(AuthMethod::sql_server(
-                &format!("{}\\{}", domain, user),
-                pass,
-            ));
+            config.authentication(AuthMethod::sql_server(format!("{domain}\\{user}"), pass));
         } else {
             config.authentication(AuthMethod::sql_server(user, pass));
         }
@@ -414,10 +383,7 @@ impl MssqlProtocol {
 
         #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
         {
-            return Ok(AuthResult::failure(
-                "Kerberos/Windows Auth not supported",
-                None,
-            ));
+            Ok(AuthResult::failure("Kerberos/Windows Auth not supported", None))
         }
 
         #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]

@@ -13,20 +13,28 @@ use tracing::info;
 pub struct GppPassword;
 
 impl GppPassword {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for GppPassword {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl NxcModule for GppPassword {
-    fn name(&self) -> &'static str { "gpp_password" }
+    fn name(&self) -> &'static str {
+        "gpp_password"
+    }
     fn description(&self) -> &'static str {
         "Extract Group Policy Preference passwords from SYSVOL (MS14-025)"
     }
-    fn supported_protocols(&self) -> &[&str] { &["smb"] }
+    fn supported_protocols(&self) -> &[&str] {
+        &["smb"]
+    }
 
     fn options(&self) -> Vec<ModuleOption> {
         vec![ModuleOption {
@@ -69,10 +77,10 @@ impl NxcModule for GppPassword {
             "Drives/Drives.xml",
         ];
 
-        output.push_str(&format!("  [*] Searching {} share for GPP XML files...\n", share));
+        output.push_str(&format!("  [*] Searching {share} share for GPP XML files...\n"));
 
         for gpp_file in &gpp_files {
-            output.push_str(&format!("  [*] Checking: {}\n", gpp_file));
+            output.push_str(&format!("  [*] Checking: {gpp_file}\n"));
         }
 
         // The publicly known AES key for decrypting cpassword values (MS14-025)

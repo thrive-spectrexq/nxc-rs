@@ -6,6 +6,12 @@ use nxc_protocols::NxcSession;
 
 pub struct PostgresEnum;
 
+impl Default for PostgresEnum {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PostgresEnum {
     pub fn new() -> Self {
         Self

@@ -10,6 +10,12 @@ use tracing::{debug, info};
 
 pub struct WmiEnumModule;
 
+impl Default for WmiEnumModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WmiEnumModule {
     pub fn new() -> Self {
         Self

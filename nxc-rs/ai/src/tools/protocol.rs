@@ -107,8 +107,7 @@ impl NxcTool for ProtocolTool {
             Protocol::Ilo => Arc::new(nxc_protocols::ilo::IloProtocol::new()),
             Protocol::Kube => Arc::new(nxc_protocols::kube::KubeProtocol::new()),
             _ => anyhow::bail!(
-                "Protocol handler for {} not yet integrated into AI tool",
-                protocol_name
+                "Protocol handler for {protocol_name} not yet integrated into AI tool"
             ),
         };
 

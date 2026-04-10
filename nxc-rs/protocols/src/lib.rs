@@ -125,9 +125,7 @@ pub trait NxcProtocol: Send + Sync {
         _path: &str,
         _data: &[u8],
     ) -> Result<()> {
-        Err(anyhow::anyhow!(
-            "File write not supported for this protocol"
-        ))
+        Err(anyhow::anyhow!("File write not supported for this protocol"))
     }
 }
 

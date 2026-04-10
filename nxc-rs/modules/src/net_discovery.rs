@@ -57,9 +57,7 @@ impl NxcModule for NetDiscovery {
         info!("Network: Starting discovery...");
 
         let _network_session = match session.protocol() {
-            "network" => session
-                .downcast_mut::<nxc_protocols::network::NetworkSession>()
-                .unwrap(),
+            "network" => session.downcast_mut::<nxc_protocols::network::NetworkSession>().unwrap(),
             _ => return Err(anyhow::anyhow!("Module only supports network")),
         };
 
@@ -69,10 +67,8 @@ impl NxcModule for NetDiscovery {
             false, None, false, false, false, true, true,
         );
 
-        let port_str = opts
-            .get("ports")
-            .cloned()
-            .unwrap_or_else(|| "22,80,443,445,135,5900,3389,5555".into());
+        let port_str =
+            opts.get("ports").cloned().unwrap_or_else(|| "22,80,443,445,135,5900,3389,5555".into());
         let ports: Vec<(u16, &str)> = port_str
             .split(',')
             .filter_map(|s| {
@@ -118,10 +114,7 @@ impl NxcModule for NetDiscovery {
         }
 
         // 3. Host Discovery using ARP
-        let output = tokio::process::Command::new("arp")
-            .args(["-a"])
-            .output()
-            .await?;
+        let output = tokio::process::Command::new("arp").args(["-a"]).output().await?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut hosts = std::collections::HashSet::new();
@@ -140,11 +133,9 @@ impl NxcModule for NetDiscovery {
                 let ip = parts[0].trim();
                 if ip.chars().all(|c| c.is_ascii_digit() || c == '.')
                     && ip.matches('.').count() == 3
-                {
-                    if !ip.ends_with(".255") && !ip.starts_with("224.") && !ip.starts_with("239.") {
+                    && !ip.ends_with(".255") && !ip.starts_with("224.") && !ip.starts_with("239.") {
                         hosts.insert(ip.to_string());
                     }
-                }
             }
         }
 
@@ -161,14 +152,14 @@ impl NxcModule for NetDiscovery {
             for ip in hosts {
                 let mut host_services = Vec::new();
                 for (port, name) in &ports {
-                    let addr = format!("{}:{}", ip, port);
+                    let addr = format!("{ip}:{port}");
                     let timeout = Duration::from_millis(400);
 
                     if let Ok(Ok(_)) =
                         tokio::time::timeout(timeout, TcpStream::connect(&addr)).await
                     {
                         host_services.push(json!({ "port": port, "service": name }));
-                        output_summary.push_str(&format!("  [+] {}:{} ({})\n", ip, port, name));
+                        output_summary.push_str(&format!("  [+] {ip}:{port} ({name})\n"));
                     }
                 }
                 if !host_services.is_empty() {

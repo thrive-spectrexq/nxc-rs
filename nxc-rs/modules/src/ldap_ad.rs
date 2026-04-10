@@ -14,6 +14,12 @@ use serde_json::json;
 
 pub struct LdapAdModule;
 
+impl Default for LdapAdModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LdapAdModule {
     pub fn new() -> Self {
         Self
@@ -92,12 +98,7 @@ impl NxcModule for LdapAdModule {
             results["delegation"] = json!(delegation);
         }
 
-        Ok(ModuleResult {
-            success: true,
-            output,
-            data: results,
-            credentials: vec![],
-        })
+        Ok(ModuleResult { success: true, output, data: results, credentials: vec![] })
     }
 }
 
@@ -121,12 +122,8 @@ impl LdapAdModule {
 
         let mut results = Vec::new();
         for entry in entries {
-            let name = entry
-                .attrs
-                .get("displayName")
-                .and_then(|v| v.first())
-                .cloned()
-                .unwrap_or_default();
+            let name =
+                entry.attrs.get("displayName").and_then(|v| v.first()).cloned().unwrap_or_default();
             let path = entry
                 .attrs
                 .get("gPCFileSysPath")
@@ -175,12 +172,8 @@ impl LdapAdModule {
                 "3" => "Bidirectional",
                 _ => "Unknown",
             };
-            let t_type = entry
-                .attrs
-                .get("trustType")
-                .and_then(|v| v.first())
-                .cloned()
-                .unwrap_or_default();
+            let t_type =
+                entry.attrs.get("trustType").and_then(|v| v.first()).cloned().unwrap_or_default();
             results.push(json!({"partner": partner, "direction": direction_str, "type": t_type}));
         }
         Ok(results)
@@ -202,11 +195,7 @@ impl LdapAdModule {
                 &base_dn,
                 ldap3::Scope::Subtree,
                 filter,
-                vec![
-                    "sAMAccountName",
-                    "userAccountControl",
-                    "msDS-AllowedToDelegateTo",
-                ],
+                vec!["sAMAccountName", "userAccountControl", "msDS-AllowedToDelegateTo"],
             )
             .await?;
 

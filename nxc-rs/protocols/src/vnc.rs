@@ -51,9 +51,7 @@ pub struct VncProtocol {
 
 impl VncProtocol {
     pub fn new() -> Self {
-        Self {
-            timeout: Duration::from_secs(10),
-        }
+        Self { timeout: Duration::from_secs(10) }
     }
 
     pub fn with_timeout(timeout: Duration) -> Self {
@@ -91,14 +89,14 @@ impl NxcProtocol for VncProtocol {
         port: u16,
         _proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
-        let addr = format!("{}:{}", target, port);
+        let addr = format!("{target}:{port}");
         debug!("VNC: Connecting to {}", addr);
 
         let timeout_fut = tokio::time::timeout(self.timeout, TcpStream::connect(&addr));
         let mut stream = match timeout_fut.await {
             Ok(Ok(s)) => s,
-            Ok(Err(e)) => return Err(anyhow!("Connection refused or unreachable: {}", e)),
-            Err(_) => return Err(anyhow!("Connection timeout to {}", addr)),
+            Ok(Err(e)) => return Err(anyhow!("Connection refused or unreachable: {e}")),
+            Err(_) => return Err(anyhow!("Connection timeout to {addr}")),
         };
 
         // 1. Probe RFB (Remote Frame Buffer) version
@@ -211,9 +209,7 @@ impl NxcProtocol for VncProtocol {
     }
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
-        Err(anyhow!(
-            "VNC explicit command execution requires macro injection (not yet ported)."
-        ))
+        Err(anyhow!("VNC explicit command execution requires macro injection (not yet ported)."))
     }
 }
 
@@ -228,9 +224,7 @@ impl VncProtocol {
         let height = vnc_sess.height;
 
         if width == 0 || height == 0 {
-            return Err(anyhow!(
-                "VNC Display not initialized. Authentication required?"
-            ));
+            return Err(anyhow!("VNC Display not initialized. Authentication required?"));
         }
 
         let stream = match vnc_sess.stream.as_mut() {
@@ -253,17 +247,11 @@ impl VncProtocol {
         stream.read_exact(&mut msg_header).await?;
 
         if msg_header[0] != 0 {
-            return Err(anyhow!(
-                "Expected FramebufferUpdate (0), got {}",
-                msg_header[0]
-            ));
+            return Err(anyhow!("Expected FramebufferUpdate (0), got {}", msg_header[0]));
         }
 
         let n_rects = u16::from_be_bytes([msg_header[2], msg_header[3]]);
-        info!(
-            "VNC: Receiving {} rectangles for {}x{} screenshot",
-            n_rects, width, height
-        );
+        info!("VNC: Receiving {} rectangles for {}x{} screenshot", n_rects, width, height);
 
         let mut fb_data = vec![0u8; (width as usize) * (height as usize) * 4];
         for _ in 0..n_rects {
@@ -317,14 +305,8 @@ impl VncProtocol {
             rgba_data[i + 2] = b;
         }
 
-        image::save_buffer(
-            &path,
-            &rgba_data,
-            width as u32,
-            height as u32,
-            image::ColorType::Rgba8,
-        )
-        .map_err(|e| anyhow!("Failed to save PNG: {}", e))?;
+        image::save_buffer(&path, &rgba_data, width as u32, height as u32, image::ColorType::Rgba8)
+            .map_err(|e| anyhow!("Failed to save PNG: {e}"))?;
 
         info!("VNC: Screenshot saved to {}", path);
         Ok(path)

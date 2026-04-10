@@ -16,11 +16,7 @@ impl GeminiProvider {
         let model = model.unwrap_or_else(|| {
             std::env::var("GEMINI_MODEL").unwrap_or_else(|_| "gemini-2.0-flash".to_string())
         });
-        Self {
-            client: Client::new(),
-            api_key,
-            model,
-        }
+        Self { client: Client::new(), api_key, model }
     }
 }
 
@@ -129,15 +125,13 @@ impl AiProvider for GeminiProvider {
         let status = resp.status();
         if !status.is_success() {
             let err_text = resp.text().await?;
-            anyhow::bail!("Gemini API error ({}): {}", status, err_text);
+            anyhow::bail!("Gemini API error ({status}): {err_text}");
         }
 
         let gemini_resp: GeminiResponse = resp.json().await?;
 
-        let candidate = gemini_resp
-            .candidates
-            .first()
-            .context("No candidates in Gemini response")?;
+        let candidate =
+            gemini_resp.candidates.first().context("No candidates in Gemini response")?;
         let mut text: Option<String> = None;
         let mut tool_calls = Vec::new();
 

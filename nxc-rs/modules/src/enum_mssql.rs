@@ -55,58 +55,45 @@ impl NxcModule for MssqlEnum {
         // 1. Enumerate Logins
         output_lines.push("[*] Enumerating SQL Logins:".to_string());
         match protocol
-            .query_json(
-                mssql_session,
-                "SELECT name, type_desc, is_disabled FROM sys.sql_logins",
-            )
+            .query_json(mssql_session, "SELECT name, type_desc, is_disabled FROM sys.sql_logins")
             .await
         {
             Ok(logins) => {
                 let mut login_list = Vec::new();
                 for login in &logins {
                     if let Some(obj) = login.as_object() {
-                        let name = obj
-                            .get("name")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("Unknown");
+                        let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
                         let disabled =
                             obj.get("is_disabled").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
-                        output_lines.push(format!("    - {} (Disabled: {})", name, disabled));
+                        output_lines.push(format!("    - {name} (Disabled: {disabled})"));
                         login_list.push(login.clone());
                     }
                 }
                 data.insert("logins".to_string(), serde_json::Value::Array(login_list));
             }
-            Err(e) => output_lines.push(format!("    [!] Failed to enumerate logins: {}", e)),
+            Err(e) => output_lines.push(format!("    [!] Failed to enumerate logins: {e}")),
         }
 
         output_lines.push("".to_string());
 
         // 2. Enumerate Databases
         output_lines.push("[*] Enumerating Databases:".to_string());
-        match protocol
-            .query_json(mssql_session, "SELECT name, state_desc FROM sys.databases")
-            .await
+        match protocol.query_json(mssql_session, "SELECT name, state_desc FROM sys.databases").await
         {
             Ok(dbs) => {
                 let mut db_list = Vec::new();
                 for db in &dbs {
                     if let Some(obj) = db.as_object() {
-                        let name = obj
-                            .get("name")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("Unknown");
-                        let state = obj
-                            .get("state_desc")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("Unknown");
-                        output_lines.push(format!("    - {} (State: {})", name, state));
+                        let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                        let state =
+                            obj.get("state_desc").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                        output_lines.push(format!("    - {name} (State: {state})"));
                         db_list.push(db.clone());
                     }
                 }
                 data.insert("databases".to_string(), serde_json::Value::Array(db_list));
             }
-            Err(e) => output_lines.push(format!("    [!] Failed to enumerate databases: {}", e)),
+            Err(e) => output_lines.push(format!("    [!] Failed to enumerate databases: {e}")),
         }
 
         output_lines.push("".to_string());
@@ -130,13 +117,13 @@ impl NxcModule for MssqlEnum {
                     if let Some(obj) = perm.as_object() {
                         let grantor = obj.get("Grantor").and_then(|v| v.as_str()).unwrap_or("?");
                         let grantee = obj.get("Grantee").and_then(|v| v.as_str()).unwrap_or("?");
-                        output_lines.push(format!("    - {} can IMPERSONATE {}", grantee, grantor));
+                        output_lines.push(format!("    - {grantee} can IMPERSONATE {grantor}"));
                         perm_list.push(perm.clone());
                     }
                 }
                 data.insert("impersonate_perms".to_string(), serde_json::Value::Array(perm_list));
             }
-            Err(e) => output_lines.push(format!("    [!] Failed to check impersonate perms: {}", e)),
+            Err(e) => output_lines.push(format!("    [!] Failed to check impersonate perms: {e}")),
         }
 
         Ok(ModuleResult {

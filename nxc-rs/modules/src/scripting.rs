@@ -27,12 +27,7 @@ impl ScriptModule {
         // For now, simpler: use filename
         let description = format!("Script module loaded from {}", path.display());
 
-        Ok(Self {
-            name,
-            description,
-            path,
-            ast,
-        })
+        Ok(Self { name, description, path, ast })
     }
 }
 

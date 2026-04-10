@@ -35,10 +35,7 @@ static TICKET_CACHE: Lazy<Mutex<HashMap<String, KerberosTicket>>> =
 
 impl KerberosClient {
     pub fn new(domain: &str, kdc_ip: &str) -> Self {
-        Self {
-            domain: domain.to_string(),
-            kdc_ip: kdc_ip.to_string(),
-        }
+        Self { domain: domain.to_string(), kdc_ip: kdc_ip.to_string() }
     }
 
     /// Perform a TCP send/receive to the KDC (port 88)
@@ -70,11 +67,7 @@ impl KerberosClient {
 
     /// Helper to request a TGT using a Credentials object.
     pub async fn request_tgt_with_creds(&self, creds: &Credentials) -> Result<KerberosTicket> {
-        let cache_key = format!(
-            "{}@{}",
-            creds.username.to_lowercase(),
-            self.domain.to_lowercase()
-        );
+        let cache_key = format!("{}@{}", creds.username.to_lowercase(), self.domain.to_lowercase());
 
         {
             let cache = TICKET_CACHE.lock().await;
@@ -84,10 +77,7 @@ impl KerberosClient {
             }
         }
 
-        tracing::debug!(
-            "Kerberos: No cached TGT for {}, requesting new one...",
-            cache_key
-        );
+        tracing::debug!("Kerberos: No cached TGT for {}, requesting new one...", cache_key);
         let ticket = self
             .request_tgt(
                 &creds.username,
@@ -116,14 +106,12 @@ impl KerberosClient {
 
         let req_body = KdcReqBody {
             kdc_options: rasn::types::BitString::from_slice(&[0x40, 0x81, 0x00, 0x00]),
-            cname: Some(PrincipalName::new(1, &[username].as_slice())), // NT-PRINCIPAL
+            cname: Some(PrincipalName::new(1, [username].as_slice())), // NT-PRINCIPAL
             realm: Realm::new(&domain_realm),
-            sname: Some(PrincipalName::new(2, &["krbtgt", &domain_realm].as_slice())), // NT-SRV-INST
+            sname: Some(PrincipalName::new(2, ["krbtgt", &domain_realm].as_slice())), // NT-SRV-INST
             from: None,
             till: GeneralizedTime::from(chrono::Utc::now() + chrono::Duration::hours(10)),
-            rtime: Some(GeneralizedTime::from(
-                chrono::Utc::now() + chrono::Duration::days(1),
-            )),
+            rtime: Some(GeneralizedTime::from(chrono::Utc::now() + chrono::Duration::days(1))),
             nonce: rand::rng().random::<u32>() & 0x7FFFFFFF,
             etype: vec![18, 17, 23], // AES256, AES128, RC4
             addresses: None,
@@ -144,7 +132,7 @@ impl KerberosClient {
         if !key.is_empty() {
             let now = GeneralizedTime::from(chrono::Utc::now());
             let ts_der =
-                rasn::der::encode(&now).map_err(|e| anyhow!("ASN.1 encode error: {}", e))?;
+                rasn::der::encode(&now).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
             let enc_ts = encrypt_rc4_hmac(&key, 1, &ts_der)?; // Usage 1
 
             padata.push(PaData {
@@ -154,7 +142,7 @@ impl KerberosClient {
                     kvno: None,
                     cipher: enc_ts.into(),
                 })
-                .map_err(|e| anyhow!("ASN.1 encode error: {}", e))?
+                .map_err(|e| anyhow!("ASN.1 encode error: {e}"))?
                 .into(),
             });
         }
@@ -162,26 +150,22 @@ impl KerberosClient {
         let as_req = AsReq(KdcReq {
             pvno: 5,
             msg_type: 10, // AS-REQ
-            padata: if padata.is_empty() {
-                None
-            } else {
-                Some(padata)
-            },
+            padata: if padata.is_empty() { None } else { Some(padata) },
             req_body,
         });
 
         let req_der =
-            rasn::der::encode(&as_req).map_err(|e| anyhow!("ASN.1 encode error: {}", e))?;
+            rasn::der::encode(&as_req).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
         let resp_der = self._send_tcp_req(&req_der)?;
 
         // Parse AS-REP
         let as_rep: AsRep =
-            rasn::der::decode(&resp_der).map_err(|e| anyhow!("ASN.1 decode error: {}", e))?;
+            rasn::der::decode(&resp_der).map_err(|e| anyhow!("ASN.1 decode error: {e}"))?;
 
         // Decrypt EncPart
         let enc_part = decrypt_rc4_hmac(&key, 3, &as_rep.0.enc_part.cipher)?; // Usage 3
         let decrypted_part: EncAsRepPart =
-            rasn::der::decode(&enc_part).map_err(|e| anyhow!("Decryption parse error: {}", e))?;
+            rasn::der::decode(&enc_part).map_err(|e| anyhow!("Decryption parse error: {e}"))?;
 
         Ok(KerberosTicket {
             client_realm: self.domain.clone(),
@@ -190,7 +174,7 @@ impl KerberosClient {
             server_name: "krbtgt".to_string(),
             session_key: decrypted_part.0.key.keyvalue.to_vec(),
             ticket_data: rasn::der::encode(&as_rep.0.ticket)
-                .map_err(|e| anyhow!("Ticket re-encode error: {}", e))?,
+                .map_err(|e| anyhow!("Ticket re-encode error: {e}"))?,
             enc_type: EncryptionType::Rc4Hmac,
         })
     }
@@ -206,9 +190,7 @@ impl KerberosClient {
             sname: Some(PrincipalName::new(2, &spn_parts)), // NT-SRV-INST
             from: None,
             till: GeneralizedTime::from(chrono::Utc::now() + chrono::Duration::hours(10)),
-            rtime: Some(GeneralizedTime::from(
-                chrono::Utc::now() + chrono::Duration::days(1),
-            )),
+            rtime: Some(GeneralizedTime::from(chrono::Utc::now() + chrono::Duration::days(1))),
             nonce: rand::rng().random::<u32>() & 0x7FFFFFFF,
             etype: vec![18, 17, 23],
             addresses: None,
@@ -230,17 +212,17 @@ impl KerberosClient {
         });
 
         let req_der =
-            rasn::der::encode(&tgs_req).map_err(|e| anyhow!("ASN.1 encode error: {}", e))?;
+            rasn::der::encode(&tgs_req).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
         let resp_der = self._send_tcp_req(&req_der)?;
 
         // Parse TGS-REP
         let tgs_rep: TgsRep =
-            rasn::der::decode(&resp_der).map_err(|e| anyhow!("ASN.1 decode error: {}", e))?;
+            rasn::der::decode(&resp_der).map_err(|e| anyhow!("ASN.1 decode error: {e}"))?;
 
         // Decrypt EncPart
         let enc_part = decrypt_rc4_hmac(&tgt.session_key, 8, &tgs_rep.0.enc_part.cipher)?; // Usage 8
         let decrypted_part: EncTgsRepPart =
-            rasn::der::decode(&enc_part).map_err(|e| anyhow!("Decryption parse error: {}", e))?;
+            rasn::der::decode(&enc_part).map_err(|e| anyhow!("Decryption parse error: {e}"))?;
 
         Ok(KerberosTicket {
             client_realm: self.domain.clone(),
@@ -249,7 +231,7 @@ impl KerberosClient {
             server_name: spn.to_string(),
             session_key: decrypted_part.0.key.keyvalue.to_vec(),
             ticket_data: rasn::der::encode(&tgs_rep.0.ticket)
-                .map_err(|e| anyhow!("Ticket re-encode error: {}", e))?,
+                .map_err(|e| anyhow!("Ticket re-encode error: {e}"))?,
             enc_type: EncryptionType::Rc4Hmac,
         })
     }
@@ -259,7 +241,7 @@ impl KerberosClient {
         let authenticator = Authenticator {
             authenticator_vno: 5,
             crealm: Realm::new(&tgt.client_realm),
-            cname: PrincipalName::new(1, &[tgt.client_name.as_str()].as_slice()), // NT-PRINCIPAL
+            cname: PrincipalName::new(1, [tgt.client_name.as_str()].as_slice()), // NT-PRINCIPAL
             cksum: None,
             cusec: 0,
             ctime: now,
@@ -269,7 +251,7 @@ impl KerberosClient {
         };
 
         let auth_der =
-            rasn::der::encode(&authenticator).map_err(|e| anyhow!("ASN.1 encode error: {}", e))?;
+            rasn::der::encode(&authenticator).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
         let enc_auth = encrypt_rc4_hmac(&tgt.session_key, 11, &auth_der)?; // Usage 11
 
         let ap_req = ApReq {
@@ -277,14 +259,10 @@ impl KerberosClient {
             msg_type: 14, // AP-REQ
             ap_options: rasn::types::BitString::from_slice(&[0x00, 0x00, 0x00, 0x00]),
             ticket: rasn::der::decode(&tgt.ticket_data)
-                .map_err(|e| anyhow!("Ticket parse error: {}", e))?,
-            authenticator: EncryptedData {
-                etype: 23,
-                kvno: None,
-                cipher: enc_auth.into(),
-            },
+                .map_err(|e| anyhow!("Ticket parse error: {e}"))?,
+            authenticator: EncryptedData { etype: 23, kvno: None, cipher: enc_auth.into() },
         };
 
-        rasn::der::encode(&ap_req).map_err(|e| anyhow!("ASN.1 encode error: {}", e))
+        rasn::der::encode(&ap_req).map_err(|e| anyhow!("ASN.1 encode error: {e}"))
     }
 }

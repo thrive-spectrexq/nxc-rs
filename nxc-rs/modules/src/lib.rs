@@ -72,37 +72,37 @@ pub mod wmi_persist;
 pub mod zerologon;
 
 // ─── Phase 1: SMB/AD Core Modules ───────────────────────────────
+pub mod add_computer;
+pub mod backup_operator;
 pub mod enum_av;
-pub mod gpp_password;
-pub mod gpp_autologin;
-pub mod ms17_010;
 pub mod enum_impersonate;
-pub mod runasppl;
-pub mod wdigest;
-pub mod uac;
+pub mod enum_trusts;
+pub mod gpp_autologin;
+pub mod gpp_password;
+pub mod ms17_010;
+pub mod ntds_dump_raw;
+pub mod ntlmv1;
+pub mod printnightmare;
 pub mod reg_query;
 pub mod reg_winlogon;
-pub mod spooler;
-pub mod printnightmare;
-pub mod ntlmv1;
-pub mod enum_trusts;
-pub mod ntds_dump_raw;
-pub mod backup_operator;
+pub mod runasppl;
 pub mod sccm;
-pub mod add_computer;
 pub mod shadowcoerce;
+pub mod spooler;
+pub mod uac;
+pub mod wdigest;
 
 // ─── Phase 2: LDAP/AD Enumeration Modules ───────────────────────
 pub mod daclread;
 pub mod delegation;
-pub mod rbcd;
+pub mod find_computer;
 pub mod get_desc_users;
 pub mod get_info_users;
 pub mod group_mem;
-pub mod subnets;
+pub mod ldap_enumeration;
 pub mod pso;
-pub mod find_computer;
-pub mod ldap_enumeration; // get_network, get_unixpassword, ldap_checker, obsolete, pre2k
+pub mod rbcd;
+pub mod subnets; // get_network, get_unixpassword, ldap_checker, obsolete, pre2k
 
 // ─── Phase 3-6: MSSQL, Cred Harvesting, Persistence, Advanced ──
 pub mod advanced_modules;
@@ -416,7 +416,8 @@ impl ModuleRegistry {
         modules.insert("gpp_password".into(), Box::new(gpp_password::GppPassword::new()));
         modules.insert("gpp_autologin".into(), Box::new(gpp_autologin::GppAutologin::new()));
         modules.insert("ms17_010".into(), Box::new(ms17_010::Ms17010::new()));
-        modules.insert("enum_impersonate".into(), Box::new(enum_impersonate::EnumImpersonate::new()));
+        modules
+            .insert("enum_impersonate".into(), Box::new(enum_impersonate::EnumImpersonate::new()));
         modules.insert("runasppl".into(), Box::new(runasppl::RunAsPpl::new()));
         modules.insert("wdigest".into(), Box::new(wdigest::Wdigest::new()));
         modules.insert("uac".into(), Box::new(uac::Uac::new()));
@@ -443,7 +444,8 @@ impl ModuleRegistry {
         modules.insert("pso".into(), Box::new(pso::Pso::new()));
         modules.insert("find_computer".into(), Box::new(find_computer::FindComputer::new()));
         modules.insert("get_network".into(), Box::new(ldap_enumeration::GetNetwork::new()));
-        modules.insert("get_unixpassword".into(), Box::new(ldap_enumeration::GetUnixPassword::new()));
+        modules
+            .insert("get_unixpassword".into(), Box::new(ldap_enumeration::GetUnixPassword::new()));
         modules.insert("ldap_checker".into(), Box::new(ldap_enumeration::LdapChecker::new()));
         modules.insert("obsolete".into(), Box::new(ldap_enumeration::Obsolete::new()));
         modules.insert("pre2k".into(), Box::new(ldap_enumeration::Pre2k::new()));
@@ -459,7 +461,8 @@ impl ModuleRegistry {
         // ─── Phase 4: Credential Harvesting (10 modules) ───────────
         modules.insert("firefox".into(), Box::new(advanced_modules::FirefoxCreds::new()));
         modules.insert("winscp".into(), Box::new(advanced_modules::WinscpCreds::new()));
-        modules.insert("keepass_discover".into(), Box::new(advanced_modules::KeepassDiscover::new()));
+        modules
+            .insert("keepass_discover".into(), Box::new(advanced_modules::KeepassDiscover::new()));
         modules.insert("keepass_trigger".into(), Box::new(advanced_modules::KeepassTrigger::new()));
         modules.insert("mremoteng".into(), Box::new(advanced_modules::MremotengCreds::new()));
         modules.insert("rdcman".into(), Box::new(advanced_modules::RdcmanCreds::new()));
@@ -477,7 +480,8 @@ impl ModuleRegistry {
         modules.insert("met_inject".into(), Box::new(advanced_modules::MetInject::new()));
         modules.insert("empire_exec".into(), Box::new(advanced_modules::EmpireExec::new()));
         modules.insert("web_delivery".into(), Box::new(advanced_modules::WebDelivery::new()));
-        modules.insert("lockscreendoors".into(), Box::new(advanced_modules::LockScreenDoors::new()));
+        modules
+            .insert("lockscreendoors".into(), Box::new(advanced_modules::LockScreenDoors::new()));
 
         // ─── Phase 6: RS-Exclusive Advanced (6 modules) ────────────
         modules.insert("amsi_bypass".into(), Box::new(advanced_modules::AmsiBypass::new()));
@@ -507,11 +511,7 @@ impl ModuleRegistry {
     pub fn list(&self, protocol: Option<&str>) -> Vec<&dyn NxcModule> {
         self.modules
             .values()
-            .filter(|m| {
-                protocol
-                    .map(|p| m.supported_protocols().contains(&p))
-                    .unwrap_or(true)
-            })
+            .filter(|m| protocol.map(|p| m.supported_protocols().contains(&p)).unwrap_or(true))
             .map(|m| m.as_ref())
             .collect()
     }

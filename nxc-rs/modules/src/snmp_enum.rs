@@ -6,6 +6,12 @@ use nxc_protocols::NxcSession;
 
 pub struct SnmpEnum;
 
+impl Default for SnmpEnum {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SnmpEnum {
     pub fn new() -> Self {
         Self

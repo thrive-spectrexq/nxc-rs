@@ -32,10 +32,7 @@ pub struct PrincipalName {
 
 impl PrincipalName {
     pub fn new(name_type: Int32, names: &[&str]) -> Self {
-        Self {
-            name_type,
-            name_string: names.iter().map(|s| krb_string(s)).collect(),
-        }
+        Self { name_type, name_string: names.iter().map(|s| krb_string(s)).collect() }
     }
 }
 

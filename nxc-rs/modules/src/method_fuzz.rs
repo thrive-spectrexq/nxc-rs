@@ -54,10 +54,7 @@ impl NxcModule for MethodFuzz {
 
         let path = opts.get("PATH").map(|s| s.as_str()).unwrap_or("/");
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
-        let url = format!(
-            "{}://{}:{}{}",
-            scheme, http_sess.target, http_sess.port, path
-        );
+        let url = format!("{}://{}:{}{}", scheme, http_sess.target, http_sess.port, path);
 
         info!("Starting HTTP Method Fuzzing against {}", url);
 
@@ -112,7 +109,7 @@ impl NxcModule for MethodFuzz {
                         );
                     }
                     if (name == "PUT" || name == "DELETE") && status.is_success() {
-                        output.push_str(&format!("      -> HIGH: {} is functionally allowed! File modification may be possible.\n", name));
+                        output.push_str(&format!("      -> HIGH: {name} is functionally allowed! File modification may be possible.\n"));
                     }
                 } else {
                     output.push_str(&format!(

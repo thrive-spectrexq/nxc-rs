@@ -1,5 +1,5 @@
 use super::{AiProvider, AiResponse, Message, ToolDefinition};
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use async_trait::async_trait;
 
 pub struct OpenAiProvider {
@@ -9,10 +9,7 @@ pub struct OpenAiProvider {
 
 impl OpenAiProvider {
     pub fn new(api_key: String, model: Option<String>) -> Self {
-        Self {
-            api_key,
-            model: model.unwrap_or_else(|| "gpt-4o".to_string()),
-        }
+        Self { api_key, model: model.unwrap_or_else(|| "gpt-4o".to_string()) }
     }
 }
 

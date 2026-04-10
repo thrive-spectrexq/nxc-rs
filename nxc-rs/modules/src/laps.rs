@@ -55,9 +55,7 @@ impl NxcModule for Laps {
         let computer_filter = opts.get("COMPUTER").map(|s| s.as_str()).unwrap_or("*");
 
         let ldap_session = match session.protocol() {
-            "ldap" => session
-                .downcast_mut::<nxc_protocols::ldap::LdapSession>()
-                .unwrap(),
+            "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap(),
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
@@ -72,8 +70,7 @@ impl NxcModule for Laps {
 
         // Filter for computers with any LAPS attributes
         let filter = format!(
-            "(&(objectCategory=computer)(|(ms-MCS-AdmPwd=*)(msLAPS-Password=*)(msLAPS-EncryptedPassword=*))(name={}))",
-            computer_filter
+            "(&(objectCategory=computer)(|(ms-MCS-AdmPwd=*)(msLAPS-Password=*)(msLAPS-EncryptedPassword=*))(name={computer_filter}))"
         );
 
         let attrs = vec![
@@ -85,15 +82,8 @@ impl NxcModule for Laps {
             "msLAPS-PasswordExpirationTime",
         ];
 
-        let entries = protocol
-            .search(
-                ldap_session,
-                &base_dn,
-                ldap3::Scope::Subtree,
-                &filter,
-                attrs,
-            )
-            .await?;
+        let entries =
+            protocol.search(ldap_session, &base_dn, ldap3::Scope::Subtree, &filter, attrs).await?;
 
         let mut output_lines = Vec::new();
         let mut laps_results = Vec::new();
@@ -101,18 +91,11 @@ impl NxcModule for Laps {
         output_lines.push("🛸 <b>LAPS Intelligence Extraction</b>\n".to_string());
 
         if entries.is_empty() {
-            output_lines.push(format!(
-                "No computers found matching filter: {}",
-                computer_filter
-            ));
+            output_lines.push(format!("No computers found matching filter: {computer_filter}"));
         } else {
             for entry in &entries {
-                let name = entry
-                    .attrs
-                    .get("name")
-                    .and_then(|v| v.first())
-                    .cloned()
-                    .unwrap_or_default();
+                let name =
+                    entry.attrs.get("name").and_then(|v| v.first()).cloned().unwrap_or_default();
                 let sam = entry
                     .attrs
                     .get("sAMAccountName")
@@ -121,10 +104,8 @@ impl NxcModule for Laps {
                     .unwrap_or_default();
 
                 let mut expiration = "Never".to_string();
-                if let Some(exp_str) = entry
-                    .attrs
-                    .get("msLAPS-PasswordExpirationTime")
-                    .and_then(|v| v.first())
+                if let Some(exp_str) =
+                    entry.attrs.get("msLAPS-PasswordExpirationTime").and_then(|v| v.first())
                 {
                     if let Ok(exp_val) = exp_str.parse::<i64>() {
                         // Windows FileTime is 100ns intervals since 1601-01-01
@@ -141,10 +122,8 @@ impl NxcModule for Laps {
                     ("Legacy", p.clone())
                 } else if let Some(p) = entry.attrs.get("msLAPS-Password").and_then(|v| v.first()) {
                     ("New-Clear", p.clone())
-                } else if let Some(p_bin) = entry
-                    .bin_attrs
-                    .get("msLAPS-EncryptedPassword")
-                    .and_then(|v| v.first())
+                } else if let Some(p_bin) =
+                    entry.bin_attrs.get("msLAPS-EncryptedPassword").and_then(|v| v.first())
                 {
                     (
                         "New-Encrypted",
@@ -158,8 +137,7 @@ impl NxcModule for Laps {
                 };
 
                 let line = format!(
-                    "{:<15} | {:<12} | Exp: {:<19} | Pwd: {}",
-                    name, version, expiration, password
+                    "{name:<15} | {version:<12} | Exp: {expiration:<19} | Pwd: {password}"
                 );
                 output_lines.push(line);
 

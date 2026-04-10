@@ -12,13 +12,7 @@ use tracing::info;
 pub fn generate_hosts_file(domain: &str, dc_ip: &str, dc_name: &str) -> String {
     let mut output = String::new();
     output.push_str("# NXC-RS Generated Hosts Entries\n");
-    output.push_str(&format!(
-        "{:<15} {} {}.{}\n",
-        dc_ip,
-        dc_name,
-        dc_name,
-        domain.to_lowercase()
-    ));
+    output.push_str(&format!("{:<15} {} {}.{}\n", dc_ip, dc_name, dc_name, domain.to_lowercase()));
     output.push_str(&format!("{:<15} {}\n", dc_ip, domain.to_lowercase()));
     output
 }

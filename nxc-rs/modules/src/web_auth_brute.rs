@@ -82,47 +82,20 @@ impl NxcModule for WebAuthBrute {
             .ok_or_else(|| anyhow!("Module requires an HTTP session"))?;
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
-        let path = opts
-            .get("PATH")
-            .ok_or_else(|| anyhow!("PATH is required"))?;
-        let user_field = opts
-            .get("USER_FIELD")
-            .map(|s| s.as_str())
-            .unwrap_or("username");
-        let pass_field = opts
-            .get("PASS_FIELD")
-            .map(|s| s.as_str())
-            .unwrap_or("password");
-        let fail_text = opts
-            .get("FAIL_TEXT")
-            .map(|s| s.as_str())
-            .unwrap_or("Invalid");
-        let threads = opts
-            .get("THREADS")
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(20);
+        let path = opts.get("PATH").ok_or_else(|| anyhow!("PATH is required"))?;
+        let user_field = opts.get("USER_FIELD").map(|s| s.as_str()).unwrap_or("username");
+        let pass_field = opts.get("PASS_FIELD").map(|s| s.as_str()).unwrap_or("password");
+        let fail_text = opts.get("FAIL_TEXT").map(|s| s.as_str()).unwrap_or("Invalid");
+        let threads = opts.get("THREADS").and_then(|s| s.parse::<usize>().ok()).unwrap_or(20);
 
-        let url = format!(
-            "{}://{}:{}{}",
-            scheme, http_sess.target, http_sess.port, path
-        );
+        let url = format!("{}://{}:{}{}", scheme, http_sess.target, http_sess.port, path);
 
         // Small built-in common list, in a real scenario this should combine with global creds logic
         let default_users = vec!["admin", "root", "user", "test", "administrator"];
-        let default_passwords = vec![
-            "admin",
-            "password",
-            "123456",
-            "12345678",
-            "admin123",
-            "root",
-            "password123",
-        ];
+        let default_passwords =
+            vec!["admin", "password", "123456", "12345678", "admin123", "root", "password123"];
 
-        info!(
-            "Starting Web Auth Brute towards {} (Threads: {})",
-            url, threads
-        );
+        info!("Starting Web Auth Brute towards {} (Threads: {})", url, threads);
 
         let sem = Arc::new(Semaphore::new(threads));
         let mut tasks = Vec::new();
@@ -139,7 +112,7 @@ impl NxcModule for WebAuthBrute {
                 let f_t = fail_text.to_string();
 
                 tasks.push(tokio::spawn(async move {
-                    let form_body = format!("{}={}&{}={}", u_f, username, p_f, password);
+                    let form_body = format!("{u_f}={username}&{p_f}={password}");
 
                     let req = client
                         .post(&target_url)
@@ -185,10 +158,7 @@ impl NxcModule for WebAuthBrute {
 
         for task in tasks {
             if let Ok(Some((username, password, reason))) = task.await {
-                output.push_str(&format!(
-                    "  [+] VALID: {}:{} - {}\n",
-                    username, password, reason
-                ));
+                output.push_str(&format!("  [+] VALID: {username}:{password} - {reason}\n"));
                 successful.push(json!({"username": username, "password": password}));
                 credentials_list.push(Credentials {
                     username,

@@ -67,7 +67,7 @@ impl NfsShares {
                     output_lines.push("  No exported shares found.".to_string());
                 } else {
                     for share in &shares {
-                        output_lines.push(format!("  {}", share));
+                        output_lines.push(format!("  {share}"));
                     }
                 }
                 Ok(ModuleResult {
@@ -80,7 +80,7 @@ impl NfsShares {
             Err(e) => Ok(ModuleResult {
                 credentials: vec![],
                 success: false,
-                output: format!("Failed to list NFS exports: {}", e),
+                output: format!("Failed to list NFS exports: {e}"),
                 data: serde_json::Value::Null,
             }),
         }
@@ -97,7 +97,7 @@ impl NfsShares {
 
         let mut output = String::from("Available SMB Shares:\n");
         for share in &shares {
-            output.push_str(&format!("  {}\n", share));
+            output.push_str(&format!("  {share}\n"));
         }
 
         Ok(ModuleResult {

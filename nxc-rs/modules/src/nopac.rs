@@ -29,7 +29,7 @@ impl NxcModule for Nopac {
     }
 
     fn supported_protocols(&self) -> &[&str] {
-        &["smb"].as_slice()
+        ["smb"].as_slice()
     }
 
     fn options(&self) -> Vec<ModuleOption> {
@@ -51,9 +51,7 @@ impl NxcModule for Nopac {
 
         Ok(ModuleResult {
             success: true,
-            output: format!(
-                "[+] VULNERABLE: Domain Controller is susceptible to NoPac privilege escalation"
-            ),
+            output: "[+] VULNERABLE: Domain Controller is susceptible to NoPac privilege escalation".to_string(),
             data: serde_json::json!({"vulnerable": true, "cve": "2021-42287"}),
             credentials: vec![],
         })

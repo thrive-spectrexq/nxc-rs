@@ -48,9 +48,7 @@ pub struct PostgresProtocol {
 
 impl PostgresProtocol {
     pub fn new() -> Self {
-        Self {
-            timeout: Duration::from_secs(5),
-        }
+        Self { timeout: Duration::from_secs(5) }
     }
 }
 
@@ -84,7 +82,7 @@ impl NxcProtocol for PostgresProtocol {
         port: u16,
         _proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
-        let addr = format!("{}:{}", target, port);
+        let addr = format!("{target}:{port}");
         debug!("Postgres: Connecting to {}", addr);
 
         // Basic TCP check or initial handshake attempt
@@ -99,8 +97,8 @@ impl NxcProtocol for PostgresProtocol {
                     credentials: None,
                 }))
             }
-            Ok(Err(e)) => Err(anyhow!("Connection failed: {}", e)),
-            Err(_) => Err(anyhow!("Connection timeout to {}", addr)),
+            Ok(Err(e)) => Err(anyhow!("Connection failed: {e}")),
+            Err(_) => Err(anyhow!("Connection timeout to {addr}")),
         }
     }
 
@@ -122,8 +120,7 @@ impl NxcProtocol for PostgresProtocol {
         let port = pg_sess.port;
 
         let config = format!(
-            "host={} port={} user={} password={} dbname=postgres",
-            target, port, username, password
+            "host={target} port={port} user={username} password={password} dbname=postgres"
         );
         debug!("Postgres: Authenticating {}@{}", username, target);
 
@@ -144,10 +141,7 @@ impl NxcProtocol for PostgresProtocol {
                 // Check for admin role
                 let mut is_admin = false;
                 if let Ok(rows) = client
-                    .query(
-                        "SELECT rolsuper FROM pg_roles WHERE rolname = current_user",
-                        &[],
-                    )
+                    .query("SELECT rolsuper FROM pg_roles WHERE rolname = current_user", &[])
                     .await
                 {
                     if let Some(row) = rows.first() {
@@ -183,10 +177,7 @@ impl NxcProtocol for PostgresProtocol {
             ));
         }
 
-        let creds = pg_sess
-            .credentials
-            .as_ref()
-            .ok_or_else(|| anyhow!("Not authenticated"))?;
+        let creds = pg_sess.credentials.as_ref().ok_or_else(|| anyhow!("Not authenticated"))?;
         let config = format!(
             "host={} port={} user={} password={} dbname=postgres",
             pg_sess.target,
@@ -204,31 +195,17 @@ impl NxcProtocol for PostgresProtocol {
 
         // Attempting RCE via COPY FROM PROGRAM (requires superuser)
         // Creating a temporary table to store output
-        let table_name = format!(
-            "nxc_exec_{}",
-            &uuid::Uuid::new_v4().simple().to_string()[..8]
-        );
+        let table_name = format!("nxc_exec_{}", &uuid::Uuid::new_v4().simple().to_string()[..8]);
 
+        client.execute(&format!("CREATE TEMP TABLE {table_name} (output text)"), &[]).await?;
         client
             .execute(
-                &format!("CREATE TEMP TABLE {} (output text)", table_name),
-                &[],
-            )
-            .await?;
-        client
-            .execute(
-                &format!(
-                    "COPY {} FROM PROGRAM '{}'",
-                    table_name,
-                    cmd.replace('\'', "''")
-                ),
+                &format!("COPY {} FROM PROGRAM '{}'", table_name, cmd.replace('\'', "''")),
                 &[],
             )
             .await?;
 
-        let rows = client
-            .query(&format!("SELECT * FROM {}", table_name), &[])
-            .await?;
+        let rows = client.query(&format!("SELECT * FROM {table_name}"), &[]).await?;
         let mut stdout = String::new();
         for row in rows {
             let line: String = row.get(0);
@@ -236,21 +213,14 @@ impl NxcProtocol for PostgresProtocol {
             stdout.push('\n');
         }
 
-        Ok(CommandOutput {
-            stdout,
-            stderr: String::new(),
-            exit_code: Some(0),
-        })
+        Ok(CommandOutput { stdout, stderr: String::new(), exit_code: Some(0) })
     }
 }
 
 impl PostgresProtocol {
     /// List all databases.
     pub async fn list_databases(&self, session: &PostgresSession) -> Result<Vec<String>> {
-        let creds = session
-            .credentials
-            .as_ref()
-            .ok_or_else(|| anyhow!("Not authenticated"))?;
+        let creds = session.credentials.as_ref().ok_or_else(|| anyhow!("Not authenticated"))?;
         let config = format!(
             "host={} port={} user={} password={} dbname=postgres",
             session.target,
@@ -264,16 +234,9 @@ impl PostgresProtocol {
             let _ = connection.await;
         });
 
-        let rows = client
-            .query(
-                "SELECT datname FROM pg_database WHERE datallowconn = true",
-                &[],
-            )
-            .await?;
-        let dbs = rows
-            .into_iter()
-            .map(|row| row.get::<_, String>(0))
-            .collect();
+        let rows =
+            client.query("SELECT datname FROM pg_database WHERE datallowconn = true", &[]).await?;
+        let dbs = rows.into_iter().map(|row| row.get::<_, String>(0)).collect();
         Ok(dbs)
     }
 }

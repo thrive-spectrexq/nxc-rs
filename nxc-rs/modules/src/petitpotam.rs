@@ -46,9 +46,8 @@ impl NxcModule for Petitpotam {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let listener = opts
-            .get("LISTENER")
-            .ok_or_else(|| anyhow::anyhow!("LISTENER option required"))?;
+        let listener =
+            opts.get("LISTENER").ok_or_else(|| anyhow::anyhow!("LISTENER option required"))?;
         let smb_session = match session.protocol() {
             "smb" => unsafe {
                 &*(session as *const dyn NxcSession as *const nxc_protocols::smb::SmbSession)
@@ -68,10 +67,7 @@ impl NxcModule for Petitpotam {
 
         Ok(ModuleResult {
             success: true,
-            output: format!(
-                "[+] Successfully sent PetitPotam trigger to {}",
-                smb_session.target
-            ),
+            output: format!("[+] Successfully sent PetitPotam trigger to {}", smb_session.target),
             data: serde_json::json!({"coercion": "efsr"}),
             credentials: vec![],
         })

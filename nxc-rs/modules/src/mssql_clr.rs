@@ -14,6 +14,12 @@ use serde_json::json;
 
 pub struct MssqlClr;
 
+impl Default for MssqlClr {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MssqlClr {
     pub fn new() -> Self {
         Self
@@ -70,12 +76,9 @@ impl NxcModule for MssqlClr {
                 output.push_str("[+] CLR execution disabled on target.\n");
                 results["status"] = json!("disabled");
             }
-            "list" | _ => {
+            _ => {
                 let assemblies = self.list_assemblies(&proto, mssql_sess).await?;
-                output.push_str(&format!(
-                    "\n[+] Loaded Assemblies ({}):\n",
-                    assemblies.len()
-                ));
+                output.push_str(&format!("\n[+] Loaded Assemblies ({}):\n", assemblies.len()));
                 for ass in &assemblies {
                     output.push_str(&format!(
                         "  - {} (Permissions: {})\n",
@@ -86,12 +89,7 @@ impl NxcModule for MssqlClr {
             }
         }
 
-        Ok(ModuleResult {
-            success: true,
-            output,
-            data: results,
-            credentials: vec![],
-        })
+        Ok(ModuleResult { success: true, output, data: results, credentials: vec![] })
     }
 }
 

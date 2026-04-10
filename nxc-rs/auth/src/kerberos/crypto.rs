@@ -84,7 +84,7 @@ pub fn decrypt_rc4_hmac(key: &[u8], key_usage: u32, ciphertext: &[u8]) -> Result
     // 4. Decrypt data using RC4(K3)
     let k3_array: &[u8; 16] = k3[..16].try_into().unwrap();
     let mut rc4 =
-        Rc4::new_from_slice(k3_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {}", e))?;
+        Rc4::new_from_slice(k3_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {e}"))?;
     let mut decrypted = enc_data.to_vec();
     rc4.apply_keystream(&mut decrypted);
 
@@ -140,7 +140,7 @@ pub fn encrypt_rc4_hmac(key: &[u8], key_usage: u32, plaintext: &[u8]) -> Result<
     // 6. Encrypt data with RC4(K3)
     let k3_array: &[u8; 16] = k3[..16].try_into().unwrap();
     let mut rc4_key =
-        Rc4::new_from_slice(k3_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {}", e))?;
+        Rc4::new_from_slice(k3_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {e}"))?;
     rc4_key.apply_keystream(&mut data);
 
     // 7. Format output: Checksum + EncryptedData
@@ -193,7 +193,7 @@ pub fn decrypt_aes(
         let mut cipher = cbc::Decryptor::<Aes256>::new(key_arr.into(), &iv.into());
         // For CTS, if length is not multiple of 16, we'd need special handling.
         // AD usually pads.
-        if decrypted.len().is_multiple_of(16) {
+        if decrypted.len() % 16 == 0 {
             cipher.decrypt_blocks_mut(unsafe {
                 std::slice::from_raw_parts_mut(
                     decrypted.as_mut_ptr() as *mut _,

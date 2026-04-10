@@ -8,9 +8,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use nxc_protocols::NxcSession;
 use serde_json::json;
-use tracing::info;
 use std::time::Duration;
 use tokio::net::TcpStream;
+use tracing::info;
 
 pub struct WifiRecon {}
 
@@ -55,9 +55,11 @@ impl NxcModule for WifiRecon {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         info!("WiFi: Starting reconnaissance...");
-        
-        let port_str = opts.get("ports").cloned().unwrap_or_else(|| "22,80,443,445,135,5900,3389,5555".into());
-        let ports: Vec<(u16, &str)> = port_str.split(',')
+
+        let port_str =
+            opts.get("ports").cloned().unwrap_or_else(|| "22,80,443,445,135,5900,3389,5555".into());
+        let ports: Vec<(u16, &str)> = port_str
+            .split(',')
             .filter_map(|s| {
                 let p = s.trim().parse::<u16>().ok()?;
                 let name = match p {
@@ -76,17 +78,17 @@ impl NxcModule for WifiRecon {
             .collect();
 
         // 1. Host Discovery using ARP
-        let output = tokio::process::Command::new("arp")
-            .args(["-a"])
-            .output()
-            .await?;
+        let output = tokio::process::Command::new("arp").args(["-a"]).output().await?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut hosts = std::collections::HashSet::new();
 
         for line in stdout.lines() {
             let line = line.trim();
-            if line.is_empty() || line.starts_with("Interface:") || line.starts_with("Internet Address") {
+            if line.is_empty()
+                || line.starts_with("Interface:")
+                || line.starts_with("Internet Address")
+            {
                 continue;
             }
 
@@ -94,7 +96,9 @@ impl NxcModule for WifiRecon {
             if !parts.is_empty() {
                 let ip = parts[0].trim();
                 // Basic IP validation (v4)
-                if ip.chars().all(|c| c.is_ascii_digit() || c == '.') && ip.matches('.').count() == 3 {
+                if ip.chars().all(|c| c.is_ascii_digit() || c == '.')
+                    && ip.matches('.').count() == 3
+                {
                     // Ignore broadcast/multicast
                     if !ip.ends_with(".255") && !ip.starts_with("224.") && !ip.starts_with("239.") {
                         hosts.insert(ip.to_string());
@@ -105,24 +109,29 @@ impl NxcModule for WifiRecon {
 
         if hosts.is_empty() {
             return Ok(ModuleResult {
-                credentials: vec![], success: false,
+                credentials: vec![],
+                success: false,
                 output: "No hosts discovered on the local network via ARP.".to_string(),
                 data: json!({}),
             });
         }
 
-        let mut output_summary = format!("[*] Discovered {} potential hosts. Fingerprinting {} ports...\n", hosts.len(), ports.len());
+        let mut output_summary = format!(
+            "[*] Discovered {} potential hosts. Fingerprinting {} ports...\n",
+            hosts.len(),
+            ports.len()
+        );
         let mut discovered_services = Vec::new();
 
         for ip in hosts {
             let mut host_services = Vec::new();
             for (port, name) in &ports {
-                let addr = format!("{}:{}", ip, port);
+                let addr = format!("{ip}:{port}");
                 let timeout = Duration::from_millis(400); // Faster probe
 
                 if let Ok(Ok(_)) = tokio::time::timeout(timeout, TcpStream::connect(&addr)).await {
                     host_services.push(json!({ "port": port, "service": name }));
-                    output_summary.push_str(&format!("  [+] {}:{} ({})\n", ip, port, name));
+                    output_summary.push_str(&format!("  [+] {ip}:{port} ({name})\n"));
                 }
             }
             if !host_services.is_empty() {
@@ -138,7 +147,8 @@ impl NxcModule for WifiRecon {
         }
 
         Ok(ModuleResult {
-            credentials: vec![], success: true,
+            credentials: vec![],
+            success: true,
             output: output_summary,
             data: json!({ "hosts": discovered_services }),
         })

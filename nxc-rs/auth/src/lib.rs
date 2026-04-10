@@ -188,11 +188,7 @@ impl AuthResult {
         Self {
             success: true,
             admin,
-            message: if admin {
-                "Pwn3d!".to_string()
-            } else {
-                "Authenticated".to_string()
-            },
+            message: if admin { "Pwn3d!".to_string() } else { "Authenticated".to_string() },
             error_code: None,
         }
     }
@@ -275,9 +271,9 @@ mod tests {
     #[test]
     fn test_auth_result_display() {
         let success = AuthResult::success(true);
-        assert!(format!("{}", success).contains("Pwn3d!"));
+        assert!(format!("{success}").contains("Pwn3d!"));
 
         let fail = AuthResult::failure("Bad creds", None);
-        assert!(format!("{}", fail).contains("Bad creds"));
+        assert!(format!("{fail}").contains("Bad creds"));
     }
 }

