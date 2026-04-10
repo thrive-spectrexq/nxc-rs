@@ -2,17 +2,11 @@
 
 NetExec-RS includes **Elite Reaper**, a massive integrated AI framework powered by Google Gemini and other LLMs. It is designed to act as an autonomous offensive orchestrator, allowing operators to conduct complex campaigns using natural language.
 
-## Launching the AI Agent
+You can engage the AI from the CLI:
+    ```bash
+    nxc ai "List all Domain Admins on 10.0.0.1"
+    ```
 
-You can engage the AI from two vectors:
-1. **Direct CLI:**
-   ```bash
-   nxc ai "List all Domain Admins on 10.0.0.1"
-   ```
-2. **Telegram Bot:**
-   ```
-   /ai Scan the 192.168.5.0/24 subnet for IPMI interfaces and dump HASHS
-   ```
 
 ## Under the Hood: Tool Execution
 

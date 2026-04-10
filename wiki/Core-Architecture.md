@@ -6,7 +6,7 @@ NetExec-RS is not just a port of the Python NetExec tool; it is a ground-up reim
 
 The repository is built as a Cargo Workspace containing multiple distinct crates:
 
-1. **`nxc`:** The frontline CLI binaries and Telegram server daemon. Connects the user to the engine.
+1. **`nxc`:** The frontline CLI binaries. Connects the user to the engine.
 2. **`nxc-ai`:** The LLM integration crate (Elite Reaper/Gemini). Translates natural language into programmatic actions.
 3. **`nxc-targets`:** Intelligent target parsing (CIDR, IP ranges, Hostname files, Nmap XML ingestion).
 4. **`nxc-auth`:** Cryptographic authentication handlers (NTLM SSP, Kerberos, Hashes, Certificates).

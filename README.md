@@ -12,7 +12,7 @@
 *   **Blazing Fast**: Powered by Tokio's async runtime for massive high-concurrency operations.
 *   **Pure Rust**: Zero dependencies on Python or Impacket. Native implementation of NTLM SSP, Kerberos, and SMB.
 *   **Stealthy & Robust**: Built-in lockout detection, jitter, and secure TLS communication.
-*   **Professional Telegram Bot**: Remote mission control with **Interactive Shell**, full module support, and tactical guides.
+
 *   **AI Mission Orchestrator**: Fully autonomous agent powered by **LLMs** for natural language mission control, automated reconnaissance, and tool chaining.
 *   **Advanced Recon**: Integrated AD CS, BloodHound, and WMI reconnaissance modules.
 
@@ -113,30 +113,7 @@ cargo run --package nxc -- nfs <target> --enum-shares
 cargo run --package nxc -- smb <target> -L
 ```
 
-### 4. Telegram Bot (APEX-REAPER) Integration
-NetExec-RS includes a built-in APEX-REAPER Telegram bot for remote management.
 
-**Setup**:
-1. Create a bot via [@BotFather](https://t.me/botfather).
-2. Add your token to the `.env` file:
-   ```env
-   TELEGRAM_BOT_TOKEN="your_token_here"
-   TELEGRAM_ADMIN_USERS="your_user_id"
-   ```
-
-**Start the Server**:
-```powershell
-cargo run --package nxc -- telegram
-```
-
-**Commands**:
-- `/help`, `/guide`, `/cheat`: Comprehensive operator's manuals and search tools.
-- `/ai <instruction>`: **Autonomous Mission Control**. Let the AI agent orchestrate discovery, scanning, and exploitation using the full protocol suite.
-- `/ping`, `/dns`, `/geo`: Tactical network utilities for rapid connectivity and identity checks.
-- `/run <protocol> <target> [options]`: Full CLI-style command execution (supports `-M` and `-o`).
-- `/shell`: Activate **Interactive Shell Mode** for the most recent target.
-- `/shares`, `/users`, `/groups`: Tactical reconnaissance shortcuts.
-- `/clear`, `/reset`: Flush session memory and clear terminal space.
 
 ### 5. AI Mission Control (CLI)
 The **Elite Reaper** AI orchestrator can be launched directly from the CLI for autonomous missions. It supports conversational multi-turn interaction.

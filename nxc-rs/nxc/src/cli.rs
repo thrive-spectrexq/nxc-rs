@@ -782,17 +782,7 @@ pub fn build_cli() -> Command {
         .subcommand(mysql_cmd)
         .subcommand(snmp_cmd)
         .subcommand(docker_cmd)
-        .subcommand(
-            Command::new("telegram")
-                .about("Start the NetExec-RS Telegram bot server")
-                .arg(
-                    Arg::new("token")
-                        .long("token")
-                        .env("TELEGRAM_BOT_TOKEN")
-                        .help("Telegram bot token")
-                        .required(true),
-                ),
-        )
+
         .subcommand(
             Command::new("ai")
                 .about("LLM-powered automation and network discovery")
