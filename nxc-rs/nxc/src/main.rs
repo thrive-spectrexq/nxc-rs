@@ -8,7 +8,7 @@ mod handlers;
 mod output;
 mod relay;
 mod reporting;
-mod telegram;
+
 
 use cli::{build_cli, build_credentials, get_protocol_handler, CODENAME, VERSION};
 use handlers::handle_ai_mode;
@@ -49,12 +49,7 @@ async fn main() -> Result<()> {
 
     // ── Get the protocol subcommand ──
     let (protocol_name, sub_matches) = match matches.subcommand() {
-        Some(("telegram", sub_m)) => {
-            // Pass token directly instead of using set_var (unsafe in async context since Rust 1.81+)
-            let token = sub_m.get_one::<String>("token").cloned();
-            telegram::start_bot_with_token(token).await?;
-            return Ok(());
-        }
+
         Some(("ai", ai_matches)) => {
             let initial_prompt = ai_matches.get_one::<String>("prompt").cloned();
             let provider_name = ai_matches.get_one::<String>("provider").cloned();

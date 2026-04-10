@@ -10,7 +10,7 @@ It currently supports:
 * **22 distinct network protocols** (SMB, LDAP, MSSQL, DNS, IPMI, Kubernetes, RDP, WinRM, etc.)
 * **135 specialized modules** for post-exploitation, enumeration, credential harvesting, and evasion.
 * **Autonomous AI Agents** built-in for conversational mission control.
-* **Telegram C2 Infrastructure** for remote and collaborative team engagements.
+
 
 ## Quick Navigation
 
@@ -37,7 +37,7 @@ It currently supports:
 
 ### 🤖 Advanced Operations
 * [Elite Reaper AI Orchestrator](AI-Orchestrator-Guide.md)
-* [Telegram (APEX-REAPER) C2 Operations](Telegram-APEX-REAPER.md)
+
 
 ---
 > [!IMPORTANT]
