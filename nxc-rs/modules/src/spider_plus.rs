@@ -19,6 +19,7 @@ impl SpiderPlus {
         Self
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn spider_directory(
         &self,
         smb: &nxc_protocols::smb::SmbProtocol,
@@ -139,7 +140,7 @@ impl NxcModule for SpiderPlus {
     }
 
     fn supported_protocols(&self) -> &[&str] {
-        &["smb"].as_slice()
+        ["smb"].as_slice()
     }
 
     fn options(&self) -> Vec<ModuleOption> {
@@ -190,18 +191,11 @@ impl NxcModule for SpiderPlus {
             None => return Err(anyhow::anyhow!("Module only supports SMB")),
         };
 
-        let download = opts
-            .get("DOWNLOAD_FLAG")
-            .map(|v| v.to_lowercase() == "true")
-            .unwrap_or(false);
-        let max_size: u64 = opts
-            .get("MAX_FILE_SIZE")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(51200);
-        let output_folder = opts
-            .get("OUTPUT_FOLDER")
-            .cloned()
-            .unwrap_or_else(|| "./nxc_spider_plus".to_string());
+        let download =
+            opts.get("DOWNLOAD_FLAG").map(|v| v.to_lowercase() == "true").unwrap_or(false);
+        let max_size: u64 = opts.get("MAX_FILE_SIZE").and_then(|v| v.parse().ok()).unwrap_or(51200);
+        let output_folder =
+            opts.get("OUTPUT_FOLDER").cloned().unwrap_or_else(|| "./nxc_spider_plus".to_string());
 
         let exclude_exts: HashSet<String> = opts
             .get("EXCLUDE_EXTS")
@@ -263,10 +257,7 @@ impl NxcModule for SpiderPlus {
 
         Ok(ModuleResult {
             success: true,
-            output: format!(
-                "Spidering completed. Metadata saved to {:?}",
-                host_json_path
-            ),
+            output: format!("Spidering completed. Metadata saved to {host_json_path:?}"),
             data: json_output,
             credentials: vec![],
         })

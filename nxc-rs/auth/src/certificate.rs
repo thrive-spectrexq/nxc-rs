@@ -10,35 +10,30 @@ pub struct CertificateAuth {
 
 impl CertificateAuth {
     pub fn new(pfx_path: &str) -> Self {
-        Self {
-            pfx_path: pfx_path.to_string(),
-            certificate: None,
-            private_key: None,
-        }
+        Self { pfx_path: pfx_path.to_string(), certificate: None, private_key: None }
     }
 
     /// Parse PFX and extract private key/certificate
     pub fn parse_pfx(&mut self, password: Option<&str>) -> Result<()> {
         let pfx_data =
-            std::fs::read(&self.pfx_path).map_err(|e| anyhow!("Failed to read PFX file: {}", e))?;
+            std::fs::read(&self.pfx_path).map_err(|e| anyhow!("Failed to read PFX file: {e}"))?;
 
-        let pfx = PFX::parse(&pfx_data).map_err(|e| anyhow!("Failed to parse PFX DER: {:?}", e))?;
+        let pfx = PFX::parse(&pfx_data).map_err(|e| anyhow!("Failed to parse PFX DER: {e:?}"))?;
 
         let pass = password.unwrap_or("");
 
         // Extract certificates from the PFX vault
         let certs = pfx
             .cert_x509_bags(pass)
-            .map_err(|e| anyhow!("Failed to extract cert bags: {:?}", e))?;
+            .map_err(|e| anyhow!("Failed to extract cert bags: {e:?}"))?;
 
         if let Some(cert) = certs.into_iter().next() {
             self.certificate = Some(cert);
         }
 
         // Extract private keys from the PFX vault
-        let keys = pfx
-            .key_bags(pass)
-            .map_err(|e| anyhow!("Failed to extract key bags: {:?}", e))?;
+        let keys =
+            pfx.key_bags(pass).map_err(|e| anyhow!("Failed to extract key bags: {e:?}"))?;
 
         if let Some(key) = keys.into_iter().next() {
             self.private_key = Some(key);

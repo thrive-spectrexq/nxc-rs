@@ -22,7 +22,7 @@ pub fn export_csv(path: &str, results: &[ExecutionResult]) -> Result<()> {
     let mut writer = csv::Writer::from_writer(file);
 
     // Write header
-    writer.write_record(&[
+    writer.write_record([
         "target",
         "protocol",
         "username",
@@ -36,7 +36,7 @@ pub fn export_csv(path: &str, results: &[ExecutionResult]) -> Result<()> {
     for res in results {
         let module_data_json =
             serde_json::to_string(&res.module_data).unwrap_or_else(|_| "{}".to_string());
-        writer.write_record(&[
+        writer.write_record([
             &res.target,
             &res.protocol,
             &res.username,

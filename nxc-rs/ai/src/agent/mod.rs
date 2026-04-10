@@ -16,11 +16,11 @@ pub struct CliFeedback;
 #[async_trait]
 impl AgentFeedback for CliFeedback {
     async fn on_thought(&self, text: &str) -> Result<()> {
-        println!("AI: {}", text);
+        println!("AI: {text}");
         Ok(())
     }
     async fn on_tool_call(&self, name: &str, args: &str) -> Result<()> {
-        println!("AI is calling tool: {} with args: {}", name, args);
+        println!("AI is calling tool: {name} with args: {args}");
         Ok(())
     }
     async fn on_tool_result(&self, _name: &str, _result: &str) -> Result<()> {
@@ -41,12 +41,7 @@ impl AiAgent {
         tools: ToolRegistry,
         feedback: Box<dyn AgentFeedback>,
     ) -> Self {
-        Self {
-            provider,
-            tools,
-            history: Vec::new(),
-            feedback,
-        }
+        Self { provider, tools, history: Vec::new(), feedback }
     }
 
     pub async fn run(&mut self, user_prompt: &str) -> Result<()> {
@@ -87,12 +82,7 @@ Guidelines:
 
             let resp = self
                 .provider
-                .complete(
-                    system_prompt,
-                    &current_user_prompt,
-                    &self.history,
-                    &tool_defs,
-                )
+                .complete(system_prompt, &current_user_prompt, &self.history, &tool_defs)
                 .await?;
 
             // Unify thought and tool calls into a single Assistant message for Gemini compatibility
@@ -122,10 +112,8 @@ Guidelines:
             for tc in &resp.tool_calls {
                 self.feedback.on_tool_call(&tc.name, &tc.arguments).await?;
 
-                let tool = self
-                    .tools
-                    .get(&tc.name)
-                    .context(format!("Tool not found: {}", tc.name))?;
+                let tool =
+                    self.tools.get(&tc.name).context(format!("Tool not found: {}", tc.name))?;
                 let args: Value = serde_json::from_str(&tc.arguments)?;
 
                 let result = tool.call(args).await?;
@@ -133,10 +121,7 @@ Guidelines:
 
                 self.feedback.on_tool_result(&tc.name, &result_str).await?;
 
-                tool_results.push(ToolResult {
-                    call_id: tc.name.clone(),
-                    content: result_str,
-                });
+                tool_results.push(ToolResult { call_id: tc.name.clone(), content: result_str });
             }
 
             self.history.push(Message {

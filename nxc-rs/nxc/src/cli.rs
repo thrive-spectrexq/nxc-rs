@@ -59,7 +59,7 @@ pub fn build_cli() -> Command {
         "@thrive-spectrexq".yellow().bold()
     );
 
-    let banner = format!("{}{}", spider, text_block);
+    let banner = format!("{spider}{text_block}");
 
     // ── Standard auth arguments (shared across all protocols) ──
     let auth_args = vec![
@@ -124,22 +124,13 @@ pub fn build_cli() -> Command {
             .long("aes-key")
             .help("AES key for Kerberos authentication (128 or 256 bits)")
             .num_args(1),
-        Arg::new("kdc-host")
-            .long("kdc-host")
-            .help("FQDN of the domain controller"),
+        Arg::new("kdc-host").long("kdc-host").help("FQDN of the domain controller"),
     ];
 
     // ── Module arguments ──
     let module_args = vec![
-        Arg::new("module")
-            .short('M')
-            .long("module")
-            .help("Module to use")
-            .num_args(1),
-        Arg::new("module-options")
-            .short('o')
-            .help("Module options (KEY=VALUE)")
-            .num_args(1..),
+        Arg::new("module").short('M').long("module").help("Module to use").num_args(1),
+        Arg::new("module-options").short('o').help("Module options (KEY=VALUE)").num_args(1..),
         Arg::new("list-modules")
             .short('L')
             .long("list-modules")
@@ -188,30 +179,15 @@ pub fn build_cli() -> Command {
                 .help("Enumerate active sessions")
                 .action(ArgAction::SetTrue),
         )
-        .arg(
-            Arg::new("disks")
-                .long("disks")
-                .help("Enumerate disks")
-                .action(ArgAction::SetTrue),
-        )
+        .arg(Arg::new("disks").long("disks").help("Enumerate disks").action(ArgAction::SetTrue))
         .arg(
             Arg::new("loggedon-users")
                 .long("loggedon-users")
                 .help("Enumerate logged-on users")
                 .action(ArgAction::SetTrue),
         )
-        .arg(
-            Arg::new("users")
-                .long("users")
-                .help("Enumerate users")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("groups")
-                .long("groups")
-                .help("Enumerate groups")
-                .action(ArgAction::SetTrue),
-        )
+        .arg(Arg::new("users").long("users").help("Enumerate users").action(ArgAction::SetTrue))
+        .arg(Arg::new("groups").long("groups").help("Enumerate groups").action(ArgAction::SetTrue))
         .arg(
             Arg::new("pass-pol")
                 .long("pass-pol")
@@ -249,11 +225,7 @@ pub fn build_cli() -> Command {
                 .default_value("22")
                 .value_parser(clap::value_parser!(u16)),
         )
-        .arg(
-            Arg::new("key-file")
-                .long("key-file")
-                .help("SSH private key file for authentication"),
-        )
+        .arg(Arg::new("key-file").long("key-file").help("SSH private key file for authentication"))
         .arg(
             Arg::new("exec-command")
                 .short('x')
@@ -287,10 +259,7 @@ pub fn build_cli() -> Command {
                 .value_parser(clap::value_parser!(u16)),
         )
         .arg(
-            Arg::new("ldaps")
-                .long("ldaps")
-                .help("Use LDAPS (port 636)")
-                .action(ArgAction::SetTrue),
+            Arg::new("ldaps").long("ldaps").help("Use LDAPS (port 636)").action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("kerberoasting")
@@ -337,12 +306,7 @@ pub fn build_cli() -> Command {
                 .default_value("5985")
                 .value_parser(clap::value_parser!(u16)),
         )
-        .arg(
-            Arg::new("ssl")
-                .long("ssl")
-                .help("Use HTTPS (port 5986)")
-                .action(ArgAction::SetTrue),
-        )
+        .arg(Arg::new("ssl").long("ssl").help("Use HTTPS (port 5986)").action(ArgAction::SetTrue))
         .arg(
             Arg::new("exec-command")
                 .short('x')
@@ -368,12 +332,7 @@ pub fn build_cli() -> Command {
                 .default_value("1433")
                 .value_parser(clap::value_parser!(u16)),
         )
-        .arg(
-            Arg::new("query")
-                .short('q')
-                .long("query")
-                .help("Execute SQL query"),
-        )
+        .arg(Arg::new("query").short('q').long("query").help("Execute SQL query"))
         .arg(
             Arg::new("exec-command")
                 .short('x')
@@ -445,13 +404,7 @@ pub fn build_cli() -> Command {
                 .default_value("135")
                 .value_parser(clap::value_parser!(u16)),
         )
-        .arg(
-            Arg::new("query")
-                .short('q')
-                .long("query")
-                .help("Execute WMI query")
-                .num_args(1),
-        )
+        .arg(Arg::new("query").short('q').long("query").help("Execute WMI query").num_args(1))
         .arg(
             Arg::new("exec-command")
                 .short('x')
@@ -476,10 +429,7 @@ pub fn build_cli() -> Command {
                 .value_parser(clap::value_parser!(u16)),
         )
         .arg(
-            Arg::new("enum")
-                .long("enum")
-                .help("Enumerate NFS exports")
-                .action(ArgAction::SetTrue),
+            Arg::new("enum").long("enum").help("Enumerate NFS exports").action(ArgAction::SetTrue),
         );
 
     let adb_cmd = Command::new("adb")
@@ -504,34 +454,19 @@ pub fn build_cli() -> Command {
                 .help("Take a screenshot of the Android device")
                 .action(ArgAction::SetTrue),
         )
-        .arg(
-            Arg::new("shell")
-                .long("shell")
-                .help("Execute shell command")
-                .num_args(1),
-        );
+        .arg(Arg::new("shell").long("shell").help("Execute shell command").num_args(1));
 
     let network_cmd = Command::new("network")
         .alias("net")
         .about("Network enumeration (ARP, WiFi, mDNS, LLMNR)")
-        .arg(
-            Arg::new("target")
-                .help("Range to sweep (e.g. 192.168.1.0/24)")
-                .num_args(1)
-                .index(1),
-        )
+        .arg(Arg::new("target").help("Range to sweep (e.g. 192.168.1.0/24)").num_args(1).index(1))
         .arg(
             Arg::new("scan")
                 .long("scan")
                 .help("Scan for nearby wireless networks")
                 .action(ArgAction::SetTrue),
         )
-        .arg(
-            Arg::new("connect")
-                .long("connect")
-                .help("Connect to a specific SSID")
-                .num_args(1),
-        )
+        .arg(Arg::new("connect").long("connect").help("Connect to a specific SSID").num_args(1))
         .arg(
             Arg::new("devices")
                 .long("devices")
@@ -569,17 +504,9 @@ pub fn build_cli() -> Command {
         .args(&module_args)
         .args(&export_args)
         .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("0")
-                .value_parser(clap::value_parser!(u16)),
+            Arg::new("port").long("port").default_value("0").value_parser(clap::value_parser!(u16)),
         )
-        .arg(
-            Arg::new("ssl")
-                .long("ssl")
-                .help("Use SSL/TLS")
-                .action(ArgAction::SetTrue),
-        );
+        .arg(Arg::new("ssl").long("ssl").help("Use SSL/TLS").action(ArgAction::SetTrue));
 
     let redis_cmd = Command::new("redis")
         .about("Redis protocol (port 6379)")
@@ -607,12 +534,7 @@ pub fn build_cli() -> Command {
                 .default_value("5432")
                 .value_parser(clap::value_parser!(u16)),
         )
-        .arg(
-            Arg::new("dbs")
-                .long("dbs")
-                .help("List databases")
-                .action(ArgAction::SetTrue),
-        )
+        .arg(Arg::new("dbs").long("dbs").help("List databases").action(ArgAction::SetTrue))
         .arg(
             Arg::new("exec-command")
                 .short('x')
@@ -629,18 +551,8 @@ pub fn build_cli() -> Command {
                 .default_value("3306")
                 .value_parser(clap::value_parser!(u16)),
         )
-        .arg(
-            Arg::new("dbs")
-                .long("dbs")
-                .help("List databases")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("query")
-                .short('q')
-                .long("query")
-                .help("Execute SQL query"),
-        );
+        .arg(Arg::new("dbs").long("dbs").help("List databases").action(ArgAction::SetTrue))
+        .arg(Arg::new("query").short('q').long("query").help("Execute SQL query"));
 
     let snmp_cmd = Command::new("snmp")
         .about("SNMP protocol (port 161/udp)")
@@ -887,9 +799,9 @@ pub fn get_protocol_handler(
         "smb" => Some(Arc::new(nxc_protocols::smb::SmbProtocol::new())),
         "ssh" => Some(Arc::new(nxc_protocols::ssh::SshProtocol::new())),
         "ldap" => Some(Arc::new(nxc_protocols::ldap::LdapProtocol::new())),
-        "winrm" => Some(Arc::new(
-            nxc_protocols::winrm::WinrmProtocol::new().with_verify_ssl(verify_ssl),
-        )),
+        "winrm" => {
+            Some(Arc::new(nxc_protocols::winrm::WinrmProtocol::new().with_verify_ssl(verify_ssl)))
+        }
         "mssql" => Some(Arc::new(nxc_protocols::mssql::MssqlProtocol::new())),
         "rdp" => Some(Arc::new(nxc_protocols::rdp::RdpProtocol::new())),
         "wmi" => Some(Arc::new(nxc_protocols::wmi::WmiProtocol::new())),
@@ -912,9 +824,7 @@ pub fn get_protocol_handler(
         "http" => {
             let ssl = sub_matches.get_flag("ssl");
             let verify_ssl = sub_matches.get_flag("verify-ssl");
-            Some(Arc::new(nxc_protocols::http::HttpProtocol::new(
-                ssl, verify_ssl,
-            )))
+            Some(Arc::new(nxc_protocols::http::HttpProtocol::new(ssl, verify_ssl)))
         }
         "redis" => Some(Arc::new(nxc_protocols::redis::RedisProtocol::new())),
         "postgres" | "postgresql" => {

@@ -50,9 +50,7 @@ impl NxcModule for SmbExec {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let cmd = opts
-            .get("CMD")
-            .ok_or_else(|| anyhow::anyhow!("CMD option is required"))?;
+        let cmd = opts.get("CMD").ok_or_else(|| anyhow::anyhow!("CMD option is required"))?;
 
         info!("SmbExec: Running '{}' on {}", cmd, session.target());
 

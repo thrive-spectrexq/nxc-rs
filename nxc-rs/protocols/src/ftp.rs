@@ -47,9 +47,7 @@ pub struct FtpProtocol {
 
 impl FtpProtocol {
     pub fn new() -> Self {
-        Self {
-            timeout: Duration::from_secs(10),
-        }
+        Self { timeout: Duration::from_secs(10) }
     }
 
     pub fn with_timeout(timeout: Duration) -> Self {
@@ -87,14 +85,14 @@ impl NxcProtocol for FtpProtocol {
         port: u16,
         _proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
-        let addr = format!("{}:{}", target, port);
+        let addr = format!("{target}:{port}");
         debug!("FTP: Connecting to {}", addr);
 
         let timeout_fut = tokio::time::timeout(self.timeout, TcpStream::connect(&addr));
         let mut stream = match timeout_fut.await {
             Ok(Ok(s)) => s,
-            Ok(Err(e)) => return Err(anyhow!("Connection refused or unreachable: {}", e)),
-            Err(_) => return Err(anyhow!("Connection timeout to {}", addr)),
+            Ok(Err(e)) => return Err(anyhow!("Connection refused or unreachable: {e}")),
+            Err(_) => return Err(anyhow!("Connection timeout to {addr}")),
         };
 
         // Grab the FTP welcome banner (should start with "220")
@@ -109,7 +107,7 @@ impl NxcProtocol for FtpProtocol {
         }
 
         if banner.is_empty() || !banner.starts_with("220") {
-            return Err(anyhow!("Invalid or empty FTP welcome banner: {}", banner));
+            return Err(anyhow!("Invalid or empty FTP welcome banner: {banner}"));
         }
 
         info!("FTP: Connected to {} (Banner: {})", addr, banner);
@@ -154,10 +152,7 @@ impl NxcProtocol for FtpProtocol {
             }
             Err(e) => {
                 debug!("FTP: Auth failed for {}@{}: {}", username, addr, e);
-                Ok(AuthResult::failure(
-                    &format!("FTP Auth failed: {}", e),
-                    None,
-                ))
+                Ok(AuthResult::failure(&format!("FTP Auth failed: {e}"), None))
             }
         }
     }
@@ -172,17 +167,14 @@ impl NxcProtocol for FtpProtocol {
         _share: &str,
         path: &str,
     ) -> Result<Vec<u8>> {
-        let ftp_sess = session
-            .downcast_ref::<FtpSession>()
-            .ok_or_else(|| anyhow!("Invalid session"))?;
+        let ftp_sess =
+            session.downcast_ref::<FtpSession>().ok_or_else(|| anyhow!("Invalid session"))?;
         let addr = format!("{}:{}", ftp_sess.target, ftp_sess.port);
         let mut ftp_stream = AsyncFtpStream::connect(&addr).await?;
 
         let empty = String::new();
         let pass = ftp_sess.credentials.password.as_ref().unwrap_or(&empty);
-        ftp_stream
-            .login(&ftp_sess.credentials.username, pass)
-            .await?;
+        ftp_stream.login(&ftp_sess.credentials.username, pass).await?;
 
         let mut reader = ftp_stream.retr_as_stream(path).await?;
         let mut buffer = Vec::new();
@@ -198,17 +190,14 @@ impl NxcProtocol for FtpProtocol {
         path: &str,
         data: &[u8],
     ) -> Result<()> {
-        let ftp_sess = session
-            .downcast_ref::<FtpSession>()
-            .ok_or_else(|| anyhow!("Invalid session"))?;
+        let ftp_sess =
+            session.downcast_ref::<FtpSession>().ok_or_else(|| anyhow!("Invalid session"))?;
         let addr = format!("{}:{}", ftp_sess.target, ftp_sess.port);
         let mut ftp_stream = AsyncFtpStream::connect(&addr).await?;
 
         let empty = String::new();
         let pass = ftp_sess.credentials.password.as_ref().unwrap_or(&empty);
-        ftp_stream
-            .login(&ftp_sess.credentials.username, pass)
-            .await?;
+        ftp_stream.login(&ftp_sess.credentials.username, pass).await?;
 
         let mut cursor = std::io::Cursor::new(data);
         ftp_stream.put_file(path, &mut cursor).await?;
@@ -224,7 +213,7 @@ impl FtpProtocol {
         port: u16,
         creds: &Credentials,
     ) -> Result<Vec<String>> {
-        let addr = format!("{}:{}", target, port);
+        let addr = format!("{target}:{port}");
         let mut ftp_stream = AsyncFtpStream::connect(&addr).await?;
 
         let username = creds.username.clone();

@@ -55,39 +55,15 @@ impl NxcModule for WebVuln {
         info!("Starting rapid vulnerability scan against {}", base_url);
 
         let checks = vec![
-            (
-                "/.git/config",
-                "repositoryformatversion",
-                "Exposed .git directory",
-            ),
+            ("/.git/config", "repositoryformatversion", "Exposed .git directory"),
             ("/.env", "APP_ENV", "Exposed .env file"),
             ("/.env", "DB_PASSWORD", "Exposed .env file"),
-            (
-                "/server-status",
-                "Apache Status",
-                "Exposed Apache server-status",
-            ),
-            (
-                "/actuator/env",
-                "java.version",
-                "Spring Boot Actuator exposed",
-            ),
+            ("/server-status", "Apache Status", "Exposed Apache server-status"),
+            ("/actuator/env", "java.version", "Spring Boot Actuator exposed"),
             ("/WEB-INF/web.xml", "<web-app", "Exposed WEB-INF"),
-            (
-                "/backup.zip",
-                "",
-                "Possible Backup file exposed (Check size)",
-            ),
-            (
-                "/etc/passwd",
-                "root:x:0:0",
-                "LFI / Path Traversal successful",
-            ),
-            (
-                "/../../../../etc/passwd",
-                "root:x:0:0",
-                "Path Traversal successful",
-            ),
+            ("/backup.zip", "", "Possible Backup file exposed (Check size)"),
+            ("/etc/passwd", "root:x:0:0", "LFI / Path Traversal successful"),
+            ("/../../../../etc/passwd", "root:x:0:0", "Path Traversal successful"),
             ("/phpinfo.php", "PHP Version", "Exposed phpinfo"),
         ];
 
@@ -97,7 +73,7 @@ impl NxcModule for WebVuln {
 
         for (path, signature, desc) in checks {
             let permit = sem.clone().acquire_owned().await.unwrap();
-            let url = format!("{}{}", base_url, path);
+            let url = format!("{base_url}{path}");
             let client = http_sess.client.clone();
             let creds = http_sess.credentials.clone();
             let signature = signature.to_string();
@@ -143,7 +119,7 @@ impl NxcModule for WebVuln {
 
         for task in tasks {
             if let Ok(Some((path, desc))) = task.await {
-                output.push_str(&format!("  [!] VULN FOUND: {} at {}\n", desc, path));
+                output.push_str(&format!("  [!] VULN FOUND: {desc} at {path}\n"));
                 found.push(json!({"path": path, "vuln": desc}));
             }
         }

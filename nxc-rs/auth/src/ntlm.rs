@@ -4,11 +4,11 @@
 //! including NTLMv2 authentication, session key derivation, and
 //! message signing/sealing for SMB3 channel security.
 
-// SECURITY: NTLM authentication and SMB signing MANDATE the use of legacy 
+// SECURITY: NTLM authentication and SMB signing MANDATE the use of legacy
 // cryptographic algorithms including MD4 (for NT hashes), MD5 (for HMAC-MD5),
 // and RC4 (for session key derivation and sealing in SMB1/2). While these
-// algorithms are considered insecure for modern applications, they are 
-// SPECIFICATION-REQUIRED and functionally necessary for a pentesting 
+// algorithms are considered insecure for modern applications, they are
+// SPECIFICATION-REQUIRED and functionally necessary for a pentesting
 // framework to communicate with legacy Windows environments.
 
 use anyhow::Result;
@@ -98,10 +98,7 @@ pub struct NtlmTargetInfo {
 impl NtlmTargetInfo {
     /// Parse AV_PAIR structures from target info buffer.
     pub fn parse(data: &[u8]) -> Self {
-        let mut info = NtlmTargetInfo {
-            raw: data.to_vec(),
-            ..Default::default()
-        };
+        let mut info = NtlmTargetInfo { raw: data.to_vec(), ..Default::default() };
 
         let mut offset = 0;
         while offset + 4 <= data.len() {
@@ -123,9 +120,8 @@ impl NtlmTargetInfo {
                 0x0004 => info.dns_domain_name = Some(decode_utf16(av_data)),
                 0x0005 => info.dns_tree_name = Some(decode_utf16(av_data)),
                 0x0006 if av_len >= 4 => {
-                    info.flags = Some(u32::from_le_bytes([
-                        av_data[0], av_data[1], av_data[2], av_data[3],
-                    ]))
+                    info.flags =
+                        Some(u32::from_le_bytes([av_data[0], av_data[1], av_data[2], av_data[3]]))
                 }
                 0x0007 if av_len >= 8 => {
                     info.timestamp = Some(u64::from_le_bytes([
@@ -219,10 +215,7 @@ impl NtlmAuthenticator {
 
         let msg_type = u32::from_le_bytes(data[8..12].try_into()?);
         if msg_type != NtlmMessageType::Challenge as u32 {
-            return Err(anyhow::anyhow!(
-                "Expected Challenge (type 2), got type {}",
-                msg_type
-            ));
+            return Err(anyhow::anyhow!("Expected Challenge (type 2), got type {msg_type}"));
         }
 
         // Target Name security buffer
@@ -252,12 +245,7 @@ impl NtlmAuthenticator {
             }
         }
 
-        Ok(NtlmChallenge {
-            nonce,
-            server_flags,
-            target_info,
-            target_info_raw,
-        })
+        Ok(NtlmChallenge { nonce, server_flags, target_info, target_info_raw })
     }
 
     // ── Type 3: Authenticate Message ──
@@ -283,9 +271,7 @@ impl NtlmAuthenticator {
 
         // 1. Calculate NT hash
         let nt_hash = if let Some(ref hash) = creds.nt_hash {
-            hex::decode(hash)?
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("Invalid NT hash length"))?
+            hex::decode(hash)?.try_into().map_err(|_| anyhow::anyhow!("Invalid NT hash length"))?
         } else if let Some(ref pass) = creds.password {
             calculate_nt_hash(pass)
         } else {
@@ -328,7 +314,7 @@ impl NtlmAuthenticator {
                 let exported_key: [u8; 16] = rand::random();
                 let key_array: &[u8; 16] = session_base_key[..16].try_into().unwrap();
                 let mut rc4_key = Rc4::new_from_slice(key_array)
-                    .map_err(|e| anyhow::anyhow!("RC4 init fail: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("RC4 init fail: {e}"))?;
                 let mut encrypted = exported_key;
                 rc4_key.apply_keystream(&mut encrypted);
                 (exported_key.to_vec(), Some(encrypted.to_vec()))
@@ -337,19 +323,10 @@ impl NtlmAuthenticator {
             };
 
         // 8. Build Type 3 message
-        let domain_utf16: Vec<u8> = domain
-            .encode_utf16()
-            .flat_map(|u| u.to_le_bytes())
-            .collect();
-        let user_utf16: Vec<u8> = username
-            .encode_utf16()
-            .flat_map(|u| u.to_le_bytes())
-            .collect();
-        let ws_utf16: Vec<u8> = self
-            .workstation
-            .encode_utf16()
-            .flat_map(|u| u.to_le_bytes())
-            .collect();
+        let domain_utf16: Vec<u8> = domain.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+        let user_utf16: Vec<u8> = username.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+        let ws_utf16: Vec<u8> =
+            self.workstation.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
 
         // LM response (24 bytes of zeros for NTLMv2)
         let lm_response = vec![0u8; 24];
@@ -555,7 +532,7 @@ pub fn calculate_lm_hash(password: &str) -> [u8; 16] {
     use des::cipher::KeyInit;
     use des::Des;
 
-    // SECURITY: The "KGS!@#$%" magic string and DES algorithm are MANDATORY 
+    // SECURITY: The "KGS!@#$%" magic string and DES algorithm are MANDATORY
     // for the legacy LM authentication protocol. These are insecure by modern
     // standards but required for protocol compatibility in a pentesting tool.
     let magic: &[u8; 8] = b"KGS!@#$%";
@@ -606,10 +583,7 @@ fn des_key_from_7(key: &[u8]) -> [u8; 8] {
 
 /// Decode a UTF-16LE byte slice to a Rust String.
 fn decode_utf16(data: &[u8]) -> String {
-    let u16s: Vec<u16> = data
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes([c[0], c[1]]))
-        .collect();
+    let u16s: Vec<u16> = data.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
     String::from_utf16_lossy(&u16s)
 }
 
@@ -671,10 +645,7 @@ mod tests {
         // MsvAvNbDomainName (0x0002)
         data.extend_from_slice(&0x0002u16.to_le_bytes());
         let domain = "TEST";
-        let domain_u16: Vec<u8> = domain
-            .encode_utf16()
-            .flat_map(|u| u.to_le_bytes())
-            .collect();
+        let domain_u16: Vec<u8> = domain.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
         data.extend_from_slice(&(domain_u16.len() as u16).to_le_bytes());
         data.extend_from_slice(&domain_u16);
         // MsvAvEOL

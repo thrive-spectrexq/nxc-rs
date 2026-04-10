@@ -114,9 +114,7 @@ pub struct RdpProtocol {
 
 impl RdpProtocol {
     pub fn new() -> Self {
-        Self {
-            timeout: Duration::from_secs(10),
-        }
+        Self { timeout: Duration::from_secs(10) }
     }
 
     pub fn with_timeout(timeout: Duration) -> Self {
@@ -154,7 +152,7 @@ impl NxcProtocol for RdpProtocol {
         port: u16,
         _proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
-        let addr = format!("{}:{}", target, port);
+        let addr = format!("{target}:{port}");
         debug!("RDP: Connecting to {}", addr);
 
         let mut stream = if let Some(proxy_url) = _proxy {
@@ -163,8 +161,8 @@ impl NxcProtocol for RdpProtocol {
             let timeout_fut = tokio::time::timeout(self.timeout, TcpStream::connect(&addr));
             match timeout_fut.await {
                 Ok(Ok(s)) => s,
-                Ok(Err(e)) => return Err(anyhow!("Connection refused or unreachable: {}", e)),
-                Err(_) => return Err(anyhow!("Connection timeout to {}", addr)),
+                Ok(Err(e)) => return Err(anyhow!("Connection refused or unreachable: {e}")),
+                Err(_) => return Err(anyhow!("Connection timeout to {addr}")),
             }
         };
 
@@ -195,12 +193,7 @@ impl NxcProtocol for RdpProtocol {
 
         info!("RDP: Connected to {} (NLA: {})", addr, is_nla);
 
-        Ok(Box::new(RdpSession {
-            target: target.to_string(),
-            port,
-            is_nla,
-            admin: false,
-        }))
+        Ok(Box::new(RdpSession { target: target.to_string(), port, is_nla, admin: false }))
     }
 
     async fn authenticate(
@@ -250,15 +243,13 @@ impl NxcProtocol for RdpProtocol {
 
         let ts_req1 = TsRequest {
             version: 6, // CredSSP v6
-            nego_tokens: Some(vec![NegoData {
-                nego_token: NegoToken(t1_msg),
-            }]),
+            nego_tokens: Some(vec![NegoData { nego_token: NegoToken(t1_msg) }]),
             auth_info: None,
             pub_key_auth: None,
         };
 
         let ts_req1_der =
-            rasn::der::encode(&ts_req1).map_err(|e| anyhow!("ASN.1 encode error: {}", e))?;
+            rasn::der::encode(&ts_req1).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
 
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let (mut reader, mut writer) = tokio::io::split(_tls);
@@ -268,7 +259,7 @@ impl NxcProtocol for RdpProtocol {
         let mut resp_buf = vec![0u8; 4096];
         let n = reader.read(&mut resp_buf).await?;
         let ts_resp: TsRequest =
-            rasn::der::decode(&resp_buf[..n]).map_err(|e| anyhow!("ASN.1 decode error: {}", e))?;
+            rasn::der::decode(&resp_buf[..n]).map_err(|e| anyhow!("ASN.1 decode error: {e}"))?;
 
         let t2_msg = ts_resp
             .nego_tokens
@@ -281,15 +272,13 @@ impl NxcProtocol for RdpProtocol {
         let t3_res = auth.generate_type3(creds, &challenge)?;
         let ts_req2 = TsRequest {
             version: 6,
-            nego_tokens: Some(vec![NegoData {
-                nego_token: NegoToken(t3_res.message),
-            }]),
+            nego_tokens: Some(vec![NegoData { nego_token: NegoToken(t3_res.message) }]),
             auth_info: None,
             pub_key_auth: None, // In real CredSSP we'd calculate public key auth here
         };
 
         let ts_req2_der =
-            rasn::der::encode(&ts_req2).map_err(|e| anyhow!("ASN.1 encode error: {}", e))?;
+            rasn::der::encode(&ts_req2).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
         writer.write_all(&ts_req2_der).await?;
 
         // 6. Receive final response
@@ -309,8 +298,6 @@ impl NxcProtocol for RdpProtocol {
     }
 
     async fn execute(&self, _session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
-        Err(anyhow!(
-            "RDP explicit command execution requires injected GUI input (not yet ported)."
-        ))
+        Err(anyhow!("RDP explicit command execution requires injected GUI input (not yet ported)."))
     }
 }

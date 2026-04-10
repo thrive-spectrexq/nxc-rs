@@ -55,9 +55,7 @@ impl NxcModule for EnumDns {
         let domain_filter = opts.get("DOMAIN").map(|s| s.as_str());
 
         let ldap_session = match session.protocol() {
-            "ldap" => session
-                .downcast_mut::<nxc_protocols::ldap::LdapSession>()
-                .unwrap(),
+            "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap(),
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
@@ -107,7 +105,7 @@ impl NxcModule for EnumDns {
                     }
                 }
 
-                output_lines.push(format!("Found Zone: {}", zone_name));
+                output_lines.push(format!("Found Zone: {zone_name}"));
                 let mut zone_records = serde_json::Map::new();
 
                 // 2. Find dnsNode objects in this zone
@@ -194,10 +192,7 @@ fn parse_dns_record(blob: &[u8]) -> Option<ParsedDnsRecord> {
         _ => return None,
     };
 
-    Some(ParsedDnsRecord {
-        rtype: rtype.to_string(),
-        value,
-    })
+    Some(ParsedDnsRecord { rtype: rtype.to_string(), value })
 }
 
 fn parse_ip_address(data: &[u8]) -> String {
@@ -213,10 +208,7 @@ fn parse_ipv6_address(data: &[u8]) -> String {
     }
     let mut parts = Vec::new();
     for i in 0..8 {
-        parts.push(format!(
-            "{:x}",
-            u16::from_be_bytes([data[i * 2], data[i * 2 + 1]])
-        ));
+        parts.push(format!("{:x}", u16::from_be_bytes([data[i * 2], data[i * 2 + 1]])));
     }
     parts.join(":")
 }
@@ -228,7 +220,7 @@ fn parse_mx_record(data: &[u8]) -> String {
     }
     let priority = u16::from_le_bytes([data[0], data[1]]);
     let name = parse_dns_name(&data[2..]);
-    format!("priority={} exchange={}", priority, name)
+    format!("priority={priority} exchange={name}")
 }
 
 /// Parses an SRV record: Priority (2 bytes) + Weight (2 bytes) + Port (2 bytes) + Target
@@ -240,10 +232,7 @@ fn parse_srv_record(data: &[u8]) -> String {
     let weight = u16::from_le_bytes([data[2], data[3]]);
     let port = u16::from_le_bytes([data[4], data[5]]);
     let target = parse_dns_name(&data[6..]);
-    format!(
-        "priority={} weight={} port={} target={}",
-        priority, weight, port, target
-    )
+    format!("priority={priority} weight={weight} port={port} target={target}")
 }
 
 /// AD DNS names are often compressed or encoded in a specific way.
@@ -316,9 +305,6 @@ mod tests {
             b'm', b'p', b'l', b'e', 0x03, b'c', b'o', b'm', 0x00,
         ];
         let result = parse_srv_record(&data);
-        assert_eq!(
-            result,
-            "priority=1 weight=2 port=389 target=dc1.example.com"
-        );
+        assert_eq!(result, "priority=1 weight=2 port=389 target=dc1.example.com");
     }
 }

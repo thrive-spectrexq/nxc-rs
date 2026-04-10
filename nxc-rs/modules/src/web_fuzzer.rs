@@ -71,10 +71,7 @@ impl NxcModule for WebFuzzer {
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         let base_url = format!("{}://{}:{}", scheme, http_sess.target, http_sess.port);
         let wordlist = opts.get("WORDLIST").map(|s| s.as_str()).unwrap_or("common");
-        let threads = opts
-            .get("THREADS")
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(50);
+        let threads = opts.get("THREADS").and_then(|s| s.parse::<usize>().ok()).unwrap_or(50);
 
         let extensions: Vec<&str> = opts
             .get("EXT")
@@ -121,7 +118,7 @@ impl NxcModule for WebFuzzer {
                 Err(_) => {
                     return Ok(ModuleResult {
                         success: false,
-                        output: format!("Failed to read wordlist at {}", wordlist),
+                        output: format!("Failed to read wordlist at {wordlist}"),
                         data: json!({}),
                         credentials: vec![],
                     });
@@ -132,9 +129,9 @@ impl NxcModule for WebFuzzer {
         // Build the target paths incorporating extensions
         let mut target_paths = Vec::new();
         for word in &words {
-            target_paths.push(format!("/{}", word));
+            target_paths.push(format!("/{word}"));
             for ext in &extensions {
-                target_paths.push(format!("/{}.{}", word, ext));
+                target_paths.push(format!("/{word}.{ext}"));
             }
         }
 
@@ -150,7 +147,7 @@ impl NxcModule for WebFuzzer {
 
         for path in target_paths {
             let permit = sem.clone().acquire_owned().await.unwrap();
-            let url = format!("{}{}", base_url, path);
+            let url = format!("{base_url}{path}");
             let client = http_sess.client.clone();
             let creds = http_sess.credentials.clone();
 
@@ -192,8 +189,7 @@ impl NxcModule for WebFuzzer {
         for task in tasks {
             if let Ok(Some((path, status, len))) = task.await {
                 output.push_str(&format!(
-                    "  [+] {:<20} [Status: {}, Size: {} bytes]\n",
-                    path, status, len
+                    "  [+] {path:<20} [Status: {status}, Size: {len} bytes]\n"
                 ));
                 found_list.push(json!({ "path": path, "status": status, "size": len }));
             }

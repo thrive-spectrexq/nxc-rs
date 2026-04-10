@@ -6,6 +6,12 @@ use tracing::info;
 
 pub struct HttpPathsModule;
 
+impl Default for HttpPathsModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HttpPathsModule {
     pub fn new() -> Self {
         Self
@@ -42,20 +48,12 @@ impl NxcModule for HttpPathsModule {
     ) -> Result<ModuleResult> {
         info!("HTTP: Starting Path Discovery on {}...", session.target());
 
-        if let Some(http_sess) = session
-            .as_any()
-            .downcast_ref::<nxc_protocols::http::HttpSession>()
+        if let Some(http_sess) = session.as_any().downcast_ref::<nxc_protocols::http::HttpSession>()
         {
-            let protocol = nxc_protocols::http::HttpProtocol {
-                use_ssl: false,
-                verify_ssl: false,
-            }; // Defaults
+            let protocol = nxc_protocols::http::HttpProtocol { use_ssl: false, verify_ssl: false }; // Defaults
 
             let default_paths = "/.git,/.env,/backup,/phpmyadmin,/admin,/config";
-            let paths_str = opts
-                .get("PATHS")
-                .map(|s| s.as_str())
-                .unwrap_or(default_paths);
+            let paths_str = opts.get("PATHS").map(|s| s.as_str()).unwrap_or(default_paths);
             let paths_vec: Vec<&str> = paths_str.split(',').collect();
 
             match protocol.enumerate_paths(http_sess, &paths_vec).await {
@@ -64,7 +62,7 @@ impl NxcModule for HttpPathsModule {
                     let mut found = Vec::new();
                     for (path, status) in results {
                         if status.is_success() {
-                            output.push_str(&format!("  [+] {} - {}\n", path, status));
+                            output.push_str(&format!("  [+] {path} - {status}\n"));
                             found.push(path);
                         }
                     }

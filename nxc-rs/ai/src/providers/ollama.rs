@@ -1,5 +1,5 @@
 use super::{AiProvider, AiResponse, Message, ToolDefinition};
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use async_trait::async_trait;
 
 pub struct OllamaProvider {
@@ -9,10 +9,7 @@ pub struct OllamaProvider {
 
 impl OllamaProvider {
     pub fn new(api_base: String, model: Option<String>) -> Self {
-        Self {
-            api_base,
-            model: model.unwrap_or_else(|| "llama3.2".to_string()),
-        }
+        Self { api_base, model: model.unwrap_or_else(|| "llama3.2".to_string()) }
     }
 }
 

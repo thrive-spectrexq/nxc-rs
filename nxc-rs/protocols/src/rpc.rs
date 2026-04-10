@@ -77,10 +77,7 @@ pub mod svcctl {
         buf.extend_from_slice(h_mgr);
 
         // ServiceName
-        let name_utf16: Vec<u16> = service_name
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
+        let name_utf16: Vec<u16> = service_name.encode_utf16().chain(std::iter::once(0)).collect();
         buf.extend_from_slice(&(name_utf16.len() as u32).to_le_bytes());
         buf.extend_from_slice(&0u32.to_le_bytes());
         buf.extend_from_slice(&(name_utf16.len() as u32).to_le_bytes());
@@ -103,10 +100,7 @@ pub mod svcctl {
         buf.extend_from_slice(&0x00000001u32.to_le_bytes());
 
         // BinaryPathName
-        let path_utf16: Vec<u16> = command_path
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
+        let path_utf16: Vec<u16> = command_path.encode_utf16().chain(std::iter::once(0)).collect();
         buf.extend_from_slice(&(path_utf16.len() as u32).to_le_bytes());
         buf.extend_from_slice(&0u32.to_le_bytes());
         buf.extend_from_slice(&(path_utf16.len() as u32).to_le_bytes());
@@ -158,10 +152,8 @@ pub mod samr {
         let mut buf = Vec::new();
         // ServerName (Unicode pointer)
         buf.extend_from_slice(&0x00020000u32.to_le_bytes());
-        let s_u16: Vec<u16> = format!("\\\\{}", server)
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
+        let s_u16: Vec<u16> =
+            format!("\\\\{server}").encode_utf16().chain(std::iter::once(0)).collect();
         buf.extend_from_slice(&(s_u16.len() as u32).to_le_bytes()); // Max
         buf.extend_from_slice(&0u32.to_le_bytes()); // Offset
         buf.extend_from_slice(&(s_u16.len() as u32).to_le_bytes()); // Actual
@@ -282,10 +274,7 @@ pub mod efsr {
         // FileName (Pointer + string)
         buf.extend_from_slice(&0x00020000u32.to_le_bytes()); // Pointer
 
-        let path_u16: Vec<u16> = target_path
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
+        let path_u16: Vec<u16> = target_path.encode_utf16().chain(std::iter::once(0)).collect();
         // Array lengths for NDR string
         buf.extend_from_slice(&(path_u16.len() as u32).to_le_bytes()); // Max count
         buf.extend_from_slice(&0u32.to_le_bytes()); // Offset
@@ -357,12 +346,7 @@ impl DcerpcHeader {
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut buf = vec![
-            self.rpc_ver,
-            self.rpc_ver_minor,
-            self.ptype as u8,
-            self.pfc_flags,
-        ];
+        let mut buf = vec![self.rpc_ver, self.rpc_ver_minor, self.ptype as u8, self.pfc_flags];
         buf.extend_from_slice(&self.packed_drep);
         buf.extend_from_slice(&self.frag_len.to_le_bytes());
         buf.extend_from_slice(&self.auth_len.to_le_bytes());
@@ -395,12 +379,7 @@ impl DcerpcAuth {
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut buf = vec![
-            self.auth_type,
-            self.auth_level,
-            self.auth_pad_len,
-            self.auth_reserved,
-        ];
+        let mut buf = vec![self.auth_type, self.auth_level, self.auth_pad_len, self.auth_reserved];
         buf.extend_from_slice(&self.auth_context_id.to_le_bytes());
         buf.extend_from_slice(&self.auth_data);
         buf
@@ -471,12 +450,7 @@ pub struct DcerpcRequest {
 
 impl DcerpcRequest {
     pub fn new(opnum: u16, payload: Vec<u8>) -> Self {
-        Self {
-            alloc_hint: payload.len() as u32,
-            p_cont_id: 0,
-            opnum,
-            payload,
-        }
+        Self { alloc_hint: payload.len() as u32, p_cont_id: 0, opnum, payload }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {

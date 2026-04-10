@@ -10,6 +10,12 @@ use tracing::info;
 
 pub struct PsrpModule;
 
+impl Default for PsrpModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PsrpModule {
     pub fn new() -> Self {
         Self

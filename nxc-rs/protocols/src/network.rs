@@ -61,15 +61,7 @@ impl NetworkProtocol {
         mdns: bool,
         llmnr: bool,
     ) -> Self {
-        Self {
-            scan,
-            connect,
-            devices,
-            profiles,
-            dump,
-            mdns,
-            llmnr,
-        }
+        Self { scan, connect, devices, profiles, dump, mdns, llmnr }
     }
 
     /// Perform a WiFi scan using `netsh wlan show networks mode=bssid` (Windows)
@@ -84,7 +76,7 @@ impl NetworkProtocol {
 
         if !output.status.success() {
             let error_msg = if !stderr.is_empty() { stderr } else { stdout };
-            return Err(anyhow!("Scan failed: {}", error_msg));
+            return Err(anyhow!("Scan failed: {error_msg}"));
         }
 
         Ok(stdout)
@@ -93,7 +85,7 @@ impl NetworkProtocol {
     /// Connect to a specific SSID using `netsh wlan connect name="..."`
     async fn connect_ssid(&self, ssid: &str) -> Result<String> {
         let output = tokio::process::Command::new("netsh")
-            .args(["wlan", "connect", &format!("name={}", ssid)])
+            .args(["wlan", "connect", &format!("name={ssid}")])
             .output()
             .await?;
 
@@ -102,7 +94,7 @@ impl NetworkProtocol {
 
         if !output.status.success() {
             let error_msg = if !stderr.is_empty() { stderr } else { stdout };
-            return Err(anyhow!("Connect failed: {}", error_msg));
+            return Err(anyhow!("Connect failed: {error_msg}"));
         }
 
         Ok(stdout)
@@ -110,17 +102,14 @@ impl NetworkProtocol {
 
     /// Perform a device sweep using `arp -a`
     async fn sweep_devices(&self) -> Result<String> {
-        let output = tokio::process::Command::new("arp")
-            .args(["-a"])
-            .output()
-            .await?;
+        let output = tokio::process::Command::new("arp").args(["-a"]).output().await?;
 
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
         if !output.status.success() {
             let error_msg = if !stderr.is_empty() { stderr } else { stdout };
-            return Err(anyhow!("Device sweep failed: {}", error_msg));
+            return Err(anyhow!("Device sweep failed: {error_msg}"));
         }
 
         Ok(stdout)
@@ -138,7 +127,7 @@ impl NetworkProtocol {
 
         if !output.status.success() {
             let error_msg = if !stderr.is_empty() { stderr } else { stdout };
-            return Err(anyhow!("List profiles failed: {}", error_msg));
+            return Err(anyhow!("List profiles failed: {error_msg}"));
         }
 
         Ok(stdout)
@@ -165,7 +154,7 @@ impl NetworkProtocol {
                             "wlan",
                             "show",
                             "profile",
-                            &format!("name={}", profile_name),
+                            &format!("name={profile_name}"),
                             "key=clear",
                         ])
                         .output()
@@ -186,7 +175,7 @@ impl NetworkProtocol {
                         }
 
                         dumped_credentials
-                            .push_str(&format!("{:<30} : {}\n", profile_name, password));
+                            .push_str(&format!("{profile_name:<30} : {password}\n"));
                     }
                 }
             }
@@ -238,10 +227,8 @@ impl NetworkProtocol {
                 if !parsed.is_empty() {
                     results.push(format!("  {} -> {}", addr, parsed.join(", ")));
                 } else {
-                    results.push(format!(
-                        "  {} responded with {} bytes (unknown format)",
-                        addr, len
-                    ));
+                    results
+                        .push(format!("  {addr} responded with {len} bytes (unknown format)"));
                 }
             }
         }
@@ -292,10 +279,8 @@ impl NetworkProtocol {
                 if !parsed.is_empty() {
                     results.push(format!("  {} -> {}", addr, parsed.join(", ")));
                 } else {
-                    results.push(format!(
-                        "  {} responded with {} bytes (unknown format)",
-                        addr, len
-                    ));
+                    results
+                        .push(format!("  {addr} responded with {len} bytes (unknown format)"));
                 }
             }
         }
@@ -405,7 +390,7 @@ fn parse_name(buf: &[u8], mut offset: usize) -> (String, usize) {
             if offset + 1 >= buf.len() {
                 break;
             }
-            let ptr = (((len & 0x3f) as usize) << 8) | (buf[offset + 1] as usize);
+            let ptr = ((len & 0x3f) << 8) | (buf[offset + 1] as usize);
             if !jumped {
                 final_next_offset = offset + 2;
                 jumped = true;
@@ -444,7 +429,7 @@ impl NxcProtocol for NetworkProtocol {
     }
 
     fn supported_modules(&self) -> &[&str] {
-        &["net_discovery"].as_slice()
+        ["net_discovery"].as_slice()
     }
 
     async fn connect(
@@ -455,10 +440,7 @@ impl NxcProtocol for NetworkProtocol {
     ) -> Result<Box<dyn NxcSession>> {
         // Since `network` actions generally interact with the host interface rather than
         // a remote TCP port, `connect` merely instantiates the session.
-        Ok(Box::new(NetworkSession {
-            target: target.to_string(),
-            admin: false,
-        }))
+        Ok(Box::new(NetworkSession { target: target.to_string(), admin: false }))
     }
 
     async fn authenticate(
@@ -472,10 +454,10 @@ impl NxcProtocol for NetworkProtocol {
 
         if self.scan {
             match self.scan_networks().await {
-                Ok(out) => final_message.push_str(&format!("\n[Network Scan Results]\n{}\n", out)),
+                Ok(out) => final_message.push_str(&format!("\n[Network Scan Results]\n{out}\n")),
                 Err(e) => {
                     success = false;
-                    final_message.push_str(&format!("\n[Network Scan Error] {}\n", e));
+                    final_message.push_str(&format!("\n[Network Scan Error] {e}\n"));
                 }
             }
         }
@@ -483,31 +465,31 @@ impl NxcProtocol for NetworkProtocol {
         if let Some(ref ssid) = self.connect {
             match self.connect_ssid(ssid).await {
                 Ok(out) => {
-                    final_message.push_str(&format!("\n[Network Connect Result]\n{}\n", out))
+                    final_message.push_str(&format!("\n[Network Connect Result]\n{out}\n"))
                 }
                 Err(e) => {
                     success = false;
-                    final_message.push_str(&format!("\n[Network Connect Error] {}\n", e));
+                    final_message.push_str(&format!("\n[Network Connect Error] {e}\n"));
                 }
             }
         }
 
         if self.devices {
             match self.sweep_devices().await {
-                Ok(out) => final_message.push_str(&format!("\n[ARP Sweep Results]\n{}\n", out)),
+                Ok(out) => final_message.push_str(&format!("\n[ARP Sweep Results]\n{out}\n")),
                 Err(e) => {
                     success = false;
-                    final_message.push_str(&format!("\n[ARP Sweep Error] {}\n", e));
+                    final_message.push_str(&format!("\n[ARP Sweep Error] {e}\n"));
                 }
             }
         }
 
         if self.profiles {
             match self.list_profiles().await {
-                Ok(out) => final_message.push_str(&format!("\n[Network Profiles]\n{}\n", out)),
+                Ok(out) => final_message.push_str(&format!("\n[Network Profiles]\n{out}\n")),
                 Err(e) => {
                     success = false;
-                    final_message.push_str(&format!("\n[Network Profiles Error] {}\n", e));
+                    final_message.push_str(&format!("\n[Network Profiles Error] {e}\n"));
                 }
             }
         }
@@ -515,12 +497,12 @@ impl NxcProtocol for NetworkProtocol {
         if self.dump {
             match self.dump_profiles().await {
                 Ok(out) => {
-                    final_message.push_str(&format!("\n[Network Configuration Dump]\n{}\n", out));
+                    final_message.push_str(&format!("\n[Network Configuration Dump]\n{out}\n"));
                     admin_result = true;
                 }
                 Err(e) => {
                     success = false;
-                    final_message.push_str(&format!("\n[Network Dump Error] {}\n", e));
+                    final_message.push_str(&format!("\n[Network Dump Error] {e}\n"));
                 }
             }
         }
@@ -528,11 +510,11 @@ impl NxcProtocol for NetworkProtocol {
         if self.mdns {
             match self.discover_mdns().await {
                 Ok(out) => {
-                    final_message.push_str(&format!("\n[mDNS Discovery Results]\n{}\n", out))
+                    final_message.push_str(&format!("\n[mDNS Discovery Results]\n{out}\n"))
                 }
                 Err(e) => {
                     success = false;
-                    final_message.push_str(&format!("\n[mDNS Error] {}\n", e));
+                    final_message.push_str(&format!("\n[mDNS Error] {e}\n"));
                 }
             }
         }
@@ -540,11 +522,11 @@ impl NxcProtocol for NetworkProtocol {
         if self.llmnr {
             match self.discover_llmnr().await {
                 Ok(out) => {
-                    final_message.push_str(&format!("\n[LLMNR Discovery Results]\n{}\n", out))
+                    final_message.push_str(&format!("\n[LLMNR Discovery Results]\n{out}\n"))
                 }
                 Err(e) => {
                     success = false;
-                    final_message.push_str(&format!("\n[LLMNR Error] {}\n", e));
+                    final_message.push_str(&format!("\n[LLMNR Error] {e}\n"));
                 }
             }
         }

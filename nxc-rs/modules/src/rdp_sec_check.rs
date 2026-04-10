@@ -67,7 +67,7 @@ impl NxcModule for RdpSecCheck {
             tokio::time::timeout(std::time::Duration::from_secs(5), TcpStream::connect(&addr))
                 .await?
         {
-            if let Ok(_) = stream.write_all(&x224_req_standard).await {
+            if (stream.write_all(&x224_req_standard).await).is_ok() {
                 let mut resp = [0u8; 19];
                 if let Ok(n) =
                     tokio::time::timeout(std::time::Duration::from_secs(5), stream.read(&mut resp))

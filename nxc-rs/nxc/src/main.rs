@@ -9,12 +9,11 @@ mod output;
 mod relay;
 mod reporting;
 
-
-use cli::{build_cli, build_credentials, get_protocol_handler, CODENAME, VERSION};
-use handlers::handle_ai_mode;
 use anyhow::Result;
 use chrono::Utc;
+use cli::{build_cli, build_credentials, get_protocol_handler, CODENAME, VERSION};
 use colored::Colorize;
+use handlers::handle_ai_mode;
 use nxc_db::NxcDb;
 use nxc_modules::ModuleRegistry;
 use nxc_protocols::Protocol;
@@ -22,8 +21,6 @@ use nxc_targets::{parse_targets, ExecutionEngine, ExecutionOpts};
 use output::{NxcGlobalOutput, NxcOutput};
 use std::sync::Arc;
 use std::time::Duration;
-
-
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -42,14 +39,10 @@ async fn main() -> Result<()> {
         tracing::Level::WARN
     };
 
-    tracing_subscriber::fmt()
-        .with_max_level(log_level)
-        .with_target(false)
-        .init();
+    tracing_subscriber::fmt().with_max_level(log_level).with_target(false).init();
 
     // ── Get the protocol subcommand ──
     let (protocol_name, sub_matches) = match matches.subcommand() {
-
         Some(("ai", ai_matches)) => {
             let initial_prompt = ai_matches.get_one::<String>("prompt").cloned();
             let provider_name = ai_matches.get_one::<String>("provider").cloned();
@@ -75,8 +68,7 @@ async fn main() -> Result<()> {
         let modules = registry.list(Some(protocol_name));
         if modules.is_empty() {
             NxcGlobalOutput::info(&format!(
-                "No modules available for protocol '{}'",
-                protocol_name
+                "No modules available for protocol '{protocol_name}'"
             ));
         } else {
             NxcGlobalOutput::info(&format!(
@@ -84,11 +76,7 @@ async fn main() -> Result<()> {
                 protocol_name.to_uppercase()
             ));
             for module in modules {
-                println!(
-                    "  {:<20} {}",
-                    module.name().bold().cyan(),
-                    module.description()
-                );
+                println!("  {:<20} {}", module.name().bold().cyan(), module.description());
             }
         }
         return Ok(());
@@ -98,10 +86,7 @@ async fn main() -> Result<()> {
     let protocol = match get_protocol_handler(protocol_name, sub_matches) {
         Some(p) => p,
         None => {
-            NxcGlobalOutput::error(&format!(
-                "Protocol '{}' is not yet implemented",
-                protocol_name
-            ));
+            NxcGlobalOutput::error(&format!("Protocol '{protocol_name}' is not yet implemented"));
             return Ok(());
         }
     };
@@ -117,7 +102,7 @@ async fn main() -> Result<()> {
         match parse_targets(spec) {
             Ok(targets) => all_targets.extend(targets),
             Err(e) => {
-                NxcGlobalOutput::error(&format!("Failed to parse target '{}': {}", spec, e));
+                NxcGlobalOutput::error(&format!("Failed to parse target '{spec}': {e}"));
             }
         }
     }
@@ -154,7 +139,7 @@ async fn main() -> Result<()> {
     // ── Build module list ──
     let mut modules: Vec<String> = sub_matches
         .get_many::<String>("module")
-        .map(|vals| vals.map(|s| s.clone()).collect())
+        .map(|vals| vals.cloned().collect())
         .unwrap_or_default();
 
     // Map protocol-specific flags to modules safely
@@ -232,10 +217,7 @@ async fn main() -> Result<()> {
     };
 
     // ── Setup Database ──
-    let workspace = matches
-        .get_one::<String>("workspace")
-        .map(|s| s.as_str())
-        .unwrap_or("default");
+    let workspace = matches.get_one::<String>("workspace").map(|s| s.as_str()).unwrap_or("default");
 
     // Ensure .nxc directory exists in home or current dir
     let home = std::env::var("HOME")
@@ -244,7 +226,7 @@ async fn main() -> Result<()> {
     let dot_nxc = std::path::PathBuf::from(home).join(".nxc");
     if !dot_nxc.exists() {
         if let Err(e) = std::fs::create_dir_all(&dot_nxc) {
-            NxcGlobalOutput::warn(&format!("Failed to create .nxc directory: {}", e));
+            NxcGlobalOutput::warn(&format!("Failed to create .nxc directory: {e}"));
         }
     }
     let db_path = dot_nxc.join("nxc.db");
@@ -252,7 +234,7 @@ async fn main() -> Result<()> {
     let db = match NxcDb::new(&db_path, workspace) {
         Ok(d) => Some(Arc::new(d)),
         Err(e) => {
-            NxcGlobalOutput::warn(&format!("Failed to initialize database: {}", e));
+            NxcGlobalOutput::warn(&format!("Failed to initialize database: {e}"));
             None
         }
     };
@@ -264,10 +246,7 @@ async fn main() -> Result<()> {
     );
     NxcGlobalOutput::banner(VERSION, CODENAME);
     if let Some(ref d) = db {
-        NxcGlobalOutput::info(&format!(
-            "Workspace: {}",
-            d.current_workspace().bold().cyan()
-        ));
+        NxcGlobalOutput::info(&format!("Workspace: {}", d.current_workspace().bold().cyan()));
     }
     NxcGlobalOutput::info(&format!(
         "{} {} | {} {} | {} {} | {} {}",
@@ -303,7 +282,7 @@ async fn main() -> Result<()> {
                     ));
                 }
                 Err(e) => {
-                    NxcGlobalOutput::warn(&format!("Failed to load credentials from DB: {}", e))
+                    NxcGlobalOutput::warn(&format!("Failed to load credentials from DB: {e}"))
                 }
             }
         } else {
@@ -319,14 +298,9 @@ async fn main() -> Result<()> {
     let results = engine.run(protocol, all_targets, creds).await;
 
     // ── Display results ──
-    let port = sub_matches
-        .get_one::<u16>("port")
-        .copied()
-        .unwrap_or_else(|| {
-            Protocol::from_str(protocol_name)
-                .map(|p| p.default_port())
-                .unwrap_or(0)
-        });
+    let port = sub_matches.get_one::<u16>("port").copied().unwrap_or_else(|| {
+        Protocol::from_str(protocol_name).map(|p| p.default_port()).unwrap_or(0)
+    });
 
     for result in &results {
         let output = NxcOutput::new(protocol_name, &result.target, port, None);
@@ -375,18 +349,15 @@ async fn main() -> Result<()> {
     let ws_reports_dir = dot_nxc.join("workspaces").join(workspace).join("reports");
     match std::fs::create_dir_all(&ws_reports_dir) {
         Ok(_) => {
-            let filename = format!(
-                "report_{}_{}.json",
-                protocol_name,
-                Utc::now().format("%Y%m%d_%H%M%S")
-            );
+            let filename =
+                format!("report_{}_{}.json", protocol_name, Utc::now().format("%Y%m%d_%H%M%S"));
             let report_path = ws_reports_dir.join(filename);
             if let Err(e) = reporting::export_json(report_path.to_str().unwrap(), &report) {
-                NxcGlobalOutput::warn(&format!("Failed to save workspace report: {}", e));
+                NxcGlobalOutput::warn(&format!("Failed to save workspace report: {e}"));
             }
         }
         Err(e) => {
-            NxcGlobalOutput::warn(&format!("Failed to create reports directory: {}", e));
+            NxcGlobalOutput::warn(&format!("Failed to create reports directory: {e}"));
         }
     }
 
@@ -397,7 +368,7 @@ async fn main() -> Result<()> {
             .ok_or_else(|| anyhow::anyhow!("--export-path is required when using --export"))?
             .to_string();
         if !path.ends_with(format) {
-            path = format!("{}.{}", path, format);
+            path = format!("{path}.{format}");
         }
 
         let res = match format.as_str() {
@@ -408,7 +379,7 @@ async fn main() -> Result<()> {
 
         match res {
             Ok(_) => NxcGlobalOutput::info(&format!("Results exported to {}", path.bold().green())),
-            Err(e) => NxcGlobalOutput::warn(&format!("Failed to export results: {}", e)),
+            Err(e) => NxcGlobalOutput::warn(&format!("Failed to export results: {e}")),
         }
     }
 

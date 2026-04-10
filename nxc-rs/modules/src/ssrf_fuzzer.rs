@@ -53,18 +53,10 @@ impl NxcModule for SsrfFuzzer {
             .ok_or_else(|| anyhow!("Module requires an HTTP session"))?;
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
-        let base_path = opts
-            .get("PATH")
-            .ok_or_else(|| anyhow!("PATH is required"))?;
-        let url = format!(
-            "{}://{}:{}{}",
-            scheme, http_sess.target, http_sess.port, base_path
-        );
+        let base_path = opts.get("PATH").ok_or_else(|| anyhow!("PATH is required"))?;
+        let url = format!("{}://{}:{}{}", scheme, http_sess.target, http_sess.port, base_path);
 
-        info!(
-            "Starting SSRF Fuzzing (Internal Port Reflection) against {}",
-            url
-        );
+        info!("Starting SSRF Fuzzing (Internal Port Reflection) against {}", url);
 
         let payloads = vec![
             "http://127.0.0.1:22",
@@ -79,7 +71,7 @@ impl NxcModule for SsrfFuzzer {
         let mut ssrf_found = false;
 
         for payload in payloads {
-            let test_url = format!("{}{}", url, payload);
+            let test_url = format!("{url}{payload}");
             let mut req = http_sess.client.get(&test_url);
 
             // Note: injecting into X-Forwarded-For etc. usually triggers Blind SSRF,
@@ -106,11 +98,9 @@ impl NxcModule for SsrfFuzzer {
 
                     if found {
                         ssrf_found = true;
-                        output.push_str(&format!(
-                            "  [!] VULNERABLE to Server-Side Request Forgery!\n"
-                        ));
-                        output.push_str(&format!("      Payload: {}\n", payload));
-                        output.push_str(&format!("      Match  : Internal SSH Banner Reflected\n"));
+                        output.push_str("  [!] VULNERABLE to Server-Side Request Forgery!\n");
+                        output.push_str(&format!("      Payload: {payload}\n"));
+                        output.push_str("      Match  : Internal SSH Banner Reflected\n");
 
                         results.push(json!({
                             "payload": payload,

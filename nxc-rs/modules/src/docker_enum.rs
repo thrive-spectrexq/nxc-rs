@@ -6,6 +6,12 @@ use nxc_protocols::NxcSession;
 
 pub struct DockerEnum;
 
+impl Default for DockerEnum {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DockerEnum {
     pub fn new() -> Self {
         Self

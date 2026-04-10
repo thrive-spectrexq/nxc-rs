@@ -49,10 +49,7 @@ impl NxcModule for SmbGhost {
             .downcast_mut::<SmbSession>()
             .ok_or_else(|| anyhow!("Module requires an SMB session"))?;
 
-        info!(
-            "Checking {} for SMBv3 Compression (CVE-2020-0796)",
-            smb_sess.target
-        );
+        info!("Checking {} for SMBv3 Compression (CVE-2020-0796)", smb_sess.target);
 
         let mut output = String::from("SMBGhost Check Results:\n");
         let mut vulnerable = false;
@@ -60,7 +57,7 @@ impl NxcModule for SmbGhost {
         let target_addr = format!("{}:{}", smb_sess.target, smb_sess.port);
         let mut stream = TcpStream::connect(&target_addr)
             .await
-            .map_err(|e| anyhow!("Failed to establish TCP for SMB negotiation: {}", e))?;
+            .map_err(|e| anyhow!("Failed to establish TCP for SMB negotiation: {e}"))?;
 
         // Manually construct an SMB2 Negotiate Protocol Request advertising Compression Capabilities
         // Using dialect 0x0311 (SMB 3.1.1)
@@ -125,10 +122,7 @@ impl NxcModule for SmbGhost {
             let response = &buf[..bytes_read];
 
             // Search for ContextType 3 (0x03 0x00)
-            if let Some(pos) = response
-                .windows(2)
-                .position(|window| window == [0x03, 0x00])
-            {
+            if let Some(pos) = response.windows(2).position(|window| window == [0x03, 0x00]) {
                 // To be precise we skip the header boundary, but for simplistic checks ContextType 3 is solid
                 if pos > 64 {
                     vulnerable = true;

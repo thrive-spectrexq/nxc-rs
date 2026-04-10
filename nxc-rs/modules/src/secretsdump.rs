@@ -6,6 +6,12 @@ use tracing::info;
 
 pub struct SecretsDumpModule;
 
+impl Default for SecretsDumpModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SecretsDumpModule {
     pub fn new() -> Self {
         Self
@@ -31,15 +37,9 @@ impl NxcModule for SecretsDumpModule {
         session: &mut dyn NxcSession,
         _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        info!(
-            "SMB: Starting SecretsDump execution on {}...",
-            session.target()
-        );
+        info!("SMB: Starting SecretsDump execution on {}...", session.target());
 
-        if let Some(smb_sess) = session
-            .as_any()
-            .downcast_ref::<nxc_protocols::smb::SmbSession>()
-        {
+        if let Some(smb_sess) = session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>() {
             let protocol = nxc_protocols::smb::SmbProtocol::new();
             match protocol.secrets_dump(smb_sess).await {
                 Ok(output) => {
@@ -54,7 +54,7 @@ impl NxcModule for SecretsDumpModule {
                     return Ok(ModuleResult {
                         credentials: vec![],
                         success: false,
-                        output: format!("SecretsDump Error: {}", e),
+                        output: format!("SecretsDump Error: {e}"),
                         data: serde_json::json!({}),
                     });
                 }

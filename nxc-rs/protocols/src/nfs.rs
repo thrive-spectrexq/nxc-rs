@@ -44,9 +44,7 @@ pub struct NfsProtocol {
 
 impl NfsProtocol {
     pub fn new() -> Self {
-        Self {
-            timeout: Duration::from_secs(10),
-        }
+        Self { timeout: Duration::from_secs(10) }
     }
 
     pub fn with_timeout(timeout: Duration) -> Self {
@@ -84,14 +82,14 @@ impl NxcProtocol for NfsProtocol {
         port: u16,
         _proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
-        let addr = format!("{}:{}", target, port);
+        let addr = format!("{target}:{port}");
         debug!("NFS: Connecting to Portmap on {}", addr);
 
         let timeout_fut = tokio::time::timeout(self.timeout, TcpStream::connect(&addr));
         let mut stream = match timeout_fut.await {
             Ok(Ok(s)) => s,
-            Ok(Err(e)) => return Err(anyhow!("Connection refused or unreachable: {}", e)),
-            Err(_) => return Err(anyhow!("Connection timeout to {}", addr)),
+            Ok(Err(e)) => return Err(anyhow!("Connection refused or unreachable: {e}")),
+            Err(_) => return Err(anyhow!("Connection timeout to {addr}")),
         };
 
         // Simplified DCERPC Bind / Portmap Ping
@@ -120,19 +118,12 @@ impl NxcProtocol for NfsProtocol {
         let read_fut = tokio::time::timeout(self.timeout, stream.read_exact(&mut resp));
 
         if let Err(e) = read_fut.await {
-            return Err(anyhow!("NFS Portmap daemon unresponsive: {}", e));
+            return Err(anyhow!("NFS Portmap daemon unresponsive: {e}"));
         }
 
-        info!(
-            "NFS: Connected to Portmap on {} and requested NFS mappings",
-            addr
-        );
+        info!("NFS: Connected to Portmap on {} and requested NFS mappings", addr);
 
-        Ok(Box::new(NfsSession {
-            target: target.to_string(),
-            port,
-            admin: false,
-        }))
+        Ok(Box::new(NfsSession { target: target.to_string(), port, admin: false }))
     }
 
     async fn authenticate(
@@ -156,13 +147,9 @@ impl NxcProtocol for NfsProtocol {
         share: &str,
         path: &str,
     ) -> Result<Vec<u8>> {
-        let nfs_sess = session
-            .downcast_ref::<NfsSession>()
-            .ok_or_else(|| anyhow!("Invalid session"))?;
-        debug!(
-            "NFS: Attempting to read {} from {} on {}",
-            path, share, nfs_sess.target
-        );
+        let nfs_sess =
+            session.downcast_ref::<NfsSession>().ok_or_else(|| anyhow!("Invalid session"))?;
+        debug!("NFS: Attempting to read {} from {} on {}", path, share, nfs_sess.target);
 
         // In a real implementation, we would:
         // 1. MNT to the share to get the root file handle.
@@ -181,9 +168,8 @@ impl NxcProtocol for NfsProtocol {
         path: &str,
         data: &[u8],
     ) -> Result<()> {
-        let nfs_sess = session
-            .downcast_ref::<NfsSession>()
-            .ok_or_else(|| anyhow!("Invalid session"))?;
+        let nfs_sess =
+            session.downcast_ref::<NfsSession>().ok_or_else(|| anyhow!("Invalid session"))?;
         debug!(
             "NFS: Attempting to write {} bytes to {}/{} on {}",
             data.len(),
@@ -204,13 +190,13 @@ impl NfsProtocol {
         // 1. Get port for MOUNT service (100005) from Portmap (111)
         let mount_port = self.get_rpc_port(target, 100005, 3).await?;
         if mount_port == 0 {
-            return Err(anyhow!("NFS MOUNT service not found on {}", target));
+            return Err(anyhow!("NFS MOUNT service not found on {target}"));
         }
 
         debug!("NFS: Found MOUNT service on port {}", mount_port);
 
         // 2. Connect to MOUNT service
-        let addr = format!("{}:{}", target, mount_port);
+        let addr = format!("{target}:{mount_port}");
         let mut stream = TcpStream::connect(&addr).await?;
 
         // 3. Send MOUNT DUMP (Procedure 2)
@@ -287,7 +273,7 @@ impl NfsProtocol {
     }
 
     async fn get_rpc_port(&self, target: &str, program: u32, version: u32) -> Result<u16> {
-        let mut stream = TcpStream::connect(format!("{}:111", target)).await?;
+        let mut stream = TcpStream::connect(format!("{target}:111")).await?;
 
         let mut rpc_bind = vec![
             0x80, 0x00, 0x00, 0x34, // Fragment header

@@ -12,12 +12,15 @@ pub struct SamModule {
     description: &'static str,
 }
 
+impl Default for SamModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SamModule {
     pub fn new() -> Self {
-        Self {
-            name: "sam",
-            description: "Dump local NT hashes from the SAM hive",
-        }
+        Self { name: "sam", description: "Dump local NT hashes from the SAM hive" }
     }
 }
 
@@ -30,7 +33,7 @@ impl NxcModule for SamModule {
         self.description
     }
     fn supported_protocols(&self) -> &[&str] {
-        &["smb"].as_slice()
+        ["smb"].as_slice()
     }
 
     async fn run(
@@ -73,11 +76,6 @@ impl NxcModule for SamModule {
         c.nt_hash = Some("31d6cfe0d16ae931b73c59d7e0c089c0".into());
         credentials.push(c);
 
-        Ok(ModuleResult {
-            success: true,
-            output,
-            data: serde_json::Value::Null,
-            credentials,
-        })
+        Ok(ModuleResult { success: true, output, data: serde_json::Value::Null, credentials })
     }
 }

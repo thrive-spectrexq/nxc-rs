@@ -55,15 +55,9 @@ impl NxcModule for WebCrawler {
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         let base_url = format!("{}://{}:{}", scheme, http_sess.target, http_sess.port);
-        let max_depth = opts
-            .get("DEPTH")
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(2);
+        let max_depth = opts.get("DEPTH").and_then(|s| s.parse::<usize>().ok()).unwrap_or(2);
 
-        info!(
-            "Starting web crawl against {} up to depth {}",
-            base_url, max_depth
-        );
+        info!("Starting web crawl against {} up to depth {}", base_url, max_depth);
 
         let mut visited = HashSet::new();
         let mut queue = vec![(base_url.clone(), 0)];
@@ -99,7 +93,7 @@ impl NxcModule for WebCrawler {
                         if href.starts_with("http") && href.contains(&http_sess.target) {
                             queue.push((href.to_string(), depth + 1));
                         } else if href.starts_with('/') {
-                            queue.push((format!("{}{}", base_url, href), depth + 1));
+                            queue.push((format!("{base_url}{href}"), depth + 1));
                         }
                     }
 
@@ -130,16 +124,13 @@ impl NxcModule for WebCrawler {
 
         let mut output = String::from("Crawl Results:\n");
         output.push_str(&format!("  [*] Total Scraped URLs: {}\n", visited.len()));
-        output.push_str(&format!(
-            "  [*] JavaScript Files Discovered: {}\n",
-            js_files.len()
-        ));
+        output.push_str(&format!("  [*] JavaScript Files Discovered: {}\n", js_files.len()));
         output.push_str(&format!("  [*] Emails Discovered: {}\n", emails.len()));
 
         if !emails.is_empty() {
             output.push_str("  [+] Emails:\n");
             for email in &emails {
-                output.push_str(&format!("      - {}\n", email));
+                output.push_str(&format!("      - {email}\n"));
             }
         }
 

@@ -48,9 +48,7 @@ pub struct LdapProtocol {
 
 impl LdapProtocol {
     pub fn new() -> Self {
-        Self {
-            timeout: Duration::from_secs(10),
-        }
+        Self { timeout: Duration::from_secs(10) }
     }
 
     pub fn with_timeout(timeout: Duration) -> Self {
@@ -59,7 +57,7 @@ impl LdapProtocol {
 
     fn build_url(&self, target: &str, port: u16) -> String {
         let scheme = if port == 636 { "ldaps" } else { "ldap" };
-        format!("{}://{}:{}", scheme, target, port)
+        format!("{scheme}://{target}:{port}")
     }
 
     /// Perform an authenticated search against the LDAP server.
@@ -110,19 +108,11 @@ impl LdapProtocol {
 
         // Anonymous RootDSE query
         let rs = ldap
-            .search(
-                "",
-                ldap3::Scope::Base,
-                "(objectClass=*)",
-                vec!["defaultNamingContext"],
-            )
+            .search("", ldap3::Scope::Base, "(objectClass=*)", vec!["defaultNamingContext"])
             .await?;
         if let Some(entry) = rs.0.first() {
             let search_entry = ldap3::SearchEntry::construct(entry.clone());
-            if let Some(dn) = search_entry
-                .attrs
-                .get("defaultNamingContext")
-                .and_then(|v| v.first())
+            if let Some(dn) = search_entry.attrs.get("defaultNamingContext").and_then(|v| v.first())
             {
                 let res = dn.clone();
                 let _ = ldap.unbind().await;
@@ -130,9 +120,7 @@ impl LdapProtocol {
             }
         }
 
-        Err(anyhow!(
-            "Could not resolve defaultNamingContext from RootDSE"
-        ))
+        Err(anyhow!("Could not resolve defaultNamingContext from RootDSE"))
     }
 
     /// Enumerate all domain users.
@@ -149,12 +137,7 @@ impl LdapProtocol {
             .await?;
         Ok(entries
             .into_iter()
-            .filter_map(|e| {
-                e.attrs
-                    .get("sAMAccountName")
-                    .and_then(|v| v.first())
-                    .cloned()
-            })
+            .filter_map(|e| e.attrs.get("sAMAccountName").and_then(|v| v.first()).cloned())
             .collect())
     }
 
@@ -162,13 +145,7 @@ impl LdapProtocol {
     pub async fn enumerate_groups(&self, session: &LdapSession) -> Result<Vec<String>> {
         let base_dn = self.get_base_dn(session).await?;
         let entries = self
-            .search(
-                session,
-                &base_dn,
-                ldap3::Scope::Subtree,
-                "(objectClass=group)",
-                vec!["cn"],
-            )
+            .search(session, &base_dn, ldap3::Scope::Subtree, "(objectClass=group)", vec!["cn"])
             .await?;
         Ok(entries
             .into_iter()
@@ -180,13 +157,7 @@ impl LdapProtocol {
     pub async fn get_domain_sid(&self, session: &LdapSession) -> Result<String> {
         let base_dn = self.get_base_dn(session).await?;
         let entries = self
-            .search(
-                session,
-                &base_dn,
-                ldap3::Scope::Base,
-                "(objectClass=*)",
-                vec!["objectSid"],
-            )
+            .search(session, &base_dn, ldap3::Scope::Base, "(objectClass=*)", vec!["objectSid"])
             .await?;
         if let Some(entry) = entries.first() {
             if let Some(sid_bin) = entry.bin_attrs.get("objectSid").and_then(|v| v.first()) {
@@ -201,13 +172,7 @@ impl LdapProtocol {
         let base_dn = self.get_base_dn(session).await?;
         let filter = "(objectClass=trustedDomain)";
         let entries = self
-            .search(
-                session,
-                &base_dn,
-                ldap3::Scope::Subtree,
-                filter,
-                vec!["cn", "trustPartner"],
-            )
+            .search(session, &base_dn, ldap3::Scope::Subtree, filter, vec!["cn", "trustPartner"])
             .await?;
         Ok(entries
             .into_iter()
@@ -220,13 +185,7 @@ impl LdapProtocol {
         let base_dn = self.get_base_dn(session).await?;
         let filter = "(objectClass=mssmsManagementPoint)";
         let entries = self
-            .search(
-                session,
-                &base_dn,
-                ldap3::Scope::Subtree,
-                filter,
-                vec!["cn", "dNSHostName"],
-            )
+            .search(session, &base_dn, ldap3::Scope::Subtree, filter, vec!["cn", "dNSHostName"])
             .await?;
         Ok(entries
             .into_iter()
@@ -239,13 +198,7 @@ impl LdapProtocol {
         let base_dn = self.get_base_dn(session).await?;
         let filter = "(description=*Azure AD Sync*)";
         let entries = self
-            .search(
-                session,
-                &base_dn,
-                ldap3::Scope::Subtree,
-                filter,
-                vec!["cn", "description"],
-            )
+            .search(session, &base_dn, ldap3::Scope::Subtree, filter, vec!["cn", "description"])
             .await?;
         Ok(entries
             .into_iter()
@@ -314,7 +267,7 @@ impl NxcProtocol for LdapProtocol {
         port: u16,
         proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
-        let addr = format!("{}:{}", target, port);
+        let addr = format!("{target}:{port}");
         let target_owned = target.to_string();
         let _timeout = self.timeout;
         let proxy_owned = proxy.map(|s| s.to_string());
@@ -329,7 +282,7 @@ impl NxcProtocol for LdapProtocol {
             let _tcp_stream = runtime.block_on(async {
                 crate::connection::connect(&target_clone, port, proxy_owned.as_deref())
                     .await
-                    .map_err(|e| anyhow::anyhow!("Connection error: {}", e))
+                    .map_err(|e| anyhow::anyhow!("Connection error: {e}"))
             })?;
 
             Ok(LdapSession {
@@ -342,10 +295,7 @@ impl NxcProtocol for LdapProtocol {
         })
         .await??;
 
-        info!(
-            "LDAP: Connected to {} (verified TCP)",
-            self.build_url(target, port)
-        );
+        info!("LDAP: Connected to {} (verified TCP)", self.build_url(target, port));
         Ok(Box::new(session_result))
     }
 
@@ -364,10 +314,7 @@ impl NxcProtocol for LdapProtocol {
         }
 
         if creds.use_kerberos {
-            debug!(
-                "LDAP: Authenticating {} via Kerberos (GSS-API)",
-                creds.username
-            );
+            debug!("LDAP: Authenticating {} via Kerberos (GSS-API)", creds.username);
             return self.authenticate_kerberos(ldap_session, creds).await;
         }
 
@@ -381,10 +328,7 @@ impl NxcProtocol for LdapProtocol {
             match tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::new(&url)).await {
                 Ok(Ok(res)) => res,
                 Ok(Err(e)) => {
-                    return Ok(AuthResult::failure(
-                        &format!("Connection failed: {}", e),
-                        None,
-                    ))
+                    return Ok(AuthResult::failure(&format!("Connection failed: {e}"), None))
                 }
                 Err(_) => return Ok(AuthResult::failure("Connection timeout", None)),
             };
@@ -436,10 +380,7 @@ impl LdapProtocol {
             match tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::new(&url)).await {
                 Ok(Ok(res)) => res,
                 Ok(Err(e)) => {
-                    return Ok(AuthResult::failure(
-                        &format!("Connection failed: {}", e),
-                        None,
-                    ))
+                    return Ok(AuthResult::failure(&format!("Connection failed: {e}"), None))
                 }
                 Err(_) => return Ok(AuthResult::failure("Connection timeout", None)),
             };

@@ -12,12 +12,15 @@ pub struct LsaModule {
     description: &'static str,
 }
 
+impl Default for LsaModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LsaModule {
     pub fn new() -> Self {
-        Self {
-            name: "lsa",
-            description: "Dump LSA secrets from the SECURITY hive",
-        }
+        Self { name: "lsa", description: "Dump LSA secrets from the SECURITY hive" }
     }
 }
 

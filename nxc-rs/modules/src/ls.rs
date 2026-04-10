@@ -71,13 +71,10 @@ impl FtpLs {
         let protocol = nxc_protocols::ftp::FtpProtocol::new();
         let mut output_lines = Vec::new();
 
-        match protocol
-            .list_files(&ftp_sess.target, ftp_sess.port, &ftp_sess.credentials)
-            .await
-        {
+        match protocol.list_files(&ftp_sess.target, ftp_sess.port, &ftp_sess.credentials).await {
             Ok(files) => {
                 for file in files {
-                    output_lines.push(format!("  {}", file));
+                    output_lines.push(format!("  {file}"));
                 }
                 Ok(ModuleResult {
                     credentials: vec![],
@@ -89,7 +86,7 @@ impl FtpLs {
             Err(e) => Ok(ModuleResult {
                 credentials: vec![],
                 success: false,
-                output: format!("Failed to list files: {}", e),
+                output: format!("Failed to list files: {e}"),
                 data: serde_json::Value::Null,
             }),
         }
@@ -116,9 +113,9 @@ impl FtpLs {
 
             match protocol.list_directory(smb_sess, share, path).await {
                 Ok(entries) => {
-                    let mut output = format!("Listing entries in {}\\{}:\n", share, path);
+                    let mut output = format!("Listing entries in {share}\\{path}:\n");
                     for entry in &entries {
-                        output.push_str(&format!("  {}\n", entry));
+                        output.push_str(&format!("  {entry}\n"));
                     }
                     Ok(ModuleResult {
                         credentials: vec![],
@@ -130,7 +127,7 @@ impl FtpLs {
                 Err(e) => Ok(ModuleResult {
                     credentials: vec![],
                     success: false,
-                    output: format!("Failed to list directory: {}", e),
+                    output: format!("Failed to list directory: {e}"),
                     data: serde_json::Value::Null,
                 }),
             }
@@ -140,7 +137,7 @@ impl FtpLs {
                 Ok(shares) => {
                     let mut output = String::from("Available Shares:\n");
                     for share in &shares {
-                        output.push_str(&format!("  {}\n", share));
+                        output.push_str(&format!("  {share}\n"));
                     }
                     Ok(ModuleResult {
                         credentials: vec![],
@@ -152,7 +149,7 @@ impl FtpLs {
                 Err(e) => Ok(ModuleResult {
                     credentials: vec![],
                     success: false,
-                    output: format!("Failed to list shares: {}", e),
+                    output: format!("Failed to list shares: {e}"),
                     data: serde_json::Value::Null,
                 }),
             }

@@ -70,10 +70,10 @@ impl NxcModule for CmsEnum {
                 if let Ok(val) = value.to_str() {
                     let k = key.as_str().to_lowercase();
                     if k == "x-generator" {
-                        found_cms.push(format!("Header X-Generator: {}", val));
+                        found_cms.push(format!("Header X-Generator: {val}"));
                     }
                     if k == "x-powered-by" {
-                        found_cms.push(format!("Header X-Powered-By: {}", val));
+                        found_cms.push(format!("Header X-Powered-By: {val}"));
                     }
                 }
             }
@@ -105,7 +105,7 @@ impl NxcModule for CmsEnum {
             output.push_str("  [!] No common CMS detected.\n");
         } else {
             for cms in &found_cms {
-                output.push_str(&format!("  [+] Found: {}\n", cms));
+                output.push_str(&format!("  [+] Found: {cms}\n"));
             }
         }
 

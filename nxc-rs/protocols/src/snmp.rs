@@ -48,9 +48,7 @@ pub struct SnmpProtocol {
 
 impl SnmpProtocol {
     pub fn new() -> Self {
-        Self {
-            timeout: Duration::from_secs(3),
-        }
+        Self { timeout: Duration::from_secs(3) }
     }
 }
 
@@ -107,16 +105,10 @@ impl NxcProtocol for SnmpProtocol {
         };
 
         // For SNMP, the "password" is typically the community string.
-        let community = if let Some(ref pass) = creds.password {
-            pass.clone()
-        } else {
-            "public".to_string()
-        };
+        let community =
+            if let Some(ref pass) = creds.password { pass.clone() } else { "public".to_string() };
 
-        debug!(
-            "SNMP: Testing community string '{}' on {}",
-            community, snmp_sess.target
-        );
+        debug!("SNMP: Testing community string '{}' on {}", community, snmp_sess.target);
 
         let addr = format!("{}:{}", snmp_sess.target, snmp_sess.port);
         let timeout = self.timeout;
@@ -127,10 +119,9 @@ impl NxcProtocol for SnmpProtocol {
         let community_clone = community.clone();
         let result: Result<bool, anyhow::Error> = tokio::task::spawn_blocking(move || {
             let mut sess = SyncSession::new(addr, community_clone.as_bytes(), Some(timeout), 0)
-                .map_err(|e| anyhow!("SNMP Session Error: {}", e))?;
-            let mut response = sess
-                .get(sys_descr_oid)
-                .map_err(|e| anyhow!("SNMP Get Error: {:?}", e))?;
+                .map_err(|e| anyhow!("SNMP Session Error: {e}"))?;
+            let mut response =
+                sess.get(sys_descr_oid).map_err(|e| anyhow!("SNMP Get Error: {e:?}"))?;
             Ok(response.varbinds.next().is_some())
         })
         .await?;
@@ -174,7 +165,7 @@ impl SnmpProtocol {
         let community_clone = community.clone();
         let result: Result<String, anyhow::Error> = tokio::task::spawn_blocking(move || {
             let mut sess = SyncSession::new(addr, community_clone.as_bytes(), Some(timeout), 0)
-                .map_err(|e| anyhow!("SNMP Session Error: {}", e))?;
+                .map_err(|e| anyhow!("SNMP Session Error: {e}"))?;
             let mut report = String::new();
             for (oid, name) in oids {
                 if let Ok(mut response) = sess.get(&oid) {

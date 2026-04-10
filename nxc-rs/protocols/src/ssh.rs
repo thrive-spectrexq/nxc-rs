@@ -168,9 +168,7 @@ pub struct SshProtocol {
 
 impl SshProtocol {
     pub fn new() -> Self {
-        Self {
-            timeout: Duration::from_secs(10),
-        }
+        Self { timeout: Duration::from_secs(10) }
     }
 
     pub fn with_timeout(timeout: Duration) -> Self {
@@ -208,7 +206,7 @@ impl NxcProtocol for SshProtocol {
         port: u16,
         proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
-        let addr = format!("{}:{}", target, port);
+        let addr = format!("{target}:{port}");
         let target_owned = target.to_string();
         let timeout = self.timeout;
         let proxy_owned = proxy.map(|s| s.to_string());
@@ -223,7 +221,7 @@ impl NxcProtocol for SshProtocol {
                 TcpStream::connect_timeout(
                     &addr
                         .parse()
-                        .map_err(|e| anyhow::anyhow!("Invalid address {}: {}", addr, e))?,
+                        .map_err(|e| anyhow::anyhow!("Invalid address {addr}: {e}"))?,
                     timeout,
                 )?
             };
@@ -273,9 +271,7 @@ impl NxcProtocol for SshProtocol {
                 debug!("SSH: Authenticating {}@{}", username, addr);
 
                 let tcp = TcpStream::connect_timeout(
-                    &addr
-                        .parse()
-                        .map_err(|e| anyhow::anyhow!("Invalid address: {}", e))?,
+                    &addr.parse().map_err(|e| anyhow::anyhow!("Invalid address: {e}"))?,
                     timeout,
                 )?;
                 tcp.set_read_timeout(Some(timeout))?;
@@ -318,7 +314,7 @@ impl NxcProtocol for SshProtocol {
                         }
                     }
                     Err(e) => {
-                        let msg = format!("{}", e);
+                        let msg = format!("{e}");
                         debug!("SSH: Auth failed for {}: {}", username, msg);
                         Ok((AuthResult::failure(&msg, None), false, false, String::new()))
                     }
@@ -335,12 +331,10 @@ impl NxcProtocol for SshProtocol {
         let timeout = self.timeout;
 
         let result = tokio::task::spawn_blocking(move || -> Result<CommandOutput> {
-            let addr = format!("{}:22", target);
+            let addr = format!("{target}:22");
 
             let tcp = TcpStream::connect_timeout(
-                &addr
-                    .parse()
-                    .map_err(|e| anyhow::anyhow!("Invalid address: {}", e))?,
+                &addr.parse().map_err(|e| anyhow::anyhow!("Invalid address: {e}"))?,
                 timeout,
             )?;
 
@@ -363,11 +357,7 @@ impl NxcProtocol for SshProtocol {
             channel.wait_close()?;
             let exit_code = channel.exit_status()?;
 
-            Ok(CommandOutput {
-                stdout,
-                stderr,
-                exit_code: Some(exit_code),
-            })
+            Ok(CommandOutput { stdout, stderr, exit_code: Some(exit_code) })
         })
         .await??;
 

@@ -47,8 +47,8 @@ impl TargetAddr {
 impl std::fmt::Display for TargetAddr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TargetAddr::Ip(ip) => write!(f, "{}", ip),
-            TargetAddr::Hostname(h) => write!(f, "{}", h),
+            TargetAddr::Ip(ip) => write!(f, "{ip}"),
+            TargetAddr::Hostname(h) => write!(f, "{h}"),
         }
     }
 }
@@ -63,11 +63,7 @@ pub struct Target {
 
 impl Target {
     pub fn new(ip: IpAddr) -> Self {
-        Self {
-            addr: TargetAddr::Ip(ip),
-            hostname: None,
-            port: None,
-        }
+        Self { addr: TargetAddr::Ip(ip), hostname: None, port: None }
     }
 
     pub fn from_hostname(hostname: &str) -> Self {
@@ -98,7 +94,7 @@ impl Target {
         match &self.addr {
             TargetAddr::Ip(ip) => {
                 if let Some(ref hostname) = self.hostname {
-                    format!("{} ({})", ip, hostname)
+                    format!("{ip} ({hostname})")
                 } else {
                     ip.to_string()
                 }
@@ -158,30 +154,23 @@ fn parse_target_file(path: &str) -> Result<Vec<Target>> {
 fn parse_cidr(spec: &str) -> Result<Vec<Target>> {
     let parts: Vec<&str> = spec.split('/').collect();
     if parts.len() != 2 {
-        anyhow::bail!("Invalid CIDR notation: {}", spec);
+        anyhow::bail!("Invalid CIDR notation: {spec}");
     }
     let base_ip: std::net::Ipv4Addr = parts[0].parse()?;
     let prefix_len: u32 = parts[1].parse()?;
     if prefix_len > 32 {
-        anyhow::bail!("Invalid CIDR prefix length: {}", prefix_len);
+        anyhow::bail!("Invalid CIDR prefix length: {prefix_len}");
     }
 
     let base = u32::from(base_ip);
-    let mask = if prefix_len == 0 {
-        0
-    } else {
-        !((1u32 << (32 - prefix_len)) - 1)
-    };
+    let mask = if prefix_len == 0 { 0 } else { !((1u32 << (32 - prefix_len)) - 1) };
     let network = base & mask;
     let broadcast = network | !mask;
     let mut targets = Vec::new();
 
     // Skip network and broadcast for /24 and larger
-    let (start, end) = if prefix_len >= 31 {
-        (network, broadcast)
-    } else {
-        (network + 1, broadcast - 1)
-    };
+    let (start, end) =
+        if prefix_len >= 31 { (network, broadcast) } else { (network + 1, broadcast - 1) };
 
     for ip_int in start..=end {
         let ip = std::net::Ipv4Addr::from(ip_int);
@@ -351,7 +340,7 @@ impl ExecutionEngine {
                                     username: cred_clone.username.clone(),
                                     success: false,
                                     admin: false,
-                                    message: format!("Connection failed: {}", e),
+                                    message: format!("Connection failed: {e}"),
                                     duration_ms: start_time.elapsed().as_millis() as u64,
                                     module_data: std::collections::HashMap::new(),
                                 }
@@ -410,7 +399,7 @@ impl ExecutionEngine {
                                         }
                                         Ok(Some(h_id))
                                     }).await;
-                                    
+
                                     host_id = db_res.ok().and_then(|r| r.ok()).flatten();
                                 }
 
@@ -456,7 +445,7 @@ impl ExecutionEngine {
                                                                             lm_hash: m_cred.lm_hash.clone(),
                                                                             aes_128: m_cred.aes_128_key.clone(),
                                                                             aes_256: m_cred.aes_256_key.clone(),
-                                                                            source: Some(format!("{}:{}", p_name, m_name)),
+                                                                            source: Some(format!("{p_name}:{m_name}")),
                                                                             host_id: h_id,
                                                                             created_at: now,
                                                                         },
@@ -473,15 +462,13 @@ impl ExecutionEngine {
                                                 }
                                                 Err(e) => {
                                                     final_message.push_str(&format!(
-                                                        " | Module {} Error: {}",
-                                                        module_name, e
+                                                        " | Module {module_name} Error: {e}"
                                                     ));
                                                 }
                                             }
                                         } else {
                                             final_message.push_str(&format!(
-                                                " | Module {} not found",
-                                                module_name
+                                                " | Module {module_name} not found"
                                             ));
                                         }
                                     }
@@ -504,7 +491,7 @@ impl ExecutionEngine {
                                 username: cred_clone.username.clone(),
                                 success: false,
                                 admin: false,
-                                message: format!("Auth error: {}", e),
+                                message: format!("Auth error: {e}"),
                                 duration_ms: start_time.elapsed().as_millis() as u64,
                                 module_data: std::collections::HashMap::new(),
                             },
@@ -550,7 +537,6 @@ impl ExecutionEngine {
 
         results
     }
-
 }
 
 // ─── Tests ──────────────────────────────────────────────────────
@@ -639,9 +625,7 @@ mod tests {
                 if target == "192.168.1.99" {
                     return Err(anyhow::anyhow!("Connection timeout mock"));
                 }
-                Ok(Box::new(MockSession {
-                    target: target.to_string(),
-                }))
+                Ok(Box::new(MockSession { target: target.to_string() }))
             }
 
             async fn authenticate(
@@ -700,10 +684,7 @@ mod tests {
         assert_eq!(results.len(), 12);
 
         // Check the connection failure for .99 matches the mock behavior
-        let failures = results
-            .iter()
-            .filter(|r| r.target == "192.168.1.99")
-            .count();
+        let failures = results.iter().filter(|r| r.target == "192.168.1.99").count();
         assert_eq!(failures, 3);
 
         // Assert admin auth logic passed correctly for others
@@ -770,9 +751,7 @@ mod tests {
                         self
                     }
                 }
-                Ok(Box::new(MockSess {
-                    t: target.to_string(),
-                }))
+                Ok(Box::new(MockSess { t: target.to_string() }))
             }
             async fn authenticate(
                 &self,

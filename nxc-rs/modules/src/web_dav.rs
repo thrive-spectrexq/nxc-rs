@@ -58,9 +58,7 @@ impl NxcModule for WebDav {
         let mut can_upload = false;
 
         // 1. Send OPTIONS request
-        let mut req_options = http_sess
-            .client
-            .request(reqwest::Method::OPTIONS, &base_url);
+        let mut req_options = http_sess.client.request(reqwest::Method::OPTIONS, &base_url);
         if let Some(creds) = &http_sess.credentials {
             if let Some(pw) = &creds.password {
                 req_options = req_options.basic_auth(&creds.username, Some(pw));
@@ -70,22 +68,14 @@ impl NxcModule for WebDav {
         }
 
         if let Ok(res) = req_options.send().await {
-            let allow_header = res
-                .headers()
-                .get("Allow")
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("");
-            let dav_header = res
-                .headers()
-                .get("DAV")
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("");
+            let allow_header =
+                res.headers().get("Allow").and_then(|v| v.to_str().ok()).unwrap_or("");
+            let dav_header = res.headers().get("DAV").and_then(|v| v.to_str().ok()).unwrap_or("");
 
             if !dav_header.is_empty() || allow_header.contains("PROPFIND") {
                 dav_enabled = true;
                 output.push_str(&format!(
-                    "  [!] WebDAV appears ENABLED.\n      DAV Header: {}\n      Allow Header: {}\n",
-                    dav_header, allow_header
+                    "  [!] WebDAV appears ENABLED.\n      DAV Header: {dav_header}\n      Allow Header: {allow_header}\n"
                 ));
             } else {
                 output.push_str(
@@ -96,8 +86,8 @@ impl NxcModule for WebDav {
 
         // 2. Regardless of OPTIONS result, forcibly attempt a PUT to check for write access.
         let epoch = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        let filename = format!("test_{}.txt", epoch);
-        let upload_url = format!("{}/{}", base_url, filename);
+        let filename = format!("test_{epoch}.txt");
+        let upload_url = format!("{base_url}/{filename}");
         let payload = "NetExec-RS WebDAV Test File\n";
 
         let mut req_put = http_sess.client.put(&upload_url).body(payload.to_string());
@@ -114,19 +104,13 @@ impl NxcModule for WebDav {
             if status.is_success() || status.as_u16() == 201 {
                 // 201 Created
                 can_upload = true;
-                output.push_str(&format!("  [!] CRITICAL: Arbitrary file upload successful via PUT!\n      File created at: {}\n", upload_url));
+                output.push_str(&format!("  [!] CRITICAL: Arbitrary file upload successful via PUT!\n      File created at: {upload_url}\n"));
 
                 // Attempt cleanup
-                let _ = http_sess
-                    .client
-                    .request(reqwest::Method::DELETE, &upload_url)
-                    .send()
-                    .await;
+                let _ = http_sess.client.request(reqwest::Method::DELETE, &upload_url).send().await;
             } else {
-                output.push_str(&format!(
-                    "  [-] File upload failed via PUT (Status: {}).\n",
-                    status
-                ));
+                output
+                    .push_str(&format!("  [-] File upload failed via PUT (Status: {status}).\n"));
             }
         }
 

@@ -28,11 +28,15 @@ pub struct ToolRegistry {
     tools: HashMap<String, Box<dyn NxcTool>>,
 }
 
+impl Default for ToolRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ToolRegistry {
     pub fn new() -> Self {
-        Self {
-            tools: HashMap::new(),
-        }
+        Self { tools: HashMap::new() }
     }
 
     pub fn register(&mut self, tool: Box<dyn NxcTool>) {

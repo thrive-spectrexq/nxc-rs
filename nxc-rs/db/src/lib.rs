@@ -132,14 +132,12 @@ fn run_migrations(conn: &rusqlite::Connection) -> Result<()> {
         "CREATE TABLE IF NOT EXISTS nxc_schema_version (
             version INTEGER PRIMARY KEY,
             applied_at INTEGER NOT NULL
-        )"
+        )",
     )?;
 
-    let current: i64 = conn.query_row(
-        "SELECT COALESCE(MAX(version), 0) FROM nxc_schema_version",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let current: i64 = conn
+        .query_row("SELECT COALESCE(MAX(version), 0) FROM nxc_schema_version", [], |row| row.get(0))
+        .unwrap_or(0);
 
     for (version, sql) in MIGRATIONS {
         if *version > current {
@@ -172,10 +170,7 @@ impl NxcDb {
         let conn = pool.get()?;
         run_migrations(&conn)?;
 
-        Ok(Self {
-            pool,
-            workspace: workspace.to_string(),
-        })
+        Ok(Self { pool, workspace: workspace.to_string() })
     }
 
     // ── Host operations ──
@@ -228,8 +223,7 @@ impl NxcDb {
                 last_seen: row.get(11)?,
             })
         })?;
-        rows.collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(Into::into)
+        rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
     }
 
     // ── Credential operations ──
@@ -297,8 +291,7 @@ impl NxcDb {
                 created_at: row.get(11)?,
             })
         })?;
-        rows.collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(Into::into)
+        rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
     }
 
     // ── Workspace management ──
@@ -315,8 +308,7 @@ impl NxcDb {
         let conn = self.pool.get()?;
         let mut stmt = conn.prepare("SELECT DISTINCT workspace FROM nxc_hosts")?;
         let rows = stmt.query_map([], |row| row.get(0))?;
-        rows.collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(Into::into)
+        rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
     }
 
     pub fn get_stats_in(&self, workspace: &str) -> Result<WorkspaceStats> {
@@ -368,9 +360,9 @@ mod tests {
     fn test_db_migration_and_upsert() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("nxc_test.db");
-        
+
         let db = NxcDb::new(&db_path, "default").unwrap();
-        
+
         // Test upserting a host
         let host = HostInfo {
             id: None,
@@ -386,10 +378,10 @@ mod tests {
             first_seen: 0,
             last_seen: 0,
         };
-        
+
         let host_id = db.upsert_host(&host).unwrap();
         assert!(host_id > 0);
-        
+
         let hosts = db.list_hosts_in("default").unwrap();
         assert_eq!(hosts.len(), 1);
         assert_eq!(hosts[0].ip, "192.168.1.100");

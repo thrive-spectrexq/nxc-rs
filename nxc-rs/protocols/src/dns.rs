@@ -20,11 +20,21 @@ pub struct DnsSession {
 }
 
 impl NxcSession for DnsSession {
-    fn protocol(&self) -> &'static str { "dns" }
-    fn target(&self) -> &str { &self.target }
-    fn is_admin(&self) -> bool { self.admin }
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    fn protocol(&self) -> &'static str {
+        "dns"
+    }
+    fn target(&self) -> &str {
+        &self.target
+    }
+    fn is_admin(&self) -> bool {
+        self.admin
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 // ─── DNS Protocol ───────────────────────────────────────────────
@@ -32,27 +42,45 @@ impl NxcSession for DnsSession {
 pub struct DnsProtocol;
 
 impl DnsProtocol {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for DnsProtocol {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl NxcProtocol for DnsProtocol {
-    fn name(&self) -> &'static str { "dns" }
-    fn default_port(&self) -> u16 { 53 }
-    fn supports_exec(&self) -> bool { false }
-    fn supported_modules(&self) -> &[&str] { &["enum_dns", "dns_nonsecure"] }
+    fn name(&self) -> &'static str {
+        "dns"
+    }
+    fn default_port(&self) -> u16 {
+        53
+    }
+    fn supports_exec(&self) -> bool {
+        false
+    }
+    fn supported_modules(&self) -> &[&str] {
+        &["enum_dns", "dns_nonsecure"]
+    }
 
-    async fn connect(&self, target: &str, port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        port: u16,
+        _proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         info!("DNS: Connecting to {}:{}", target, port);
 
         // Verify DNS is reachable via a simple query
-        let addr = format!("{}:{}", target, port);
-        let socket = UdpSocket::bind("0.0.0.0:0").await
-            .map_err(|e| anyhow!("Failed to bind UDP socket: {}", e))?;
+        let addr = format!("{target}:{port}");
+        let socket = UdpSocket::bind("0.0.0.0:0")
+            .await
+            .map_err(|e| anyhow!("Failed to bind UDP socket: {e}"))?;
 
         // Simple DNS query for version.bind (CHAOS class)
         let query = build_dns_query(b"\x07version\x04bind\x00", 16, 3); // TXT, CH
@@ -61,16 +89,17 @@ impl NxcProtocol for DnsProtocol {
             debug!("DNS: Could not reach {}:{}, continuing anyway", target, port);
         }
 
-        Ok(Box::new(DnsSession {
-            target: target.to_string(),
-            port,
-            admin: false,
-            domain: None,
-        }))
+        Ok(Box::new(DnsSession { target: target.to_string(), port, admin: false, domain: None }))
     }
 
-    async fn authenticate(&self, session: &mut dyn NxcSession, creds: &Credentials) -> Result<AuthResult> {
-        let dns_sess = session.as_any_mut().downcast_mut::<DnsSession>()
+    async fn authenticate(
+        &self,
+        session: &mut dyn NxcSession,
+        creds: &Credentials,
+    ) -> Result<AuthResult> {
+        let dns_sess = session
+            .as_any_mut()
+            .downcast_mut::<DnsSession>()
             .ok_or_else(|| anyhow!("Invalid session type"))?;
 
         // DNS doesn't really have auth, but we store the domain from creds
@@ -94,8 +123,9 @@ impl DnsProtocol {
 
         // Build AXFR query (TCP required for zone transfers)
         let target_addr = format!("{}:{}", session.target, session.port);
-        let mut stream = tokio::net::TcpStream::connect(&target_addr).await
-            .map_err(|e| anyhow!("TCP connection failed for AXFR: {}", e))?;
+        let mut stream = tokio::net::TcpStream::connect(&target_addr)
+            .await
+            .map_err(|e| anyhow!("TCP connection failed for AXFR: {e}"))?;
 
         let domain_labels = encode_dns_name(domain);
         let query = build_dns_query(&domain_labels, 252, 1); // AXFR, IN
@@ -111,18 +141,20 @@ impl DnsProtocol {
         let mut buf = vec![0u8; 65535];
         match stream.read(&mut buf).await {
             Ok(n) if n > 2 => {
-                records.push(format!("Received {} bytes in AXFR response", n));
+                records.push(format!("Received {n} bytes in AXFR response"));
                 if n > 12 {
                     let rcode = buf[5] & 0x0F;
                     match rcode {
                         0 => records.push("AXFR succeeded (NOERROR)".to_string()),
-                        5 => records.push("AXFR refused (REFUSED) - zone transfers not allowed".to_string()),
-                        _ => records.push(format!("AXFR rcode: {}", rcode)),
+                        5 => records.push(
+                            "AXFR refused (REFUSED) - zone transfers not allowed".to_string(),
+                        ),
+                        _ => records.push(format!("AXFR rcode: {rcode}")),
                     }
                 }
             }
             Ok(_) => records.push("AXFR: Empty or minimal response".to_string()),
-            Err(e) => records.push(format!("AXFR read error: {}", e)),
+            Err(e) => records.push(format!("AXFR read error: {e}")),
         }
 
         Ok(records)

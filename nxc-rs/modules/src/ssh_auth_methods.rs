@@ -54,26 +54,19 @@ impl NxcModule for SshAuthMethods {
             .downcast_ref::<SshSession>()
             .ok_or_else(|| anyhow!("Module requires an SSH session"))?;
 
-        let username = opts
-            .get("USERNAME")
-            .map(|s| s.as_str())
-            .unwrap_or("root")
-            .to_string();
+        let username = opts.get("USERNAME").map(|s| s.as_str()).unwrap_or("root").to_string();
         let target = ssh_sess.target.clone();
         let port = ssh_sess.port;
 
-        info!(
-            "Enumerating supported SSH auth methods for '{}' on {}:{}",
-            username, target, port
-        );
+        info!("Enumerating supported SSH auth methods for '{}' on {}:{}", username, target, port);
 
         // SSH connections from ssh2 crate are blocking, so we use spawn_blocking (which is completely acceptable and common here)
         let result = tokio::task::spawn_blocking(move || -> Result<(String, bool, Vec<String>)> {
-            let addr = format!("{}:{}", target, port);
+            let addr = format!("{target}:{port}");
             let mut output = String::from("SSH Authentication Methods Results:\n");
-            
+
             let tcp = TcpStream::connect_timeout(
-                &addr.parse().map_err(|e| anyhow!("Invalid address: {}", e))?,
+                &addr.parse().map_err(|e| anyhow!("Invalid address: {e}"))?,
                 std::time::Duration::from_secs(5),
             )?;
             tcp.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
@@ -88,16 +81,16 @@ impl NxcModule for SshAuthMethods {
             let methods_raw = sess.auth_methods(&username)?;
             let methods: Vec<String> = methods_raw.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
 
-            output.push_str(&format!("  [*] Target Username: {}\n", username));
-            
+            output.push_str(&format!("  [*] Target Username: {username}\n"));
+
             if methods.is_empty() {
                 output.push_str("  [-] No authentication methods gracefully returned by the server.\n");
             } else {
                  output.push_str(&format!("  [+] Supported Methods (count: {}):\n", methods.len()));
                  for method in &methods {
-                      output.push_str(&format!("      -> {}\n", method));
+                      output.push_str(&format!("      -> {method}\n"));
                  }
-                 
+
                  // Add security analysis context
                  if methods.contains(&"password".to_string()) || methods.contains(&"keyboard-interactive".to_string()) {
                       output.push_str("\n      [!] WARNING: Target supports password/interactive authentication. Prone to brute-force attacks.\n");
@@ -105,7 +98,7 @@ impl NxcModule for SshAuthMethods {
                       output.push_str("\n      [+] SECURE: Target strictly enforces Public Key authentication. Resistant to traditional credential brute forcing.\n");
                  }
             }
-            
+
             Ok((output, sess.authenticated(), methods))
         }).await??;
 

@@ -13,6 +13,12 @@ use zip::{write::FileOptions, ZipWriter};
 
 pub struct BloodhoundModule;
 
+impl Default for BloodhoundModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BloodhoundModule {
     pub fn new() -> Self {
         Self
@@ -112,15 +118,14 @@ impl NxcModule for BloodhoundModule {
         {
             let verify_ssl = opts.get("verify_ssl").map(|s| s == "true").unwrap_or(false);
             info!("BloodHound: Zipping and pushing data to {}...", bh_uri);
-            if let Err(e) = self
-                .upload_to_bloodhound(bh_uri, bh_user, bh_pass, verify_ssl, &payload)
-                .await
+            if let Err(e) =
+                self.upload_to_bloodhound(bh_uri, bh_user, bh_pass, verify_ssl, &payload).await
             {
                 error!("BloodHound: Failed to upload data: {}", e);
                 return Ok(ModuleResult {
                     credentials: vec![],
                     success: false,
-                    output: format!("Failed to push to BloodHound API: {}", e),
+                    output: format!("Failed to push to BloodHound API: {e}"),
                     data: payload,
                 });
             } else {
@@ -154,9 +159,7 @@ impl BloodhoundModule {
         verify_ssl: bool,
         payload: &serde_json::Value,
     ) -> Result<()> {
-        let client = Client::builder()
-            .danger_accept_invalid_certs(!verify_ssl)
-            .build()?;
+        let client = Client::builder().danger_accept_invalid_certs(!verify_ssl).build()?;
 
         // 1. Authenticate with BloodHound CE API to get a session JWT
         let login_url = format!("{}/api/v2/login", uri.trim_end_matches('/'));
@@ -204,7 +207,7 @@ impl BloodhoundModule {
         debug!("BloodHound: Pushing zip payload to {}", upload_url);
         let upload_resp = client
             .post(&upload_url)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .multipart(form)
             .send()
             .await?;

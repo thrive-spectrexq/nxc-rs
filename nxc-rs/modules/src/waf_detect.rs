@@ -49,10 +49,8 @@ impl NxcModule for WafDetect {
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         // Malicious payload to trigger WAF blocking behavior: a standard benign SQLi
-        let base_url = format!(
-            "{}://{}:{}/?id=1'+OR+'1'='1'--",
-            scheme, http_sess.target, http_sess.port
-        );
+        let base_url =
+            format!("{}://{}:{}/?id=1'+OR+'1'='1'--", scheme, http_sess.target, http_sess.port);
 
         info!("Starting WAF Detection against {}", base_url);
 
@@ -132,7 +130,7 @@ impl NxcModule for WafDetect {
 
         match &detected_waf {
             Some(waf) => {
-                output.push_str(&format!("  [!] WAF Detected: {}\n", waf));
+                output.push_str(&format!("  [!] WAF Detected: {waf}\n"));
             }
             None => {
                 output

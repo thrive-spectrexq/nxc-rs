@@ -57,7 +57,7 @@ impl NxcModule for FtpAnon {
 
         if let Ok(mut ftp_stream) = AsyncFtpStream::connect(&addr).await {
             // Attempt anonymous login
-            if let Ok(_) = ftp_stream.login("anonymous", "anonymous@domain.com").await {
+            if ftp_stream.login("anonymous", "anonymous@domain.com").await.is_ok() {
                 anon_successful = true;
                 output.push_str("  [+] VULNERABLE: Anonymous login successful!\n");
 

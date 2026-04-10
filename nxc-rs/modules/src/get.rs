@@ -50,9 +50,7 @@ impl NxcModule for GetModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let path = opts
-            .get("PATH")
-            .ok_or_else(|| anyhow::anyhow!("PATH option is required"))?;
+        let path = opts.get("PATH").ok_or_else(|| anyhow::anyhow!("PATH option is required"))?;
 
         match session.protocol() {
             "smb" => self.run_smb(session, path).await,
@@ -74,12 +72,7 @@ impl GetModule {
             .split_once('\\')
             .ok_or_else(|| anyhow::anyhow!("PATH must be in format SHARE\\path"))?;
 
-        info!(
-            "Get: Downloading {}\\{} from {}",
-            share,
-            path,
-            session.target()
-        );
+        info!("Get: Downloading {}\\{} from {}", share, path, session.target());
         match protocol.download_file(smb_sess, share, path).await {
             Ok(data) => {
                 let local_path = format!("loot/{}_{}", session.target(), path.replace('\\', "_"));
@@ -89,17 +82,14 @@ impl GetModule {
                 Ok(ModuleResult {
                     credentials: vec![],
                     success: true,
-                    output: format!(
-                        "[+] Successfully downloaded {} to {}",
-                        path_full, local_path
-                    ),
+                    output: format!("[+] Successfully downloaded {path_full} to {local_path}"),
                     data: serde_json::json!({ "local_path": local_path, "size": data.len() }),
                 })
             }
             Err(e) => Ok(ModuleResult {
                 credentials: vec![],
                 success: false,
-                output: format!("[-] Failed to download: {}", e),
+                output: format!("[-] Failed to download: {e}"),
                 data: serde_json::Value::Null,
             }),
         }

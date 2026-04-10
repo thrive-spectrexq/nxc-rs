@@ -10,6 +10,12 @@ use tracing::{debug, info};
 
 pub struct AdcsModule;
 
+impl Default for AdcsModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AdcsModule {
     pub fn new() -> Self {
         Self
@@ -41,22 +47,19 @@ impl NxcModule for AdcsModule {
         let mut data_templates = Vec::new();
         let mut data_cas = Vec::new();
 
-        if let Some(ldap_sess) = session
-            .as_any()
-            .downcast_ref::<nxc_protocols::ldap::LdapSession>()
+        if let Some(ldap_sess) = session.as_any().downcast_ref::<nxc_protocols::ldap::LdapSession>()
         {
             let protocol = nxc_protocols::ldap::LdapProtocol::new();
             let base_dn = protocol.get_base_dn(ldap_sess).await?;
-            let config_dn = format!("CN=Configuration,{}", base_dn);
+            let config_dn = format!("CN=Configuration,{base_dn}");
 
-            output.push_str(&format!("[*] AD CS Enumeration for {}\n", base_dn));
+            output.push_str(&format!("[*] AD CS Enumeration for {base_dn}\n"));
             output.push_str("--------------------------------------------------\n");
 
             // 1. Certification Authorities
             debug!("LDAP: Querying Certification Authorities in {}", config_dn);
             let ca_dn = format!(
-                "CN=Certification Authorities,CN=Public Key Services,CN=Services,{}",
-                config_dn
+                "CN=Certification Authorities,CN=Public Key Services,CN=Services,{config_dn}"
             );
             let ca_entries = protocol
                 .search(
@@ -70,22 +73,15 @@ impl NxcModule for AdcsModule {
 
             output.push_str("\n[+] Certification Authorities:\n");
             for entry in ca_entries {
-                let cn = entry
-                    .attrs
-                    .get("cn")
-                    .and_then(|v| v.first())
-                    .cloned()
-                    .unwrap_or_default();
-                output.push_str(&format!("  - {}\n", cn));
+                let cn = entry.attrs.get("cn").and_then(|v| v.first()).cloned().unwrap_or_default();
+                output.push_str(&format!("  - {cn}\n"));
                 data_cas.push(cn);
             }
 
             // 2. Enrollment Services (CAs that actually issue certs)
             debug!("LDAP: Querying Enrollment Services in {}", config_dn);
-            let enroll_dn = format!(
-                "CN=Enrollment Services,CN=Public Key Services,CN=Services,{}",
-                config_dn
-            );
+            let enroll_dn =
+                format!("CN=Enrollment Services,CN=Public Key Services,CN=Services,{config_dn}");
             let enroll_entries = protocol
                 .search(
                     ldap_sess,
@@ -98,26 +94,20 @@ impl NxcModule for AdcsModule {
 
             output.push_str("\n[+] Enrollment Services (Active CAs):\n");
             for entry in enroll_entries {
-                let cn = entry
-                    .attrs
-                    .get("cn")
-                    .and_then(|v| v.first())
-                    .cloned()
-                    .unwrap_or_default();
+                let cn = entry.attrs.get("cn").and_then(|v| v.first()).cloned().unwrap_or_default();
                 let host = entry
                     .attrs
                     .get("dNSHostName")
                     .and_then(|v| v.first())
                     .cloned()
                     .unwrap_or_default();
-                output.push_str(&format!("  - {} (Host: {})\n", cn, host));
+                output.push_str(&format!("  - {cn} (Host: {host})\n"));
             }
 
             // 3. Certificate Templates
             debug!("LDAP: Querying Certificate Templates in {}", config_dn);
             let template_dn = format!(
-                "CN=Certificate Templates,CN=Public Key Services,CN=Services,{}",
-                config_dn
+                "CN=Certificate Templates,CN=Public Key Services,CN=Services,{config_dn}"
             );
             let template_entries = protocol
                 .search(
@@ -138,12 +128,7 @@ impl NxcModule for AdcsModule {
 
             output.push_str("\n[+] Certificate Templates & Vulnerabilities:\n");
             for entry in template_entries {
-                let cn = entry
-                    .attrs
-                    .get("cn")
-                    .and_then(|v| v.first())
-                    .cloned()
-                    .unwrap_or_default();
+                let cn = entry.attrs.get("cn").and_then(|v| v.first()).cloned().unwrap_or_default();
                 let display_name = entry
                     .attrs
                     .get("displayName")
@@ -169,11 +154,7 @@ impl NxcModule for AdcsModule {
                     .and_then(|v| v.first())
                     .and_then(|s| s.parse::<u32>().ok())
                     .unwrap_or(0);
-                let ekus = entry
-                    .attrs
-                    .get("pKIExtendedKeyUsage")
-                    .cloned()
-                    .unwrap_or_default();
+                let ekus = entry.attrs.get("pKIExtendedKeyUsage").cloned().unwrap_or_default();
 
                 let mut vulns = Vec::new();
 
@@ -206,7 +187,7 @@ impl NxcModule for AdcsModule {
                         vulns.join(", ")
                     ));
                 } else {
-                    output.push_str(&format!("  - {} ({})\n", cn, display_name));
+                    output.push_str(&format!("  - {cn} ({display_name})\n"));
                 }
 
                 data_templates.push(serde_json::json!({
