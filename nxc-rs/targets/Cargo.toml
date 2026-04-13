@@ -10,6 +10,7 @@ nxc-auth = { path = "../auth" }
 nxc-protocols = { path = "../protocols" }
 nxc-modules = { path = "../modules" }
 nxc-db = { path = "../db" }
+nxc-resilience = { path = "../resilience" }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }

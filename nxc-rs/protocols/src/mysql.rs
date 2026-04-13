@@ -190,8 +190,23 @@ impl NxcProtocol for MysqlProtocol {
                 for row in rows {
                     let mut line = String::new();
                     for i in 0..row.len() {
-                        let val: String = row.get(i).unwrap_or_else(|| "NULL".to_string());
-                        line.push_str(&val);
+                        let val_opt: Option<mysql_async::Value> = row.get(i);
+                        let val_str = match val_opt {
+                            Some(mysql_async::Value::NULL) | None => "NULL".to_string(),
+                            Some(mysql_async::Value::Bytes(b)) => String::from_utf8_lossy(&b).to_string(),
+                            Some(mysql_async::Value::Int(v)) => v.to_string(),
+                            Some(mysql_async::Value::UInt(v)) => v.to_string(),
+                            Some(mysql_async::Value::Float(v)) => v.to_string(),
+                            Some(mysql_async::Value::Double(v)) => v.to_string(),
+                            Some(mysql_async::Value::Date(y, m, d, h, min, s, ms)) => {
+                                format!("{y}-{m:02}-{d:02} {h:02}:{min:02}:{s:02}.{ms:06}")
+                            }
+                            Some(mysql_async::Value::Time(is_neg, d, h, m, s, ms)) => {
+                                let sign = if is_neg { "-" } else { "" };
+                                format!("{sign}{d} days {h:02}:{m:02}:{s:02}.{ms:06}")
+                            }
+                        };
+                        line.push_str(&val_str);
                         line.push_str(" | ");
                     }
                     stdout.push_str(&line);

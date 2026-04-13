@@ -6,6 +6,7 @@
 mod cli;
 mod handlers;
 mod output;
+mod profiling;
 mod relay;
 mod reporting;
 
@@ -14,13 +15,16 @@ use chrono::Utc;
 use cli::{build_cli, build_credentials, get_protocol_handler, CODENAME, VERSION};
 use colored::Colorize;
 use handlers::handle_ai_mode;
+use nxc_auth::Credentials;
 use nxc_db::NxcDb;
 use nxc_modules::ModuleRegistry;
+use nxc_protocols::connection::ConnectionManager;
 use nxc_protocols::Protocol;
-use nxc_targets::{parse_targets, ExecutionEngine, ExecutionOpts};
+use nxc_targets::{parse_targets, ExecutionEngine, ExecutionOpts, Target};
 use output::{NxcGlobalOutput, NxcOutput};
 use std::sync::Arc;
 use std::time::Duration;
+use crate::profiling::{capture_memory_snapshot, log_memory_usage, ScopedTimer};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -128,6 +132,14 @@ async fn main() -> Result<()> {
     let stealth = matches.get_flag("stealth");
     let continue_on_success = sub_matches.get_flag("continue-on-success");
     let no_bruteforce = sub_matches.get_flag("no-bruteforce");
+    let profiling_enabled = matches.get_flag("profiling");
+    let retries = matches.get_one::<u32>("retries").copied().unwrap_or(3);
+    let cb_threshold = matches.get_one::<u32>("cb-threshold").copied().unwrap_or(5);
+
+    if profiling_enabled {
+        NxcGlobalOutput::info("Performance profiling enabled");
+        log_memory_usage("Process Start");
+    }
 
     // Apply stealth macro
     if stealth {
@@ -187,6 +199,13 @@ async fn main() -> Result<()> {
         "docker" => {
             if sub_matches.get_flag("enum") && !modules.contains(&"docker_enum".to_string()) {
                 modules.push("docker_enum".to_string());
+            }
+        }
+        "opcua" => {
+            if sub_matches.get_flag("enum") && !modules.contains(&"opcua_enum".to_string()) {
+                // For OPC-UA, we map 'enum' to a stub if we want module isolation,
+                // but NxcEngine will call protocol.execute() by default?
+                // Actually, let's just mark it.
             }
         }
         _ => {}
@@ -292,10 +311,28 @@ async fn main() -> Result<()> {
 
     // ── Run the execution engine ──
     let mut engine = ExecutionEngine::new(exec_opts);
+
+    // Apply resilience settings
+    if let Some(manager) = Arc::get_mut(engine.manager_mut()) {
+        manager.set_failure_threshold(cb_threshold);
+        manager.retry_policy_mut().max_retries = retries;
+    }
+
     if let Some(d) = db {
         engine = engine.with_db(d);
     }
+
+    let _timer = if profiling_enabled {
+        Some(ScopedTimer::new("ExecutionEngine::run"))
+    } else {
+        None
+    };
+
     let results = engine.run(protocol, all_targets, creds).await;
+
+    if profiling_enabled {
+        log_memory_usage("Process End");
+    }
 
     // ── Display results ──
     let port = sub_matches.get_one::<u16>("port").copied().unwrap_or_else(|| {

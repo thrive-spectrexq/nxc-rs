@@ -24,6 +24,8 @@ pub mod mysql;
 pub mod network;
 pub mod nfs;
 pub mod obfuscation;
+#[cfg(feature = "opcua-support")]
+pub mod opcua;
 pub mod postgresql;
 pub mod rdp;
 pub mod redis;
@@ -156,6 +158,7 @@ pub enum Protocol {
     Ipmi,
     Ilo,
     Kube,
+    OpcUa,
 }
 
 impl Protocol {
@@ -183,6 +186,7 @@ impl Protocol {
             Protocol::Ipmi => "ipmi",
             Protocol::Ilo => "ilo",
             Protocol::Kube => "kube",
+            Protocol::OpcUa => "opcua",
         }
     }
 
@@ -210,6 +214,7 @@ impl Protocol {
             Protocol::Ipmi => 623,
             Protocol::Ilo => 443,
             Protocol::Kube => 6443,
+            Protocol::OpcUa => 4840,
         }
     }
 
@@ -239,6 +244,7 @@ impl Protocol {
             "ipmi" => Some(Protocol::Ipmi),
             "ilo" | "idrac" | "bmc" => Some(Protocol::Ilo),
             "kube" | "kubernetes" | "k8s" => Some(Protocol::Kube),
+            "opcua" | "opc" => Some(Protocol::OpcUa),
             _ => None,
         }
     }
@@ -268,6 +274,7 @@ impl Protocol {
             Protocol::Ipmi,
             Protocol::Ilo,
             Protocol::Kube,
+            Protocol::OpcUa,
         ]
     }
 }

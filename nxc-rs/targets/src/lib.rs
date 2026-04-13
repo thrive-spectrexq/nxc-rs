@@ -7,7 +7,9 @@ use anyhow::Result;
 use chrono::Utc;
 use nxc_auth::Credentials;
 use nxc_db::{Credential, HostInfo, NxcDb};
+use nxc_protocols::connection::ConnectionManager;
 use nxc_protocols::NxcProtocol;
+use nxc_resilience::RetryPolicy;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -252,11 +254,22 @@ pub struct ExecutionResult {
 pub struct ExecutionEngine {
     opts: ExecutionOpts,
     db: Option<Arc<NxcDb>>,
+    manager: Arc<ConnectionManager>,
 }
 
 impl ExecutionEngine {
     pub fn new(opts: ExecutionOpts) -> Self {
-        Self { opts, db: None }
+        let manager = ConnectionManager::new()
+            .with_timeout_manager(nxc_resilience::TimeoutManager {
+                connect: opts.timeout,
+                ..Default::default()
+            });
+
+        Self {
+            opts,
+            db: None,
+            manager: Arc::new(manager),
+        }
     }
 
     pub fn with_db(mut self, db: Arc<NxcDb>) -> Self {
@@ -264,8 +277,25 @@ impl ExecutionEngine {
         self
     }
 
+    /// Set a custom retry policy for the engine.
+    pub fn with_retry_policy(mut self, policy: RetryPolicy) -> Self {
+        // Re-create the manager with the updated policy since ConnectionManager
+        // doesn't implement Clone and is behind an Arc.
+        let new_manager = ConnectionManager::new().with_retry_policy(policy);
+        self.manager = Arc::new(new_manager);
+        self
+    }
+
     pub fn opts(&self) -> &ExecutionOpts {
         &self.opts
+    }
+
+    pub fn manager(&self) -> &Arc<ConnectionManager> {
+        &self.manager
+    }
+
+    pub fn manager_mut(&mut self) -> &mut Arc<ConnectionManager> {
+        &mut self.manager
     }
 
     /// Execute the given protocol against the targets using the provided credentials.
@@ -300,8 +330,19 @@ impl ExecutionEngine {
         let semaphore = Arc::new(Semaphore::new(self.opts.threads));
         let mut join_handles: Vec<JoinHandle<ExecutionResult>> = Vec::new();
         let db = self.db.clone();
+        let manager = self.manager.clone();
 
         for target in targets {
+            let target_str = target.ip_string();
+
+            // Circuit breaker check: skip target if circuit is open
+            if !manager.is_target_available(&target_str).await {
+                if let Some(ref p) = pb {
+                    p.inc(creds.len() as u64);
+                }
+                continue;
+            }
+
             for cred in creds.iter() {
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
                 let protocol_clone = protocol.clone();
@@ -310,6 +351,7 @@ impl ExecutionEngine {
                 let opts_clone = self.opts.clone();
                 let db_clone = db.clone();
                 let pb_clone = pb.clone();
+                let manager_clone = manager.clone();
 
                 let handle = tokio::spawn(async move {
                     let start_time = std::time::Instant::now();
@@ -322,14 +364,19 @@ impl ExecutionEngine {
                     }
 
                     let result = tokio::time::timeout(opts_clone.timeout, async {
-                        // Attempt connection
+                        // Attempt connection with resilience
                         let target_str = target_clone.display();
-                        let mut session = match protocol_clone
-                            .connect(
-                                &target_str,
-                                protocol_clone.default_port(),
-                                opts_clone.proxy.as_deref(),
-                            )
+                        let target_ip = target_clone.ip_string();
+                        let port = protocol_clone.default_port();
+                        let proxy = opts_clone.proxy.as_deref();
+
+                        let mut session = match manager_clone
+                            .call(&target_ip, || {
+                                let p = protocol_clone.clone();
+                                let t = target_str.clone();
+                                let pr = proxy.map(|s| s.to_string());
+                                async move { p.connect(&t, port, pr.as_deref()).await }
+                            })
                             .await
                         {
                             Ok(s) => s,

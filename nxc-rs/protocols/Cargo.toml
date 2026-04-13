@@ -11,6 +11,7 @@ base64 = "0.22"
 tokio-rustls = "0.26"
 rustls-pki-types = "1.0"
 nxc-auth = { path = "../auth" }
+nxc-resilience = { path = "../resilience" }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
@@ -20,7 +21,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 ssh2 = { workspace = true }
 tiberius = { version = "0.12", features = ["winauth", "integrated-auth-gssapi"] }
-reqwest = "0.13"
+reqwest = { workspace = true, features = ["json"] }
 tokio-util = { version = "0.7.18", features = ["compat"] }
 uuid = { workspace = true, features = ["v4"] }
 bytes = "1.11.1"
@@ -37,7 +38,9 @@ url = "2.5.8"
 rasn = "0.28"
 image = "0.25"
 hex.workspace = true
+opcua = { workspace = true, optional = true }
 
 [features]
+opcua-support = ["opcua"]
 winauth = []
 integrated-auth-gssapi = []

@@ -108,15 +108,33 @@ impl PutModule {
 
     async fn run_ftp(
         &self,
-        _session: &mut dyn NxcSession,
-        _local: &str,
-        _remote: &str,
+        session: &mut dyn NxcSession,
+        local: &str,
+        remote: &str,
     ) -> Result<ModuleResult> {
+        let ftp_sess = session
+            .as_any()
+            .downcast_ref::<nxc_protocols::ftp::FtpSession>()
+            .ok_or_else(|| anyhow::anyhow!("Invalid session"))?;
+        let addr = format!("{}:{}", ftp_sess.target, ftp_sess.port);
+
+        info!("Put: FTP upload '{}' → '{}' on {}", local, remote, addr);
+        let data = std::fs::read(local)?;
+
+        let mut ftp_stream = suppaftp::tokio::AsyncFtpStream::connect(&addr).await?;
+
+        let empty = String::new();
+        let pass = ftp_sess.credentials.password.as_ref().unwrap_or(&empty);
+        ftp_stream.login(&ftp_sess.credentials.username, pass).await?;
+
+        let mut cursor = std::io::Cursor::new(&data);
+        ftp_stream.put_file(remote, &mut cursor).await?;
+
         Ok(ModuleResult {
             credentials: vec![],
-            success: false,
-            output: "FTP upload not yet implemented".into(),
-            data: serde_json::Value::Null,
+            success: true,
+            output: format!("[+] Uploaded {} ({} bytes) → {}", local, data.len(), remote),
+            data: serde_json::json!({ "remote_path": remote, "size": data.len() }),
         })
     }
 }
