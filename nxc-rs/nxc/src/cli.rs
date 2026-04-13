@@ -586,6 +586,54 @@ pub fn build_cli() -> Command {
                 .action(ArgAction::SetTrue),
         );
 
+    let opcua_cmd = Command::new("opcua")
+        .about("OPC-UA (Industrial Control Systems) protocol (port 4840)")
+        .args(&auth_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("4840")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("enum")
+                .long("enum")
+                .help("Enumerate OPC-UA server status and metadata")
+                .action(ArgAction::SetTrue),
+        );
+
+    let dns_cmd = Command::new("dns")
+        .about("DNS protocol (port 53)")
+        .args(&auth_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("53")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("enum")
+                .long("enum")
+                .help("Enumerate DNS records")
+                .action(ArgAction::SetTrue),
+        );
+
+    let ipmi_cmd = Command::new("ipmi")
+        .about("IPMI protocol (port 623/udp)")
+        .args(&auth_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("623")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("enum")
+                .long("enum")
+                .help("Enumerate IPMI information")
+                .action(ArgAction::SetTrue),
+        );
+
     Command::new("nxc")
         .about(banner)
         .version(VERSION)
@@ -676,6 +724,29 @@ pub fn build_cli() -> Command {
                 .default_value("default")
                 .global(true),
         )
+        .arg(
+            Arg::new("profiling")
+                .long("profiling")
+                .help("Enable performance and memory profiling")
+                .action(ArgAction::SetTrue)
+                .global(true),
+        )
+        .arg(
+            Arg::new("retries")
+                .long("retries")
+                .help("Max number of retries for transient failures")
+                .default_value("3")
+                .value_parser(clap::value_parser!(u32))
+                .global(true),
+        )
+        .arg(
+            Arg::new("cb-threshold")
+                .long("cb-threshold")
+                .help("Circuit breaker failure threshold")
+                .default_value("5")
+                .value_parser(clap::value_parser!(u32))
+                .global(true),
+        )
         .subcommand(smb_cmd)
         .subcommand(ssh_cmd)
         .subcommand(ldap_cmd)
@@ -685,15 +756,18 @@ pub fn build_cli() -> Command {
         .subcommand(ftp_cmd)
         .subcommand(vnc_cmd)
         .subcommand(wmi_cmd)
+        .subcommand(mysql_cmd)
+        .subcommand(snmp_cmd)
+        .subcommand(docker_cmd)
+        .subcommand(opcua_cmd)
+        .subcommand(dns_cmd)
+        .subcommand(ipmi_cmd)
         .subcommand(nfs_cmd)
         .subcommand(adb_cmd)
         .subcommand(network_cmd)
         .subcommand(http_cmd)
         .subcommand(redis_cmd)
         .subcommand(postgres_cmd)
-        .subcommand(mysql_cmd)
-        .subcommand(snmp_cmd)
-        .subcommand(docker_cmd)
 
         .subcommand(
             Command::new("ai")
@@ -809,6 +883,8 @@ pub fn get_protocol_handler(
         "vnc" => Some(Arc::new(nxc_protocols::vnc::VncProtocol::new())),
         "nfs" => Some(Arc::new(nxc_protocols::nfs::NfsProtocol::new())),
         "adb" => Some(Arc::new(nxc_protocols::adb::AdbProtocol::new())),
+        #[cfg(feature = "opcua-support")]
+        "opcua" => Some(Arc::new(nxc_protocols::opcua::OpcUaProtocol::new())),
         "network" | "net" | "wifi" => {
             let scan = sub_matches.get_flag("scan");
             let connect = sub_matches.get_one::<String>("connect").cloned();
@@ -833,6 +909,11 @@ pub fn get_protocol_handler(
         "mysql" => Some(Arc::new(nxc_protocols::mysql::MysqlProtocol::new())),
         "snmp" => Some(Arc::new(nxc_protocols::snmp::SnmpProtocol::new())),
         "docker" => Some(Arc::new(nxc_protocols::docker::DockerProtocol::new())),
+        "dns" => Some(Arc::new(nxc_protocols::dns::DnsProtocol::new())),
+        "ipmi" => Some(Arc::new(nxc_protocols::ipmi::IpmiProtocol::new())),
+        "kube" | "kubernetes" | "k8s" => {
+            Some(Arc::new(nxc_protocols::kube::KubeProtocol::new()))
+        }
         _ => None,
     }
 }

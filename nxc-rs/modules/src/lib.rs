@@ -43,6 +43,8 @@ pub mod nopac;
 pub mod ntds;
 pub mod petitpotam;
 pub mod pg_enum;
+#[cfg(feature = "opcua-support")]
+pub mod opcua_enum;
 pub mod printerbug;
 pub mod psrp;
 pub mod put;
@@ -297,6 +299,12 @@ impl ModuleRegistry {
 
         let mysql_enum: Box<dyn NxcModule> = Box::new(mysql_enum::MysqlEnum::new());
         modules.insert("mysql_enum".into(), mysql_enum);
+
+        #[cfg(feature = "opcua-support")]
+        {
+            let opcua_enum: Box<dyn NxcModule> = Box::new(opcua_enum::OpcUaEnum::new());
+            modules.insert("opcua_enum".into(), opcua_enum);
+        }
 
         let snmp_enum: Box<dyn NxcModule> = Box::new(snmp_enum::SnmpEnum::new());
         modules.insert("snmp_enum".into(), snmp_enum);

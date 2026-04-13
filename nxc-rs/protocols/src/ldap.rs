@@ -161,7 +161,7 @@ impl LdapProtocol {
             .await?;
         if let Some(entry) = entries.first() {
             if let Some(sid_bin) = entry.bin_attrs.get("objectSid").and_then(|v| v.first()) {
-                return Ok(format!("[SID: {}]", hex::encode(sid_bin))); // In a real app we'd decode the SID blob
+                return Ok(decode_sid(sid_bin));
             }
         }
         Err(anyhow!("Could not retrieve domain SID"))
@@ -397,6 +397,46 @@ impl LdapProtocol {
     }
 }
 
+// ─── SID Decoding ───────────────────────────────────────────────
+
+/// Decode a binary Windows SID blob into the standard string format (e.g. `S-1-5-21-...`).
+///
+/// SID binary structure:
+///   - Byte 0: Revision (always 1)
+///   - Byte 1: Sub-authority count
+///   - Bytes 2-7: Identifier authority (48-bit big-endian)
+///   - Bytes 8+: Sub-authority values (32-bit little-endian each)
+fn decode_sid(sid_bytes: &[u8]) -> String {
+    if sid_bytes.len() < 8 {
+        return format!("[SID: {}]", hex::encode(sid_bytes));
+    }
+
+    let revision = sid_bytes[0];
+    let sub_auth_count = sid_bytes[1] as usize;
+    let identifier_authority = u64::from_be_bytes([
+        0, 0, sid_bytes[2], sid_bytes[3], sid_bytes[4], sid_bytes[5], sid_bytes[6], sid_bytes[7],
+    ]);
+
+    let expected_len = 8 + sub_auth_count * 4;
+    if sid_bytes.len() < expected_len {
+        return format!("[SID: {}]", hex::encode(sid_bytes));
+    }
+
+    let mut sid = format!("S-{revision}-{identifier_authority}");
+    for i in 0..sub_auth_count {
+        let offset = 8 + i * 4;
+        let sub_auth = u32::from_le_bytes([
+            sid_bytes[offset],
+            sid_bytes[offset + 1],
+            sid_bytes[offset + 2],
+            sid_bytes[offset + 3],
+        ]);
+        sid.push_str(&format!("-{sub_auth}"));
+    }
+
+    sid
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -407,5 +447,29 @@ mod tests {
         assert_eq!(proto.name(), "ldap");
         assert_eq!(proto.default_port(), 389);
         assert!(!proto.supports_exec());
+    }
+
+    #[test]
+    fn test_decode_sid_well_known() {
+        // S-1-5-21-3623811015-3361044348-30300820-1013
+        let sid_bytes: Vec<u8> = vec![
+            0x01,                   // Revision 1
+            0x05,                   // 5 sub-authorities
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x05, // Authority 5
+            0xA7, 0x93, 0xF1, 0xD7, // 3623811015 (LE)
+            0xFC, 0x89, 0x6E, 0xC8, // 3361044348 (LE)
+            0x44, 0xCA, 0xCE, 0x01, // 30300820 (LE)
+            0xF5, 0x03, 0x00, 0x00, // 1013 (LE)
+            0x01, 0x02, 0x00, 0x00, // filler sub-auth (not used beyond count)
+        ];
+        let result = decode_sid(&sid_bytes);
+        assert!(result.starts_with("S-1-5-"));
+        assert!(result.contains("21"));
+    }
+
+    #[test]
+    fn test_decode_sid_short_buffer() {
+        let result = decode_sid(&[0x01, 0x00, 0x00]);
+        assert!(result.starts_with("[SID: "));
     }
 }

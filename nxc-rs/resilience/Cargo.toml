@@ -1,0 +1,12 @@
+[package]
+name = "nxc-resilience"
+version.workspace = true
+edition.workspace = true
+description = "NetExec-RS resilience primitives — retry, circuit breaker, connection pooling, caching"
+
+[dependencies]
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+dashmap = "6"
+rand = { workspace = true }
