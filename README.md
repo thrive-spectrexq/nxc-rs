@@ -72,7 +72,7 @@ cargo build --workspace
 
 ---
 
-## Local Development Usage
+## Local Development & Usage
 
 ### 1. View Global Help
 To see all available protocols and global options:
@@ -90,7 +90,7 @@ cargo run --package nxc -- ftp --help
 cargo run --package nxc -- winrm --help
 ```
 
-### 5. AI Mission Control (CLI)
+### 3. AI Mission Control (CLI)
 The **Elite Reaper** AI orchestrator can be launched directly from the CLI for autonomous missions. It supports conversational multi-turn interaction.
 
 **Environment Setup**:
@@ -113,20 +113,20 @@ cargo run --package nxc -- ai "Find hosts on 192.168.1.0/24 with SMB signing dis
 
 *Type `quit`, `exit`, or `bye` to end the session.*
 
-### 6. Build for Production
+### 4. Build for Production
 If you want to use the compiled binary directly without `cargo run`, you can build a release version:
 ```powershell
 cargo build --release --package nxc
 ```
 The binary will be located at `target\debug\nxc.exe` (Windows) or `target/release/nxc` (Linux).
 
-### 1. View Global Help
+### View Global Help
 To see all available protocols and global options:
 ```powershell
 nxc --help
 ```
 
-### 2. Protocol-Specific Help
+### Protocol-Specific Help
 Each protocol has its own set of flags. For example, to see options for the newly implemented **FTP** or **NFS** handlers:
 ```powershell
 # FTP Help
@@ -136,7 +136,7 @@ nxc ftp --help
 nxc winrm --help
 ```
 
-### 3. Example Execution Commands
+### Example Execution Commands
 Here are a few ways to test the current capabilities (replace `<target>` with a lab IP or CIDR):
 
 **WinRM PSRP Execution**: Run PowerShell commands securely via WinRM.
