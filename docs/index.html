@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetExec-RS — Native Rust Network Exploitation Framework</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06080d;
+  --bg2: #0c0f18;
+  --bg3: #101420;
+  --surface: #131825;
+  --surface2: #1a2133;
+  --orange: #ff6b1a;
+  --orange-dim: #c74f0e;
+  --orange-glow: rgba(255,107,26,0.15);
+  --cyan: #00e5c8;
+  --cyan-dim: #00b09c;
+  --cyan-glow: rgba(0,229,200,0.1);
+  --text: #e8eaf0;
+  --text-dim: #8892a4;
+  --text-muted: #4a5568;
+  --border: rgba(255,107,26,0.15);
+  --border-dim: rgba(255,255,255,0.06);
+  --mono: 'Share Tech Mono', monospace;
+  --display: 'Barlow Condensed', sans-serif;
+  --body: 'Barlow', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* Grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,107,26,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,107,26,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Scan line overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.04) 2px,
+    rgba(0,0,0,0.04) 4px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(6,8,13,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.nav-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-logo {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--orange);
+  text-decoration: none;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-logo .diamond {
+  color: var(--cyan);
+  font-size: 10px;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  list-style: none;
+}
+
+.nav-links a {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  text-decoration: none;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+
+.nav-links a:hover { color: var(--orange); }
+
+.nav-cta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--bg) !important;
+  background: var(--orange);
+  padding: 6px 14px;
+  text-decoration: none;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+  transition: background 0.2s, color 0.2s;
+}
+
+.nav-cta:hover { background: var(--cyan) !important; color: var(--bg) !important; }
+
+/* ── HERO ── */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 100px 0 60px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-bg-text {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--display);
+  font-size: clamp(80px, 18vw, 260px);
+  font-weight: 900;
+  color: rgba(255,107,26,0.03);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+  line-height: 1;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--cyan);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hero-eyebrow::before {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 1px;
+  background: var(--cyan);
+}
+
+.hero-title {
+  font-family: var(--display);
+  font-size: clamp(52px, 9vw, 110px);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+}
+
+.hero-title .accent { color: var(--orange); }
+.hero-title .dim { color: var(--text-dim); font-weight: 300; }
+
+.hero-subtitle {
+  font-family: var(--display);
+  font-size: clamp(16px, 2.5vw, 22px);
+  font-weight: 300;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+  margin-bottom: 2.5rem;
+  max-width: 600px;
+}
+
+.hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 3rem;
+}
+
+.badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 5px 10px;
+  border: 1px solid;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.badge-orange { color: var(--orange); border-color: rgba(255,107,26,0.4); background: var(--orange-glow); }
+.badge-cyan { color: var(--cyan); border-color: rgba(0,229,200,0.3); background: var(--cyan-glow); }
+.badge-dim { color: var(--text-dim); border-color: var(--border-dim); }
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 4rem;
+}
+
+.btn-primary {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--bg);
+  background: var(--orange);
+  border: none;
+  padding: 12px 28px;
+  text-decoration: none;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  transition: background 0.2s;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.btn-primary:hover { background: var(--cyan); }
+
+.btn-ghost {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--border-dim);
+  padding: 12px 28px;
+  text-decoration: none;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: border-color 0.2s, color 0.2s;
+  display: inline-block;
+}
+
+.btn-ghost:hover { border-color: var(--orange); color: var(--orange); }
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1px;
+  background: var(--border-dim);
+  border: 1px solid var(--border-dim);
+  max-width: 480px;
+}
+
+.stat {
+  background: var(--bg);
+  padding: 16px 20px;
+  text-align: center;
+}
+
+.stat-value {
+  font-family: var(--display);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--orange);
+  line-height: 1;
+  display: block;
+}
+
+.stat-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-top: 4px;
+  display: block;
+}
+
+/* ── TERMINAL DEMO ── */
+.terminal-wrap {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(460px, 45vw);
+  opacity: 0.9;
+}
+
+.terminal {
+  background: var(--bg2);
+  border: 1px solid var(--border-dim);
+  border-top: 2px solid var(--orange);
+  overflow: hidden;
+}
+
+.terminal-bar {
+  background: var(--surface);
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.dot-r { background: #e05252; }
+.dot-y { background: #d4a317; }
+.dot-g { background: #4caf50; }
+
+.terminal-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: 6px;
+  letter-spacing: 0.06em;
+}
+
+.terminal-body {
+  padding: 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--text-dim);
+  min-height: 280px;
+}
+
+.t-prompt { color: var(--orange); }
+.t-cmd { color: var(--text); }
+.t-ok { color: #4caf50; }
+.t-info { color: var(--cyan); }
+.t-warn { color: #f0c040; }
+.t-dim { color: var(--text-muted); }
+.t-hit { color: var(--orange); font-weight: bold; }
+
+.cursor {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  background: var(--orange);
+  vertical-align: middle;
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ── SECTIONS ── */
+section {
+  padding: 80px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--orange);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-label::after {
+  content: '';
+  flex: 1;
+  max-width: 40px;
+  height: 1px;
+  background: var(--orange);
+}
+
+.section-title {
+  font-family: var(--display);
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.5rem;
+}
+
+.section-desc {
+  color: var(--text-dim);
+  font-size: 15px;
+  font-weight: 300;
+  max-width: 520px;
+  margin-bottom: 3rem;
+}
+
+/* ── FEATURES ── */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1px;
+  background: var(--border-dim);
+  border: 1px solid var(--border-dim);
+}
+
+.feature-card {
+  background: var(--bg2);
+  padding: 28px 24px;
+  position: relative;
+  transition: background 0.25s;
+}
+
+.feature-card:hover { background: var(--surface); }
+
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+  transition: background 0.25s;
+}
+
+.feature-card:hover::before { background: var(--orange); }
+
+.feature-icon {
+  font-family: var(--mono);
+  font-size: 20px;
+  color: var(--orange);
+  margin-bottom: 14px;
+  display: block;
+}
+
+.feature-title {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.feature-desc {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  font-weight: 300;
+}
+
+/* ── PROTOCOLS ── */
+.protocols-table-wrap {
+  border: 1px solid var(--border-dim);
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+thead {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-dim);
+}
+
+th {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 12px 16px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border-dim);
+  vertical-align: top;
+  color: var(--text-dim);
+  font-weight: 300;
+}
+
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,107,26,0.03); }
+
+.proto-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--orange);
+  white-space: nowrap;
+  font-weight: normal;
+}
+
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #4caf50;
+  white-space: nowrap;
+}
+
+.status-dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4caf50;
+  display: block;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.cap-tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--cyan);
+  border: 1px solid rgba(0,229,200,0.25);
+  padding: 2px 6px;
+  margin: 2px 2px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  background: var(--cyan-glow);
+}
+
+/* ── INSTALL ── */
+.install-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border-dim);
+  border: 1px solid var(--border-dim);
+  margin-bottom: 2rem;
+}
+
+.install-pane {
+  background: var(--bg2);
+  padding: 0;
+}
+
+.install-header {
+  background: var(--surface);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-dim);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.install-os {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.install-os-icon {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.code-block {
+  padding: 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--text-dim);
+  overflow-x: auto;
+}
+
+.code-block .kw { color: var(--orange); }
+.code-block .str { color: var(--cyan); }
+.code-block .comment { color: var(--text-muted); }
+.code-block .flag { color: #f0c040; }
+
+.divider {
+  height: 1px;
+  background: var(--border-dim);
+  margin: 2.5rem 0;
+  position: relative;
+}
+
+.divider::before {
+  content: attr(data-label);
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  background: var(--bg);
+  padding-right: 12px;
+}
+
+/* ── EXAMPLES ── */
+.examples-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--border-dim);
+  border: 1px solid var(--border-dim);
+}
+
+.example-item {
+  background: var(--bg2);
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 20px;
+  align-items: start;
+  transition: background 0.2s;
+}
+
+.example-item:hover { background: var(--surface); }
+
+.example-proto {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--bg);
+  background: var(--orange);
+  padding: 3px 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  margin-top: 2px;
+  clip-path: polygon(4px 0%, 100% 0%, calc(100% - 4px) 100%, 0% 100%);
+}
+
+.example-code {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.example-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  font-weight: 300;
+  grid-column: 2;
+}
+
+/* ── AI SECTION ── */
+.ai-section {
+  background: var(--bg2);
+  border: 1px solid var(--border-dim);
+  border-left: 3px solid var(--cyan);
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-section::before {
+  content: 'AI';
+  position: absolute;
+  right: -10px;
+  top: -20px;
+  font-family: var(--display);
+  font-size: 120px;
+  font-weight: 900;
+  color: rgba(0,229,200,0.04);
+  pointer-events: none;
+  line-height: 1;
+}
+
+.ai-title {
+  font-family: var(--display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.ai-subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 1.5rem;
+  font-weight: 300;
+}
+
+.env-vars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.env-var {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--cyan);
+  border: 1px solid rgba(0,229,200,0.2);
+  padding: 4px 10px;
+  background: var(--cyan-glow);
+  letter-spacing: 0.06em;
+}
+
+.ai-examples {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+}
+
+.ai-example {
+  background: var(--bg);
+  border: 1px solid var(--border-dim);
+  padding: 12px 14px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  position: relative;
+}
+
+.ai-example::before {
+  content: '›';
+  color: var(--cyan);
+  margin-right: 6px;
+}
+
+/* ── ARCHITECTURE ── */
+.arch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1px;
+  background: var(--border-dim);
+  border: 1px solid var(--border-dim);
+}
+
+.arch-card {
+  background: var(--bg2);
+  padding: 20px 16px;
+  text-align: center;
+  transition: background 0.2s;
+}
+
+.arch-card:hover { background: var(--surface); }
+
+.arch-name {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--orange);
+  margin-bottom: 6px;
+  display: block;
+}
+
+.arch-role {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  font-weight: 300;
+}
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid var(--border-dim);
+  padding: 40px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: gap;
+  gap: 1rem;
+}
+
+.footer-logo {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--orange);
+  text-decoration: none;
+}
+
+.footer-note {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+}
+
+.footer-links {
+  display: flex;
+  gap: 1.5rem;
+  list-style: none;
+}
+
+.footer-links a {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-decoration: none;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+
+.footer-links a:hover { color: var(--orange); }
+
+.disclaimer {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.7;
+  letter-spacing: 0.04em;
+}
+
+.disclaimer strong { color: var(--orange); }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate {
+  opacity: 0;
+  animation: fadeInUp 0.6s ease forwards;
+}
+
+.hero-eyebrow.animate { animation-delay: 0.1s; }
+.hero-title.animate { animation-delay: 0.2s; }
+.hero-subtitle.animate { animation-delay: 0.3s; }
+.hero-badges.animate { animation-delay: 0.4s; }
+.hero-actions.animate { animation-delay: 0.5s; }
+.hero-stats.animate { animation-delay: 0.6s; }
+.terminal-wrap.animate { animation-delay: 0.4s; }
+
+/* ── GLITCH ── */
+@keyframes glitch {
+  0%, 90%, 100% { clip-path: none; transform: none; }
+  92% { clip-path: inset(10% 0 80% 0); transform: translateX(-4px); }
+  94% { clip-path: inset(60% 0 10% 0); transform: translateX(4px); }
+  96% { clip-path: inset(30% 0 50% 0); transform: translateX(-2px); }
+}
+
+.hero-title:hover .glitch-target {
+  animation: glitch 0.4s steps(1) forwards;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .terminal-wrap { display: none; }
+  .install-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .nav-links { display: none; }
+  .hero-stats { grid-template-columns: repeat(3, 1fr); }
+  .example-item { grid-template-columns: 1fr; gap: 6px; }
+  .example-desc { grid-column: 1; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <span class="diamond">◈</span>
+      nxc-rs
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">features</a></li>
+      <li><a href="#protocols">protocols</a></li>
+      <li><a href="#install">install</a></li>
+      <li><a href="#ai">ai mode</a></li>
+      <li><a href="https://github.com/thrive-spectrexq/nxc-rs" target="_blank">github</a></li>
+      <li><a href="https://github.com/thrive-spectrexq/nxc-rs/releases" class="nav-cta">download</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-content">
+      <p class="hero-eyebrow animate">v1.0 · BSD-2-Clause</p>
+      <h1 class="hero-title animate">
+        <span class="glitch-target">NET<span class="accent">EXEC</span></span><br>
+        <span class="dim">—RS</span>
+      </h1>
+      <p class="hero-subtitle animate">
+        A blazing-fast, pure Rust network exploitation framework.<br>
+        Zero Python. Zero Impacket. Full power.
+      </p>
+      <div class="hero-badges animate">
+        <span class="badge badge-orange">rustc 1.94.0+</span>
+        <span class="badge badge-cyan">22 protocols</span>
+        <span class="badge badge-cyan">135 modules</span>
+        <span class="badge badge-dim">NTLM · Kerberos · SMB</span>
+        <span class="badge badge-dim">AI orchestrator</span>
+        <span class="badge badge-dim">BSD-2-Clause</span>
+      </div>
+      <div class="hero-actions animate">
+        <a href="#install" class="btn-primary">Install Now</a>
+        <a href="https://github.com/thrive-spectrexq/nxc-rs" target="_blank" class="btn-ghost">View Source →</a>
+      </div>
+      <div class="hero-stats animate">
+        <div class="stat">
+          <span class="stat-value">22</span>
+          <span class="stat-label">Protocols</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">135</span>
+          <span class="stat-label">Modules</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">0</span>
+          <span class="stat-label">Python Deps</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Terminal -->
+    <div class="terminal-wrap animate">
+      <div class="terminal">
+        <div class="terminal-bar">
+          <div class="dot dot-r"></div>
+          <div class="dot dot-y"></div>
+          <div class="dot dot-g"></div>
+          <span class="terminal-title">nxc — mission terminal</span>
+        </div>
+        <div class="terminal-body">
+          <div><span class="t-prompt">$ </span><span class="t-cmd">nxc smb 192.168.1.0/24 -u Admin -H a3b7c...</span></div>
+          <div><span class="t-dim">──────────────────────────────────────</span></div>
+          <div><span class="t-info">[*] </span><span class="t-dim">Enumerating 254 hosts on 192.168.1.0/24</span></div>
+          <div><span class="t-ok">[+] </span><span class="t-dim">192.168.1.10 — Windows Server 2022</span></div>
+          <div><span class="t-hit">[!] </span><span class="t-dim">192.168.1.10 — SMB signing: DISABLED</span></div>
+          <div><span class="t-ok">[+] </span><span class="t-dim">192.168.1.22 — Windows 11 Pro</span></div>
+          <div><span class="t-ok">[+] </span><span class="t-dim">192.168.1.45 — Windows Server 2019</span></div>
+          <div><span class="t-hit">[!] </span><span class="t-dim">192.168.1.45 — SMB signing: DISABLED</span></div>
+          <div><span class="t-dim">──────────────────────────────────────</span></div>
+          <div><span class="t-info">[*] </span><span class="t-dim">Scan complete: 254 hosts, 2 vulnerable</span></div>
+          <div><span class="t-prompt">$ </span><span class="t-cmd">nxc ai "dump lsa on vuln hosts"</span></div>
+          <div><span class="t-info">[AI] </span><span class="t-dim">Launching Elite Reaper mission...</span></div>
+          <div><span class="t-prompt">$ </span><span class="cursor"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="hero-bg-text">NXC-RS</div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" style="background: var(--bg2); border-top: 1px solid var(--border-dim); border-bottom: 1px solid var(--border-dim);">
+  <div class="container">
+    <div class="section-label">Core capabilities</div>
+    <h2 class="section-title">Built Different</h2>
+    <p class="section-desc">Native Rust from the ground up — not a wrapper, not a port. Re-engineered for speed, stealth, and scale.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <span class="feature-icon">⚡</span>
+        <div class="feature-title">Async Runtime</div>
+        <p class="feature-desc">Powered by Tokio's async runtime for massive concurrency. Scan full /16 subnets with configurable thread pools and minimal overhead.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🦀</span>
+        <div class="feature-title">Pure Rust</div>
+        <p class="feature-desc">Zero Python. Zero Impacket. Native implementations of NTLM SSP, Kerberos, and SMB protocol stack baked directly into the binary.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🕶</span>
+        <div class="feature-title">Stealth &amp; Safety</div>
+        <p class="feature-desc">Built-in lockout detection, randomized jitter, and secure TLS communication to avoid triggering alarms during authorized assessments.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🤖</span>
+        <div class="feature-title">AI Orchestrator</div>
+        <p class="feature-desc">Natural language mission control via LLMs. Chain tools, run recon, and automate entire engagement workflows with a single sentence.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🔍</span>
+        <div class="feature-title">AD CS &amp; BloodHound</div>
+        <p class="feature-desc">Integrated AD Certificate Services enumeration, BloodHound data export, and full Kerberoasting/AS-REP pipeline built into LDAP.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🗄</span>
+        <div class="feature-title">Workspace DB</div>
+        <p class="feature-desc">Credential and target storage across sessions. Every hash, password, and finding is captured in structured workspace databases.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROTOCOLS -->
+<section id="protocols">
+  <div class="container">
+    <div class="section-label">Coverage</div>
+    <h2 class="section-title">22 Protocols</h2>
+    <p class="section-desc">Full cross-protocol exploitation surface from enterprise AD to cloud-native Kubernetes and embedded IPMI/iDRAC targets.</p>
+
+    <div class="protocols-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Protocol</th>
+            <th>Status</th>
+            <th>Key Capabilities</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="proto-name">SMB</span></td>
+            <td><span class="status-dot">Active</span></td>
+            <td>
+              <span class="cap-tag">NTLM SSP</span>
+              <span class="cap-tag">smbexec</span>
+              <span class="cap-tag">lsassy</span>
+              <span class="cap-tag">dcshadow</span>
+              <span class="cap-tag">SAM/LSA/NTDS dump</span>
+              <span class="cap-tag">Share enum</span>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="proto-name">LDAP</span></td>
+            <td><span class="status-dot">Active</span></td>
+            <td>
+              <span class="cap-tag">AD CS enum</span>
+              <span class="cap-tag">BloodHound export</span>
+              <span class="cap-tag">Kerberoasting</span>
+              <span class="cap-tag">gMSA</span>
+              <span class="cap-tag">LAPS read</span>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="proto-name">WinRM</span></td>
+            <td><span class="status-dot">Active</span></td>
+            <td>
+              <span class="cap-tag">NTLM/Kerberos</span>
+              <span class="cap-tag">PSRP objects</span>
+              <span class="cap-tag">PS/CMD exec</span>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="proto-name">MSSQL</span></td>
+            <td><span class="status-dot">Active</span></td>
+            <td>
+              <span class="cap-tag">SQL query</span>
+              <span class="cap-tag">xp_cmdshell</span>
+              <span class="cap-tag">IMPERSONATE checks</span>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="proto-name">SSH</span></td>
+            <td><span class="status-dot">Active</span></td>
+            <td>
+              <span class="cap-tag">Password &amp; key auth</span>
+              <span class="cap-tag">Sudo check</span>
+              <span class="cap-tag">Fingerprinting</span>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="proto-name">WMI</span></td>
+            <td><span class="status-dot">Active</span></td>
+            <td>
+              <span class="cap-tag">Direct exec</span>
+              <span class="cap-tag">Process enum</span>
+              <span class="cap-tag">Service enum</span>
+              <span class="cap-tag">Patch enum</span>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="proto-name">RDP</span></td>
+            <td><span class="status-dot">Active</span></td>
+            <td>
+              <span class="cap-tag">NLA auth</span>
+              <span class="cap-tag">TSRequest gen</span>
+              <span class="cap-tag">Screenshot</span>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="proto-name">IPMI</span></td>
+            <td><span class="status-dot">Active</span></td>
+            <td>
+              <span class="cap-tag">BMC probe</span>
+              <span class="cap-tag">RAKP hash dump</span>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="proto-name">Kubernetes</span></td>
+            <td><span class="status-dot">Active</span></td>
+            <td>
+              <span class="cap-tag">API auth test</span>
+              <span class="cap-tag">Pod enum</span>
+              <span class="cap-tag">Secret enum</span>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="proto-name">DNS</span></td>
+            <td><span class="status-dot">Active</span></td>
+            <td>
+              <span class="cap-tag">AXFR</span>
+              <span class="cap-tag">Record enum</span>
+              <span class="cap-tag">Insecure update</span>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="proto-name">ADB / VNC / FTP / NFS / HTTP / iLO / iDRAC</span></td>
+            <td><span class="status-dot">Active</span></td>
+            <td>
+              <span class="cap-tag">Auth testing</span>
+              <span class="cap-tag">Shell exec</span>
+              <span class="cap-tag">Screenshot</span>
+              <span class="cap-tag">Share enum</span>
+              <span class="cap-tag">Redfish API</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section id="install" style="background: var(--bg2); border-top: 1px solid var(--border-dim); border-bottom: 1px solid var(--border-dim);">
+  <div class="container">
+    <div class="section-label">Get started</div>
+    <h2 class="section-title">Installation</h2>
+    <p class="section-desc">One-line install for most systems. Or build from source with Cargo.</p>
+
+    <div class="install-grid">
+      <div class="install-pane">
+        <div class="install-header">
+          <span class="install-os">Linux / macOS</span>
+          <span class="install-os-icon">bash</span>
+        </div>
+        <div class="code-block">
+          <span class="comment"># one-line install</span><br>
+          <span class="kw">curl</span> -sSf https://raw.githubusercontent.com/<br>
+          &nbsp;&nbsp;thrive-spectrexq/nxc-rs/master/install.sh <span class="flag">| bash</span>
+        </div>
+      </div>
+      <div class="install-pane">
+        <div class="install-header">
+          <span class="install-os">Windows</span>
+          <span class="install-os-icon">powershell</span>
+        </div>
+        <div class="code-block">
+          <span class="comment"># powershell one-liner</span><br>
+          <span class="kw">iex</span> (New-Object System.Net.WebClient)<br>
+          &nbsp;&nbsp;.DownloadString(<span class="str">'https://raw.githubusercontent.com/<br>
+          &nbsp;&nbsp;thrive-spectrexq/nxc-rs/master/install.ps1'</span>)
+        </div>
+      </div>
+    </div>
+
+    <div class="divider" data-label="or build from source"></div>
+
+    <div class="install-grid" style="grid-template-columns: 1fr;">
+      <div class="install-pane">
+        <div class="install-header">
+          <span class="install-os">Cargo · requires rustc 1.94.0+</span>
+          <span class="install-os-icon">rust</span>
+        </div>
+        <div class="code-block">
+          <span class="comment"># clone the repository</span><br>
+          <span class="kw">git</span> clone https://github.com/thrive-spectrexq/nxc-rs.git &amp;&amp; <span class="kw">cd</span> nxc-rs<br><br>
+          <span class="comment"># debug build (dev)</span><br>
+          <span class="kw">cargo</span> build <span class="flag">--workspace</span><br><br>
+          <span class="comment"># release binary</span><br>
+          <span class="kw">cargo</span> build <span class="flag">--release --package</span> nxc<br><br>
+          <span class="comment"># binary location: target/release/nxc (Linux/macOS)</span><br>
+          <span class="comment">#                  target\release\nxc.exe (Windows)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider" data-label="usage examples"></div>
+
+    <div class="examples-stack">
+      <div class="example-item">
+        <span class="example-proto">WinRM</span>
+        <div>
+          <div class="example-code">nxc winrm &lt;target&gt; -u Admin -p Pass123 -x "Get-Process"</div>
+          <div class="example-desc">Run PowerShell commands securely via PSRP over WinRM</div>
+        </div>
+      </div>
+      <div class="example-item">
+        <span class="example-proto">SMB</span>
+        <div>
+          <div class="example-code">nxc smb 192.168.1.0/24 -u Admin -H 31d6cfe0d16ae931b73c59d7e0c089c0 -M lsassy</div>
+          <div class="example-desc">Dump LSA secrets from an entire /24 subnet using pass-the-hash</div>
+        </div>
+      </div>
+      <div class="example-item">
+        <span class="example-proto">LDAP</span>
+        <div>
+          <div class="example-code">nxc ldap &lt;dc&gt; -u user -p pass --bloodhound --collection All</div>
+          <div class="example-desc">Export BloodHound data for full Active Directory attack path analysis</div>
+        </div>
+      </div>
+      <div class="example-item">
+        <span class="example-proto">NFS</span>
+        <div>
+          <div class="example-code">nxc nfs &lt;target&gt; --enum-shares</div>
+          <div class="example-desc">List exported NFS shares via the MOUNT service</div>
+        </div>
+      </div>
+      <div class="example-item">
+        <span class="example-proto">LIST</span>
+        <div>
+          <div class="example-code">nxc smb &lt;target&gt; -L</div>
+          <div class="example-desc">List all available offensive modules for a given protocol</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AI SECTION -->
+<section id="ai">
+  <div class="container">
+    <div class="section-label">Autonomous mode</div>
+    <h2 class="section-title">Elite Reaper AI</h2>
+    <p class="section-desc">Natural language mission orchestration powered by your choice of LLM backend. Fully conversational, multi-turn, tool-chaining.</p>
+
+    <div class="ai-section">
+      <div class="ai-title">Mission Orchestrator</div>
+      <p class="ai-subtitle">Set one environment variable. Launch autonomous recon with a sentence.</p>
+
+      <div class="env-vars">
+        <span class="env-var">GEMINI_API_KEY</span>
+        <span class="env-var">OPENAI_API_KEY</span>
+        <span class="env-var">ANTHROPIC_API_KEY</span>
+        <span class="env-var">OLLAMA_API_BASE</span>
+      </div>
+
+      <div style="margin-bottom: 1.5rem;">
+        <div class="code-block" style="background: var(--bg); border: 1px solid var(--border-dim); padding: 14px 16px;">
+          <span class="t-prompt" style="color: var(--cyan);">$ </span>
+          <span style="font-family: var(--mono); font-size: 11px; color: var(--text);">nxc ai "Find hosts on 192.168.1.0/24 with SMB signing disabled"</span>
+        </div>
+      </div>
+
+      <div class="ai-examples">
+        <div class="ai-example">Scan 10.0.0.0/24 for port 445 and identify OS versions</div>
+        <div class="ai-example">Enumerate all GPO names from the domain using LDAP</div>
+        <div class="ai-example">Audit 172.16.5.0/24 for default passwords on MSSQL and SSH</div>
+        <div class="ai-example">Check if 192.168.1.50 has active web directories on 80 or 443</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section style="background: var(--bg2); border-top: 1px solid var(--border-dim); border-bottom: 1px solid var(--border-dim);">
+  <div class="container">
+    <div class="section-label">Internals</div>
+    <h2 class="section-title">Architecture</h2>
+    <p class="section-desc">Layered Cargo workspace for clean separation of concerns and maximum extensibility.</p>
+
+    <div class="arch-grid">
+      <div class="arch-card">
+        <span class="arch-name">nxc</span>
+        <div class="arch-role">Main CLI entry point &amp; argument dispatcher</div>
+      </div>
+      <div class="arch-card">
+        <span class="arch-name">nxc-protocols</span>
+        <div class="arch-role">Core network handlers: SMB, LDAP, SSH, WinRM, and more</div>
+      </div>
+      <div class="arch-card">
+        <span class="arch-name">nxc-auth</span>
+        <div class="arch-role">Shared auth engines: NTLM, Kerberos, crypto primitives</div>
+      </div>
+      <div class="arch-card">
+        <span class="arch-name">nxc-modules</span>
+        <div class="arch-role">Post-exploitation module library (135 modules)</div>
+      </div>
+      <div class="arch-card">
+        <span class="arch-name">nxc-targets</span>
+        <div class="arch-role">Advanced target parsing: CIDR, ranges, file inputs</div>
+      </div>
+      <div class="arch-card">
+        <span class="arch-name">nxc-db</span>
+        <div class="arch-role">Credential storage &amp; workspace session management</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <a href="#" class="footer-logo">◈ nxc-rs</a>
+      <ul class="footer-links">
+        <li><a href="https://github.com/thrive-spectrexq/nxc-rs" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/thrive-spectrexq/nxc-rs/releases" target="_blank">Releases</a></li>
+        <li><a href="https://github.com/thrive-spectrexq/nxc-rs/issues" target="_blank">Issues</a></li>
+        <li><a href="https://github.com/thrive-spectrexq/nxc-rs/blob/master/LICENSE" target="_blank">License</a></li>
+      </ul>
+      <span class="footer-note">BSD-2-Clause · Rust 1.94.0+</span>
+    </div>
+    <div class="disclaimer">
+      <strong>Legal Notice:</strong> NetExec-RS is intended for educational purposes and authorized security testing only.
+      Use of this tool against targets without prior mutual consent is illegal. The developers assume no liability
+      and are not responsible for any misuse or damage caused by this program.
+    </div>
+  </div>
+</footer>
+
+<script>
+// Intersection observer for scroll animations
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.style.opacity = '1';
+      entry.target.style.transform = 'translateY(0)';
+      entry.target.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.feature-card, .arch-card, .example-item, .install-pane, .ai-section').forEach(el => {
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(16px)';
+  observer.observe(el);
+});
+
+// Typing effect for terminal
+const lines = document.querySelectorAll('.terminal-body > div');
+lines.forEach((line, i) => {
+  line.style.opacity = '0';
+  line.style.transition = 'opacity 0.3s ease';
+  setTimeout(() => { line.style.opacity = '1'; }, 800 + i * 300);
+});
+</script>
+</body>
+</html>
