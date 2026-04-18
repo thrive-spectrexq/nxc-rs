@@ -72,7 +72,7 @@ cargo build --workspace
 
 ---
 
-## Local Development & Usage
+## Local Development Usage
 
 ### 1. View Global Help
 To see all available protocols and global options:
@@ -89,31 +89,6 @@ cargo run --package nxc -- ftp --help
 # WinRM Help
 cargo run --package nxc -- winrm --help
 ```
-
-### 3. Example Execution Commands
-Here are a few ways to test the current capabilities (replace `<target>` with a lab IP or CIDR):
-
-**WinRM PSRP Execution**: Run PowerShell commands securely via WinRM.
-```powershell
-cargo run --package nxc -- winrm <target> -u Admin -p Pass123 -x "Get-Process"
-```
-
-**SMB LSA Dumping**: Dump LSA secrets from an entire /24 subnet.
-```powershell
-cargo run --package nxc -- smb 192.168.1.0/24 -u Admin -H 31d6cfe0d16ae931b73c59d7e0c089c0 -M lsassy
-```
-
-**NFS Enumeration**: List exported shares via the MOUNT service.
-```powershell
-cargo run --package nxc -- nfs <target> --enum-shares
-```
-
-**Module Listing**: See which offensive modules are available for a protocol.
-```powershell
-cargo run --package nxc -- smb <target> -L
-```
-
-
 
 ### 5. AI Mission Control (CLI)
 The **Elite Reaper** AI orchestrator can be launched directly from the CLI for autonomous missions. It supports conversational multi-turn interaction.
@@ -143,8 +118,50 @@ If you want to use the compiled binary directly without `cargo run`, you can bui
 ```powershell
 cargo build --release --package nxc
 ```
-The binary will be located at `target\release\nxc.exe` (Windows) or `target/release/nxc` (Linux).
+The binary will be located at `target\debug\nxc.exe` (Windows) or `target/release/nxc` (Linux).
 
+### 1. View Global Help
+To see all available protocols and global options:
+```powershell
+nxc --help
+```
+
+### 2. Protocol-Specific Help
+Each protocol has its own set of flags. For example, to see options for the newly implemented **FTP** or **NFS** handlers:
+```powershell
+# FTP Help
+nxc ftp --help
+
+# WinRM Help
+nxc winrm --help
+```
+
+### 3. Example Execution Commands
+Here are a few ways to test the current capabilities (replace `<target>` with a lab IP or CIDR):
+
+**WinRM PSRP Execution**: Run PowerShell commands securely via WinRM.
+```powershell
+nxc winrm <target> -u Admin -p Pass123 -x "Get-Process"
+```
+
+**SMB LSA Dumping**: Dump LSA secrets from an entire /24 subnet.
+```powershell
+nxc smb 192.168.1.0/24 -u Admin -H 31d6cfe0d16ae931b73c59d7e0c089c0 -M lsassy
+```
+
+**NFS Enumeration**: List exported shares via the MOUNT service.
+```powershell
+nxc nfs <target> --enum-shares
+```
+
+**Module Listing**: See which offensive modules are available for a protocol.
+```powershell
+nxc smb <target> -L
+```
+**Launch an Initial Mission**:
+```powershell
+nxc ai "Find hosts on 192.168.1.0/24 with SMB signing disabled"
+```
 ---
 
 ## Architecture
@@ -165,4 +182,4 @@ NetExec-RS is designed with a layered approach for maximum maintainability:
 Distributed under the **BSD 2-Clause License**. See [LICENSE](LICENSE) for more information.
 
 ### Legal Disclaimer
-**NetExec-RS is for educational purposes and authorized security testing only.** Use of this tool for attacking targets without prior mutual consent is illegal. It is the end user's responsibility to obey all applicable local, state, and federal laws. Developers assume no liability and are not responsible for any misuse or damage caused by this program.
+**NetExec-RS is for educational purposes and authorized security testing only.** Use of this tool for attacking targets without prior mutual consent is illegal. Developers assume no liability and are not responsible for any misuse or damage caused by this program.
