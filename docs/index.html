@@ -149,6 +149,13 @@ nav {
   overflow: hidden;
 }
 
+.hero .container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+}
+
 .hero-bg-text {
   position: absolute;
   bottom: -20px;
@@ -310,12 +317,10 @@ nav {
 
 /* ── TERMINAL DEMO ── */
 .terminal-wrap {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: min(460px, 45vw);
+  position: relative;
+  width: 100%;
   opacity: 0.9;
+  z-index: 1;
 }
 
 .terminal {
@@ -893,6 +898,7 @@ footer {
 
 /* ── RESPONSIVE ── */
 @media (max-width: 900px) {
+  .hero .container { grid-template-columns: 1fr; }
   .terminal-wrap { display: none; }
   .install-grid { grid-template-columns: 1fr; }
 }
@@ -929,10 +935,9 @@ footer {
 <section class="hero">
   <div class="container">
     <div class="hero-content">
-      <p class="hero-eyebrow animate">v1.0 · BSD-2-Clause</p>
+      <p class="hero-eyebrow animate">v0.4.0 · BSD-2-Clause</p>
       <h1 class="hero-title animate">
-        <span class="glitch-target">NET<span class="accent">EXEC</span></span><br>
-        <span class="dim">—RS</span>
+        <span class="glitch-target">NET<span class="accent">EXEC</span><span class="dim">—RS</span></span>
       </h1>
       <p class="hero-subtitle animate">
         A blazing-fast, pure Rust network exploitation framework.<br>
