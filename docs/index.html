@@ -43,19 +43,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Grid background */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255,107,26,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,107,26,0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-  pointer-events: none;
-  z-index: 0;
-}
-
 /* Scan line overlay */
 body::after {
   content: '';
