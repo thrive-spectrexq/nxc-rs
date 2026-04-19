@@ -14,7 +14,7 @@ resolver = "2"
 [workspace.package]
 version = "0.4.0"
 edition = "2021"
-authors = ["Antigravity"]
+authors = ["thrive-spectrexq"]
 description = "NetExec-RS — Network Execution Tool (Pure Rust Rewrite)"
 license = "BSD-2-Clause"
 repository = "https://github.com/thrive-spectrexq/nxc-rs"
