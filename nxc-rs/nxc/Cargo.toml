@@ -7,8 +7,8 @@ license.workspace = true
 repository.workspace = true
 
 [package.metadata.deb]
-maintainer = "Antigravity <open_source@antigravity>"
-copyright = "2026, Antigravity"
+maintainer = "thrive-spectrexq>"
+copyright = "2026, thrive-spectrexq"
 license-file = ["../../LICENSE", "4"]
 extended-description = """
 NetExec-RS is a massive monolithic offensive post-exploitation and orchestration network tool.
