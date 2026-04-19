@@ -11,7 +11,7 @@ maintainer = "thrive-spectrexq>"
 copyright = "2026, thrive-spectrexq"
 license-file = ["../../LICENSE", "4"]
 extended-description = """
-NetExec-RS is a massive monolithic offensive post-exploitation and orchestration network tool.
+NetExec-RS is a monolithic offensive post-exploitation and orchestration network tool.
 """
 section = "admin"
 priority = "optional"
