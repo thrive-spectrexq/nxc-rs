@@ -58,7 +58,7 @@ hmac = "0.12"
 md-5 = "0.10"
 rc4 = "0.2"
 aes = "0.9"
-des = "0.8"
+des = "0.9"
 csv = "1.3"
 zeroize = { version = "1.8", features = ["derive"] }
 colored = "3.1"
