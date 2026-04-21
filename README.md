@@ -7,38 +7,68 @@
 
 ---
 
+**NetExec-RS (nxc-rs)** is a modern, high-performance **Rust implementation inspired by the original Python-based [NetExec](https://github.com/Pennyw0rth/NetExec.git)**.
+
+By leveraging Rust, NetExec-RS benefits from:
+
+- Memory safety without garbage collection  
+- Zero-cost abstractions  
+- High-performance async execution (Tokio)  
+- Strong type guarantees for protocol correctness  
+
+The result is a **next-generation offensive security framework** focused on speed, scalability and reliability.
+
+---
+
 ## Key Features
 
-*   **Blazing Fast**: Powered by Tokio's async runtime for massive high-concurrency operations.
-*   **Pure Rust**: Zero dependencies on Python or Impacket. Native implementation of NTLM SSP, Kerberos, and SMB.
-*   **Stealthy & Robust**: Built-in lockout detection, jitter, and secure TLS communication.
+- **Blazing Fast**  
+  Built on Tokio's async runtime for massive concurrency across large networks.
 
-*   **AI Mission Orchestrator**: Fully autonomous agent powered by **LLMs** for natural language mission control, automated reconnaissance, and tool chaining.
-*   **Advanced Recon**: Integrated AD CS, BloodHound, and WMI reconnaissance modules.
+- **Pure Rust**  
+  No Python or Impacket dependencies. Native implementations include:
+  - NTLM SSP  
+  - Kerberos  
+  - SMB stack  
+
+- **Stealthy & Robust**
+  - Lockout detection  
+  - Jitter/random delays  
+  - Secure TLS handling  
+
+- **AI Mission Orchestrator**
+  - Natural language control via LLMs  
+  - Autonomous reconnaissance  
+  - Multi-step attack chaining  
+
+- **Advanced Recon**
+  - AD CS enumeration  
+  - BloodHound integration  
+  - WMI reconnaissance  
 
 ---
 
 ## Protocols & Capabilities
 
-NetExec-RS supports **22 protocols** and **135 modules** for complete cross-protocol exploitation.
+Supports **22 protocols** and **135+ modules**.
 
 | Protocol | Status | Capabilities |
 | :--- | :--- | :--- |
-| **SMB** | ✅ Active | **NTLM SSP**, Negotiate/Session, Share/Disk Enum, **smbexec**, lsassy, dcshadow, SAM/LSA/NTDS dumping |
-| **LDAP** | ✅ Active | User/Group Enum, **AD CS Enum**, **BloodHound Export**, Roasting, gMSA, **LAPS password reading** |
-| **SSH** | ✅ Active | Password & Key Auth, Command Exec, Sudo Check, Fingerprinting |
-| **WinRM** | ✅ Active | NTLM/Kerberos Auth, **PSRP Object handling**, Command Exec (PS/CMD) |
-| **MSSQL** | ✅ Active | SQL Query, `xp_cmdshell`, **IMPERSONATE privilege checks** |
-| **WMI** | ✅ Active | Direct execution, **Process/Service/Patch Enumeration** |
-| **ADB** | ✅ Active | Handshake, Shell execution, Screenshotting |
-| **RDP** | ✅ Active | NLA authentication, TSRequest generation, Screenshotting |
-| **VNC** | ✅ Active | Authentication, Screenshotting |
-| **FTP/NFS**| ✅ Active | Directory listing, Export/Share enumeration |
-| **HTTP** | ✅ Active | Web reconnaissance, SSL/TLS validation |
-| **DNS** | ✅ Active | AXFR, Record enumeration, Insecure update detection |
-| **IPMI** | ✅ Active | BMC probing, **RAKP Hash dumping** |
-| **iLO / iDRAC** | ✅ Active | Redfish API testing, Management interface fingerprinting |
-| **Kube** | ✅ Active | Kubernetes API server auth testing, Pod/Secret enumeration |
+| **SMB** | ✅ | NTLM SSP, shares, smbexec, lsassy, dcshadow, dumping |
+| **LDAP** | ✅ | Enum, AD CS, BloodHound, roasting, gMSA, LAPS |
+| **SSH** | ✅ | Auth, exec, sudo checks |
+| **WinRM** | ✅ | NTLM/Kerberos, PSRP, command exec |
+| **MSSQL** | ✅ | Queries, xp_cmdshell, impersonation |
+| **WMI** | ✅ | Exec, system enumeration |
+| **ADB** | ✅ | Shell, screenshots |
+| **RDP** | ✅ | NLA, screenshots |
+| **VNC** | ✅ | Auth, screenshots |
+| **FTP/NFS** | ✅ | Listing, share enumeration |
+| **HTTP** | ✅ | Web recon |
+| **DNS** | ✅ | AXFR, records |
+| **IPMI** | ✅ | RAKP dumping |
+| **iLO/iDRAC** | ✅ | Redfish probing |
+| **Kube** | ✅ | Kubernetes enumeration |
 
 ---
 
@@ -181,5 +211,5 @@ NetExec-RS is designed with a layered approach for maximum maintainability:
 
 Distributed under the **BSD 2-Clause License**. See [LICENSE](LICENSE) for more information.
 
-### Legal Disclaimer
+### ⚠️ Legal Disclaimer
 **NetExec-RS is for educational purposes and authorized security testing only.** Use of this tool for attacking targets without prior mutual consent is illegal. Developers assume no liability and are not responsible for any misuse or damage caused by this program.
