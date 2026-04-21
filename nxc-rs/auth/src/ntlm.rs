@@ -446,35 +446,42 @@ pub struct NtlmAuthResult {
 impl NtlmSessionSecurity {
     /// Derive the client signing key.
     pub fn client_signing_key(&self) -> [u8; 16] {
-        let mut md5 = <Md5 as Digest>::new();
+        use md5::Digest as Md5Digest;
+        let mut md5 = <Md5 as Md5Digest>::new();
         md5.update(&self.exported_session_key);
         let sign_magic = b"session key to client-to-server signing key magic constant\0".as_slice();
         md5.update(sign_magic);
-        md5.finalize().into()
+        Md5Digest::finalize(md5).into()
     }
 
     /// Derive the client sealing key.
     pub fn client_sealing_key(&self) -> [u8; 16] {
-        let mut md5 = <Md5 as Digest>::new();
+        use md5::Digest as Md5Digest;
+        let mut md5 = <Md5 as Md5Digest>::new();
+        md5.update(&self.exported_session_key);
         let seal_magic = b"session key to client-to-server sealing key magic constant\0".as_slice();
         md5.update(seal_magic);
-        md5.finalize().into()
+        Md5Digest::finalize(md5).into()
     }
 
     /// Derive the server signing key.
     pub fn server_signing_key(&self) -> [u8; 16] {
-        let mut md5 = <Md5 as Digest>::new();
+        use md5::Digest as Md5Digest;
+        let mut md5 = <Md5 as Md5Digest>::new();
+        md5.update(&self.exported_session_key);
         let sign_magic = b"session key to server-to-client signing key magic constant\0".as_slice();
         md5.update(sign_magic);
-        md5.finalize().into()
+        Md5Digest::finalize(md5).into()
     }
 
     /// Derive the server sealing key.
     pub fn server_sealing_key(&self) -> [u8; 16] {
-        let mut md5 = <Md5 as Digest>::new();
+        use md5::Digest as Md5Digest;
+        let mut md5 = <Md5 as Md5Digest>::new();
+        md5.update(&self.exported_session_key);
         let seal_magic = b"session key to server-to-client sealing key magic constant\0".as_slice();
         md5.update(seal_magic);
-        md5.finalize().into()
+        Md5Digest::finalize(md5).into()
     }
 
     /// Compute an NTLM message signature (MAC) for signing.
@@ -528,8 +535,7 @@ pub fn calculate_v2_hash(username: &str, domain: &str, nt_hash: &[u8; 16]) -> [u
 
 /// Calculate LM hash from a password (DES of "KGS!@#$%" with password key).
 pub fn calculate_lm_hash(password: &str) -> [u8; 16] {
-    use des::cipher::BlockEncrypt;
-    use des::cipher::KeyInit;
+    use des::cipher::{BlockCipherEncrypt, KeyInit};
     use des::Des;
 
     // SECURITY: The "KGS!@#$%" magic string and DES algorithm are MANDATORY
@@ -549,8 +555,8 @@ pub fn calculate_lm_hash(password: &str) -> [u8; 16] {
     let cipher1 = Des::new_from_slice(&key1).expect("DES key");
     let cipher2 = Des::new_from_slice(&key2).expect("DES key");
 
-    let mut block1 = des::cipher::generic_array::GenericArray::clone_from_slice(magic);
-    let mut block2 = des::cipher::generic_array::GenericArray::clone_from_slice(magic);
+    let mut block1: cipher::Array<u8, _> = (*magic).into();
+    let mut block2: cipher::Array<u8, _> = (*magic).into();
 
     cipher1.encrypt_block(&mut block1);
     cipher2.encrypt_block(&mut block2);

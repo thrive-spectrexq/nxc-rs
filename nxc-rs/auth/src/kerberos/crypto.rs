@@ -11,7 +11,7 @@ type HmacMd5 = Hmac<Md5>;
 type HmacSha1 = Hmac<Sha1>;
 
 use aes::Aes256;
-use cbc::cipher::{BlockDecryptMut, BlockEncryptMut, KeyIvInit};
+use cbc::cipher::KeyIvInit;
 
 use serde::{Deserialize, Serialize};
 
@@ -174,7 +174,8 @@ pub fn decrypt_aes(
     let checksum = &ciphertext[enc_len..];
 
     // 2. Verify HMAC-SHA1-96
-    let mut hmac = <HmacSha1 as Mac>::new_from_slice(key)?;
+    let mut hmac = HmacSha1::new_from_slice(key)
+        .map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
     hmac.update(&key_usage.to_be_bytes()); // Simplified usage derivation
     hmac.update(enc_data);
     let full_mac = hmac.finalize().into_bytes();
@@ -194,7 +195,8 @@ pub fn decrypt_aes(
         // For CTS, if length is not multiple of 16, we'd need special handling.
         // AD usually pads.
         if decrypted.len() % 16 == 0 {
-            cipher.decrypt_blocks_mut(unsafe {
+            use cbc::cipher::BlockModeDecrypt;
+            cipher.decrypt_blocks(unsafe {
                 std::slice::from_raw_parts_mut(
                     decrypted.as_mut_ptr() as *mut _,
                     decrypted.len() / 16,
@@ -234,13 +236,17 @@ pub fn encrypt_aes(
         let key_arr: &[u8; 32] = key[..32].try_into()?;
         let iv = [0u8; 16];
         let mut cipher = cbc::Encryptor::<Aes256>::new(key_arr.into(), &iv.into());
-        cipher.encrypt_blocks_mut(unsafe {
-            std::slice::from_raw_parts_mut(enc_data.as_mut_ptr() as *mut _, enc_data.len() / 16)
-        });
+        {
+            use cbc::cipher::BlockModeEncrypt;
+            cipher.encrypt_blocks(unsafe {
+                std::slice::from_raw_parts_mut(enc_data.as_mut_ptr() as *mut _, enc_data.len() / 16)
+            });
+        }
     }
 
     // Checksum: HMAC-SHA1-96(key, usage, enc_data)
-    let mut hmac = <HmacSha1 as Mac>::new_from_slice(key)?;
+    let mut hmac = HmacSha1::new_from_slice(key)
+        .map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
     hmac.update(&key_usage.to_be_bytes());
     hmac.update(&enc_data);
     let full_mac = hmac.finalize().into_bytes();

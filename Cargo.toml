@@ -69,7 +69,7 @@ kerberos_asn1 = "0.2"
 kerberos_constants = "0.0.9"
 pbkdf2 = { version = "0.12", features = ["hmac"] }
 rasn = "0.28"
-sha1 = "0.11"
+sha1 = "0.10"
 sha2 = "0.10"
 cbc = "0.2"
 cipher = { version = "0.5", features = ["alloc"] }

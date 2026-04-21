@@ -31,11 +31,8 @@ pub fn parse_ccache_v4(path: &str) -> Result<Vec<KerberosTicket>> {
 
     // Parse credential entries
     let mut tickets = Vec::new();
-    loop {
-        match read_credential(&mut file) {
-            Ok(ticket) => tickets.push(ticket),
-            Err(_) => break, // EOF or parse error means no more creds
-        }
+    while let Ok(ticket) = read_credential(&mut file) {
+        tickets.push(ticket);
     }
 
     if tickets.is_empty() {
@@ -75,6 +72,7 @@ fn read_data(r: &mut impl Read) -> Result<Vec<u8>> {
 /// A CCache principal: name_type (u32), num_components (u32), realm, components[].
 #[derive(Debug, Clone)]
 struct CcachePrincipal {
+    #[allow(dead_code)]
     name_type: u32,
     realm: String,
     components: Vec<String>,

@@ -3,7 +3,7 @@
 //! XOR-based and AES-based obfuscation to hide common IOC strings from static analysis.
 //! Supports single-byte XOR, multi-byte XOR keys, and AES-128-ECB encrypted strings.
 
-use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
+use aes::cipher::{BlockCipherDecrypt, BlockCipherEncrypt, KeyInit};
 use aes::Aes128;
 
 // ─── Single-byte XOR ────────────────────────────────────────────
@@ -98,7 +98,7 @@ pub fn aes_encrypt(plaintext: &str, key: &[u8; 16]) -> Vec<u8> {
 
     let mut ciphertext = Vec::with_capacity(padded.len());
     for chunk in padded.chunks_exact(16) {
-        let mut block = aes::Block::clone_from_slice(chunk);
+        let mut block: aes::Block = chunk.try_into().unwrap();
         cipher.encrypt_block(&mut block);
         ciphertext.extend_from_slice(&block);
     }
@@ -117,7 +117,7 @@ pub fn aes_decrypt(ciphertext: &[u8], key: &[u8; 16]) -> Result<String, &'static
     let mut plaintext = Vec::with_capacity(ciphertext.len());
 
     for chunk in ciphertext.chunks_exact(16) {
-        let mut block = aes::Block::clone_from_slice(chunk);
+        let mut block: aes::Block = chunk.try_into().unwrap();
         cipher.decrypt_block(&mut block);
         plaintext.extend_from_slice(&block);
     }
