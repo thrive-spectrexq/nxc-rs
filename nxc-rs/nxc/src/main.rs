@@ -411,6 +411,9 @@ async fn main() -> Result<()> {
         let res = match format.as_str() {
             "json" => reporting::export_json(&path, &report),
             "csv" => reporting::export_csv(&path, &results),
+            "html" => reporting::export_html(&path, &report),
+            "md" => reporting::export_markdown(&path, &report),
+            "ndjson" => reporting::export_ndjson(&path, &results),
             _ => unreachable!(),
         };
 

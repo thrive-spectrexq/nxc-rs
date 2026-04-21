@@ -175,7 +175,58 @@ impl SmbProtocol {
         let req = Self::build_smb2_negotiate_request();
         Self::send_smb2_packet(stream, &req, timeout).await?;
         let resp = Self::recv_smb2_packet(stream, timeout).await?;
-        Self::parse_negotiate_response(&resp)
+        let mut info = Self::parse_negotiate_response(&resp)?;
+
+        // Send dummy SESSION_SETUP with NTLMSSP Type 1 to extract Target Info
+        let mut buf = Vec::with_capacity(128);
+        buf.extend_from_slice(&Smb2Header::new(0x0001).to_bytes()); // SESSION_SETUP
+        let ntlm_t1 = b"NTLMSSP\0\x01\x00\x00\x00\x07\x82\x08\xa2\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+        buf.extend_from_slice(&[
+            25, 0, // Structure Size
+            0,     // Flags
+            1,     // SecurityMode
+            0, 0, 0, 0, // Capabilities
+            0, 0, 0, 0, // Channel
+            88, 0, // SecurityBufferOffset
+            (ntlm_t1.len() as u16) as u8, 0, // SecurityBufferLength
+            0, 0, 0, 0, 0, 0, 0, 0, // PreviousSessionId
+        ]);
+        buf.extend_from_slice(ntlm_t1);
+
+        if Self::send_smb2_packet(stream, &buf, timeout).await.is_ok() {
+            if let Ok(sess_resp) = Self::recv_smb2_packet(stream, timeout).await {
+                let signature = b"NTLMSSP\0\x02\x00\x00\x00";
+                if let Some(pos) = sess_resp.windows(signature.len()).position(|w| w == signature) {
+                    let ntlm_blob = &sess_resp[pos..];
+                    let auth = nxc_auth::ntlm::NtlmAuthenticator::new(None);
+                    if let Ok(challenge) = auth.parse_type2(ntlm_blob) {
+                        if let Some(dom) = challenge.target_info.nb_domain_name {
+                            info.domain = dom;
+                        }
+                        if let Some(host) = challenge.target_info.nb_computer_name {
+                            info.hostname = host;
+                        }
+                        if ntlm_blob.len() >= 56 {
+                            let major = ntlm_blob[48];
+                            let minor = ntlm_blob[49];
+                            let build = u16::from_le_bytes([ntlm_blob[50], ntlm_blob[51]]);
+                            if major > 0 {
+                                info.os_version = format!("{}.{}.{}", major, minor, build);
+                                if major == 10 {
+                                    info.os = "Windows 10/11 / Server 2016+".to_string();
+                                } else if major == 6 {
+                                    info.os = "Windows 7/8 / Server 2008/2012".to_string();
+                                } else {
+                                    info.os = format!("Windows {}", major);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(info)
     }
 
     // --- High Level Operations ---
@@ -578,7 +629,7 @@ impl SmbProtocol {
     fn parse_negotiate_response(data: &[u8]) -> Result<SmbHostInfo> {
         let mut info = SmbHostInfo::default();
         if data.len() >= 4 && &data[0..4] == SMB2_MAGIC && data.len() >= 72 {
-            let dialect = u16::from_le_bytes([data[70], data[71]]);
+            let dialect = u16::from_le_bytes([data[68], data[69]]);
             info.smb_dialect = match dialect {
                 0x0202 => "SMB 2.0.2".into(),
                 0x0210 => "SMB 2.1".into(),
@@ -586,6 +637,10 @@ impl SmbProtocol {
                 0x0311 => "SMB 3.1.1".into(),
                 _ => format!("SMB 0x{dialect:04x}"),
             };
+
+            let security_mode = data[66];
+            info.smb_signing = (security_mode & 0x01) != 0 || (security_mode & 0x02) != 0;
+            info.signing_required = (security_mode & 0x02) != 0;
         }
         Ok(info)
     }
@@ -684,25 +739,131 @@ impl SmbProtocol {
         pkt
     }
 
+    /// Parse SRVSVC NetShareEnumAll Level 1 NDR response.
+    ///
+    /// The NDR response for SHARE_INFO_1 contains:
+    ///   - InfoStruct level (u32)
+    ///   - ShareInfo1Container: EntriesRead (u32), pointer to array
+    ///   - Array of SHARE_INFO_1 entries: { name_ptr(u32), type(u32), remark_ptr(u32) }
+    ///   - Conformant varying strings for each name and remark
     fn parse_srvsvc_shares(&self, data: &[u8]) -> Result<Vec<ShareInfo>> {
         let mut shares = Vec::new();
-        let mut i = 0;
-        while i + 4 < data.len() {
-            if i + 10 < data.len() && data[i..i + 4] == [0x43, 0x00, 0x24, 0x00] {
-                // C$
-                shares.push(ShareInfo {
-                    name: "C$".into(),
-                    share_type: "DISK".into(),
-                    remark: "".into(),
-                    read_access: true,
-                    write_access: true,
-                });
-                i += 4;
-                continue;
-            }
-            i += 1;
+        if data.len() < 24 {
+            return Ok(shares);
         }
+
+        // Skip DCERPC response header (24 bytes) to get to the NDR payload
+        let ndr = if data.len() > 24 { &data[24..] } else { data };
+
+        // We need at least: Level(4) + SwitchValue(4) + EntriesRead(4) + ArrayPtr(4) + MaxCount(4) = 20 bytes
+        if ndr.len() < 20 {
+            return Ok(shares);
+        }
+
+        let mut pos = 0;
+
+        // Skip Level and SwitchValue (8 bytes)
+        pos += 8;
+
+        // EntriesRead
+        if pos + 4 > ndr.len() {
+            return Ok(shares);
+        }
+        let entries_read = u32::from_le_bytes(ndr[pos..pos + 4].try_into()?) as usize;
+        pos += 4;
+
+        // Referent pointer to array (skip it)
+        pos += 4;
+
+        // MaxCount of the conformant array
+        if pos + 4 > ndr.len() {
+            return Ok(shares);
+        }
+        let _max_count = u32::from_le_bytes(ndr[pos..pos + 4].try_into()?) as usize;
+        pos += 4;
+
+        // Read the fixed-size portion of each SHARE_INFO_1 entry:
+        //   NamePtr (4) + Type (4) + RemarkPtr (4) = 12 bytes each
+        let mut entry_types = Vec::with_capacity(entries_read);
+        for _ in 0..entries_read {
+            if pos + 12 > ndr.len() {
+                break;
+            }
+            let _name_ptr = u32::from_le_bytes(ndr[pos..pos + 4].try_into()?);
+            pos += 4;
+            let share_type = u32::from_le_bytes(ndr[pos..pos + 4].try_into()?);
+            pos += 4;
+            let _remark_ptr = u32::from_le_bytes(ndr[pos..pos + 4].try_into()?);
+            pos += 4;
+            entry_types.push(share_type);
+        }
+
+        // Now read the conformant varying strings (name, then remark for each entry)
+        let mut names = Vec::with_capacity(entries_read);
+        let mut remarks = Vec::with_capacity(entries_read);
+
+        for _ in 0..entries_read {
+            let name = Self::read_ndr_string(ndr, &mut pos)?;
+            names.push(name);
+        }
+        for _ in 0..entries_read {
+            let remark = Self::read_ndr_string(ndr, &mut pos)?;
+            remarks.push(remark);
+        }
+
+        for i in 0..names.len().min(entry_types.len()) {
+            let type_str = match entry_types[i] & 0x0FFFFFFF {
+                0x00000000 => "DISK",
+                0x00000001 => "PRINT",
+                0x00000002 => "DEVICE",
+                0x00000003 => "IPC",
+                _ => "UNKNOWN",
+            };
+            let name = &names[i];
+            shares.push(ShareInfo {
+                name: name.clone(),
+                share_type: type_str.to_string(),
+                remark: remarks.get(i).cloned().unwrap_or_default(),
+                read_access: false,  // Will be checked via TreeConnect
+                write_access: false,
+            });
+        }
+
         Ok(shares)
+    }
+
+    /// Read a conformant varying NDR unicode string at the given position.
+    /// Format: MaxCount(u32) + Offset(u32) + ActualCount(u32) + UTF-16LE data + padding
+    fn read_ndr_string(data: &[u8], pos: &mut usize) -> Result<String> {
+        if *pos + 12 > data.len() {
+            return Ok(String::new());
+        }
+        let _max_count = u32::from_le_bytes(data[*pos..*pos + 4].try_into()?);
+        *pos += 4;
+        let _offset = u32::from_le_bytes(data[*pos..*pos + 4].try_into()?);
+        *pos += 4;
+        let actual_count = u32::from_le_bytes(data[*pos..*pos + 4].try_into()?) as usize;
+        *pos += 4;
+
+        let byte_len = actual_count * 2; // UTF-16LE
+        if *pos + byte_len > data.len() {
+            return Ok(String::new());
+        }
+
+        let u16_vec: Vec<u16> = data[*pos..*pos + byte_len]
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        *pos += byte_len;
+
+        // Align to 4-byte boundary
+        if *pos % 4 != 0 {
+            *pos += 4 - (*pos % 4);
+        }
+
+        // Trim null terminator
+        let s = String::from_utf16_lossy(&u16_vec);
+        Ok(s.trim_end_matches('\0').to_string())
     }
 
     async fn send_smb2_packet(
