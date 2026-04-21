@@ -65,10 +65,7 @@ impl<C: Send + 'static> ConnectionPool<C> {
 
     /// Create a named pool (name appears in logs).
     pub fn with_name(name: &str, max_size: usize, idle_timeout: Duration) -> Self {
-        Self {
-            name: name.to_string(),
-            ..Self::new(max_size, idle_timeout)
-        }
+        Self { name: name.to_string(), ..Self::new(max_size, idle_timeout) }
     }
 
     /// Set the maximum total lifetime for a pooled connection.
@@ -124,10 +121,7 @@ impl<C: Send + 'static> ConnectionPool<C> {
         let mut pool = self.idle.lock().await;
 
         if pool.len() >= self.max_size {
-            warn!(
-                "Pool '{}': at capacity ({}), dropping connection",
-                self.name, self.max_size
-            );
+            warn!("Pool '{}': at capacity ({}), dropping connection", self.name, self.max_size);
             return;
         }
 
@@ -137,12 +131,7 @@ impl<C: Send + 'static> ConnectionPool<C> {
             last_used: Instant::now(),
         });
 
-        debug!(
-            "Pool '{}': connection returned ({}/{})",
-            self.name,
-            pool.len(),
-            self.max_size
-        );
+        debug!("Pool '{}': connection returned ({}/{})", self.name, pool.len(), self.max_size);
     }
 
     /// Evict all expired connections from the pool.
@@ -157,10 +146,7 @@ impl<C: Send + 'static> ConnectionPool<C> {
 
         let evicted = before - pool.len();
         if evicted > 0 {
-            debug!(
-                "Pool '{}': evicted {} expired connections",
-                self.name, evicted
-            );
+            debug!("Pool '{}': evicted {} expired connections", self.name, evicted);
         }
         evicted
     }
@@ -187,10 +173,7 @@ mod tests {
     async fn test_create_when_empty() {
         let pool: ConnectionPool<String> = ConnectionPool::new(5, Duration::from_secs(60));
 
-        let conn = pool
-            .get_or_create(|| async { Ok("new_connection".to_string()) })
-            .await
-            .unwrap();
+        let conn = pool.get_or_create(|| async { Ok("new_connection".to_string()) }).await.unwrap();
 
         assert_eq!(conn, "new_connection");
         assert_eq!(pool.idle_count().await, 0);
@@ -205,10 +188,8 @@ mod tests {
         assert_eq!(pool.idle_count().await, 1);
 
         // Should reuse instead of creating new
-        let conn = pool
-            .get_or_create(|| async { Ok("should_not_create".to_string()) })
-            .await
-            .unwrap();
+        let conn =
+            pool.get_or_create(|| async { Ok("should_not_create".to_string()) }).await.unwrap();
 
         assert_eq!(conn, "cached_conn");
         assert_eq!(pool.idle_count().await, 0);
@@ -259,10 +240,7 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Should skip the expired connection and create a new one
-        let conn = pool
-            .get_or_create(|| async { Ok("fresh_conn".to_string()) })
-            .await
-            .unwrap();
+        let conn = pool.get_or_create(|| async { Ok("fresh_conn".to_string()) }).await.unwrap();
 
         assert_eq!(conn, "fresh_conn");
     }

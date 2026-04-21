@@ -359,14 +359,9 @@ impl NxcDb {
             "DELETE FROM nxc_auth_results WHERE host_id = ?1",
             rusqlite::params![host_id],
         )?;
-        conn.execute(
-            "DELETE FROM nxc_shares WHERE host_id = ?1",
-            rusqlite::params![host_id],
-        )?;
-        let rows = conn.execute(
-            "DELETE FROM nxc_hosts WHERE id = ?1",
-            rusqlite::params![host_id],
-        )?;
+        conn.execute("DELETE FROM nxc_shares WHERE host_id = ?1", rusqlite::params![host_id])?;
+        let rows =
+            conn.execute("DELETE FROM nxc_hosts WHERE id = ?1", rusqlite::params![host_id])?;
         Ok(rows > 0)
     }
 
@@ -377,10 +372,8 @@ impl NxcDb {
             "DELETE FROM nxc_auth_results WHERE credential_id = ?1",
             rusqlite::params![cred_id],
         )?;
-        let rows = conn.execute(
-            "DELETE FROM nxc_credentials WHERE id = ?1",
-            rusqlite::params![cred_id],
-        )?;
+        let rows =
+            conn.execute("DELETE FROM nxc_credentials WHERE id = ?1", rusqlite::params![cred_id])?;
         Ok(rows > 0)
     }
 
@@ -402,10 +395,8 @@ impl NxcDb {
             "DELETE FROM nxc_credentials WHERE workspace = ?1",
             rusqlite::params![workspace],
         )?;
-        let host_rows = conn.execute(
-            "DELETE FROM nxc_hosts WHERE workspace = ?1",
-            rusqlite::params![workspace],
-        )?;
+        let host_rows = conn
+            .execute("DELETE FROM nxc_hosts WHERE workspace = ?1", rusqlite::params![workspace])?;
 
         Ok((cred_rows + host_rows) as u64)
     }
@@ -425,7 +416,8 @@ impl NxcDb {
             "SELECT c.id, c.workspace, c.domain, c.username, c.password, c.nt_hash, c.lm_hash, c.aes_128, c.aes_256, c.source, c.host_id, c.created_at
              FROM nxc_credentials c WHERE c.workspace = ?1"
         );
-        let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(self.workspace.clone())];
+        let mut params: Vec<Box<dyn rusqlite::types::ToSql>> =
+            vec![Box::new(self.workspace.clone())];
         let mut param_idx = 1u32;
 
         if let Some(dom) = domain {
@@ -444,7 +436,8 @@ impl NxcDb {
             );
         }
 
-        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params.iter().map(|p| p.as_ref()).collect();
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
             Ok(Credential {
@@ -506,11 +499,7 @@ impl NxcDb {
             credentials: Vec<Credential>,
         }
 
-        let dump = WorkspaceDump {
-            workspace: self.workspace.clone(),
-            hosts,
-            credentials: creds,
-        };
+        let dump = WorkspaceDump { workspace: self.workspace.clone(), hosts, credentials: creds };
 
         Ok(serde_json::to_string_pretty(&dump)?)
     }
@@ -587,12 +576,22 @@ mod tests {
         let dir = tempdir().unwrap();
         let db = NxcDb::new(&dir.path().join("test.db"), "default").unwrap();
 
-        let host_id = db.upsert_host(&HostInfo {
-            id: None, workspace: "default".into(), ip: "10.0.0.1".into(),
-            hostname: None, domain: None, os: None, os_version: None,
-            smb_signing: None, signing_required: None, is_dc: false,
-            first_seen: 0, last_seen: 0,
-        }).unwrap();
+        let host_id = db
+            .upsert_host(&HostInfo {
+                id: None,
+                workspace: "default".into(),
+                ip: "10.0.0.1".into(),
+                hostname: None,
+                domain: None,
+                os: None,
+                os_version: None,
+                smb_signing: None,
+                signing_required: None,
+                is_dc: false,
+                first_seen: 0,
+                last_seen: 0,
+            })
+            .unwrap();
 
         assert!(db.delete_host(host_id).unwrap());
         assert_eq!(db.list_hosts().unwrap().len(), 0);
@@ -605,12 +604,22 @@ mod tests {
         let dir = tempdir().unwrap();
         let db = NxcDb::new(&dir.path().join("test.db"), "default").unwrap();
 
-        let cred_id = db.add_credential(&Credential {
-            id: None, workspace: "default".into(), domain: Some("CORP".into()),
-            username: "admin".into(), password: Some("pass".into()),
-            nt_hash: None, lm_hash: None, aes_128: None, aes_256: None,
-            source: Some("smb".into()), host_id: None, created_at: 0,
-        }).unwrap();
+        let cred_id = db
+            .add_credential(&Credential {
+                id: None,
+                workspace: "default".into(),
+                domain: Some("CORP".into()),
+                username: "admin".into(),
+                password: Some("pass".into()),
+                nt_hash: None,
+                lm_hash: None,
+                aes_128: None,
+                aes_256: None,
+                source: Some("smb".into()),
+                host_id: None,
+                created_at: 0,
+            })
+            .unwrap();
 
         assert!(db.delete_credential(cred_id).unwrap());
         assert_eq!(db.list_credentials().unwrap().len(), 0);
@@ -622,17 +631,35 @@ mod tests {
         let db = NxcDb::new(&dir.path().join("test.db"), "default").unwrap();
 
         db.upsert_host(&HostInfo {
-            id: None, workspace: "default".into(), ip: "10.0.0.1".into(),
-            hostname: None, domain: None, os: None, os_version: None,
-            smb_signing: None, signing_required: None, is_dc: false,
-            first_seen: 0, last_seen: 0,
-        }).unwrap();
+            id: None,
+            workspace: "default".into(),
+            ip: "10.0.0.1".into(),
+            hostname: None,
+            domain: None,
+            os: None,
+            os_version: None,
+            smb_signing: None,
+            signing_required: None,
+            is_dc: false,
+            first_seen: 0,
+            last_seen: 0,
+        })
+        .unwrap();
         db.add_credential(&Credential {
-            id: None, workspace: "default".into(), domain: None,
-            username: "user1".into(), password: Some("p".into()),
-            nt_hash: None, lm_hash: None, aes_128: None, aes_256: None,
-            source: None, host_id: None, created_at: 0,
-        }).unwrap();
+            id: None,
+            workspace: "default".into(),
+            domain: None,
+            username: "user1".into(),
+            password: Some("p".into()),
+            nt_hash: None,
+            lm_hash: None,
+            aes_128: None,
+            aes_256: None,
+            source: None,
+            host_id: None,
+            created_at: 0,
+        })
+        .unwrap();
 
         let deleted = db.delete_workspace("default").unwrap();
         assert!(deleted >= 2);
@@ -645,12 +672,22 @@ mod tests {
         let dir = tempdir().unwrap();
         let db = NxcDb::new(&dir.path().join("test.db"), "default").unwrap();
 
-        let host_id = db.upsert_host(&HostInfo {
-            id: None, workspace: "default".into(), ip: "10.0.0.5".into(),
-            hostname: None, domain: None, os: None, os_version: None,
-            smb_signing: None, signing_required: None, is_dc: false,
-            first_seen: 0, last_seen: 0,
-        }).unwrap();
+        let host_id = db
+            .upsert_host(&HostInfo {
+                id: None,
+                workspace: "default".into(),
+                ip: "10.0.0.5".into(),
+                hostname: None,
+                domain: None,
+                os: None,
+                os_version: None,
+                smb_signing: None,
+                signing_required: None,
+                is_dc: false,
+                first_seen: 0,
+                last_seen: 0,
+            })
+            .unwrap();
 
         let ar_id = db.add_auth_result(host_id, None, "smb", "success", true).unwrap();
         assert!(ar_id > 0);
@@ -666,17 +703,35 @@ mod tests {
         let db = NxcDb::new(&dir.path().join("test.db"), "default").unwrap();
 
         db.add_credential(&Credential {
-            id: None, workspace: "default".into(), domain: Some("CORP".into()),
-            username: "admin".into(), password: Some("p".into()),
-            nt_hash: None, lm_hash: None, aes_128: None, aes_256: None,
-            source: Some("smb".into()), host_id: None, created_at: 0,
-        }).unwrap();
+            id: None,
+            workspace: "default".into(),
+            domain: Some("CORP".into()),
+            username: "admin".into(),
+            password: Some("p".into()),
+            nt_hash: None,
+            lm_hash: None,
+            aes_128: None,
+            aes_256: None,
+            source: Some("smb".into()),
+            host_id: None,
+            created_at: 0,
+        })
+        .unwrap();
         db.add_credential(&Credential {
-            id: None, workspace: "default".into(), domain: Some("OTHER".into()),
-            username: "user".into(), password: Some("q".into()),
-            nt_hash: None, lm_hash: None, aes_128: None, aes_256: None,
-            source: Some("ssh".into()), host_id: None, created_at: 0,
-        }).unwrap();
+            id: None,
+            workspace: "default".into(),
+            domain: Some("OTHER".into()),
+            username: "user".into(),
+            password: Some("q".into()),
+            nt_hash: None,
+            lm_hash: None,
+            aes_128: None,
+            aes_256: None,
+            source: Some("ssh".into()),
+            host_id: None,
+            created_at: 0,
+        })
+        .unwrap();
 
         let corp_creds = db.search_credentials(Some("CORP"), None, false).unwrap();
         assert_eq!(corp_creds.len(), 1);
@@ -692,17 +747,35 @@ mod tests {
         let db = NxcDb::new(&dir.path().join("test.db"), "default").unwrap();
 
         db.upsert_host(&HostInfo {
-            id: None, workspace: "default".into(), ip: "10.0.0.1".into(),
-            hostname: Some("dc01".into()), domain: Some("CORP".into()),
-            os: None, os_version: None, smb_signing: None, signing_required: None,
-            is_dc: true, first_seen: 100, last_seen: 200,
-        }).unwrap();
+            id: None,
+            workspace: "default".into(),
+            ip: "10.0.0.1".into(),
+            hostname: Some("dc01".into()),
+            domain: Some("CORP".into()),
+            os: None,
+            os_version: None,
+            smb_signing: None,
+            signing_required: None,
+            is_dc: true,
+            first_seen: 100,
+            last_seen: 200,
+        })
+        .unwrap();
         db.add_credential(&Credential {
-            id: None, workspace: "default".into(), domain: Some("CORP".into()),
-            username: "admin".into(), password: Some("pass123".into()),
-            nt_hash: None, lm_hash: None, aes_128: None, aes_256: None,
-            source: Some("smb".into()), host_id: None, created_at: 100,
-        }).unwrap();
+            id: None,
+            workspace: "default".into(),
+            domain: Some("CORP".into()),
+            username: "admin".into(),
+            password: Some("pass123".into()),
+            nt_hash: None,
+            lm_hash: None,
+            aes_128: None,
+            aes_256: None,
+            source: Some("smb".into()),
+            host_id: None,
+            created_at: 100,
+        })
+        .unwrap();
 
         // Export
         let json = db.export_workspace().unwrap();

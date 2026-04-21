@@ -111,11 +111,7 @@ impl TimeoutManager {
         match tokio::time::timeout(timeout, fut).await {
             Ok(result) => result,
             Err(_) => {
-                warn!(
-                    "Timeout exceeded for '{}' phase ({}ms)",
-                    phase,
-                    timeout.as_millis()
-                );
+                warn!("Timeout exceeded for '{}' phase ({}ms)", phase, timeout.as_millis());
                 Err(anyhow!(
                     "Operation timed out during '{}' phase after {}ms",
                     phase,
@@ -146,18 +142,13 @@ mod tests {
     #[tokio::test]
     async fn test_timeout_succeeds_within_limit() {
         let tm = TimeoutManager::default();
-        let result = tm
-            .with_connect_timeout(async { Ok::<_, anyhow::Error>(42) })
-            .await;
+        let result = tm.with_connect_timeout(async { Ok::<_, anyhow::Error>(42) }).await;
         assert_eq!(result.unwrap(), 42);
     }
 
     #[tokio::test]
     async fn test_timeout_expires() {
-        let tm = TimeoutManager {
-            connect: Duration::from_millis(50),
-            ..Default::default()
-        };
+        let tm = TimeoutManager { connect: Duration::from_millis(50), ..Default::default() };
 
         let result = tm
             .with_connect_timeout(async {

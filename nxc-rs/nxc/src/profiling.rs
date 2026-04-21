@@ -14,6 +14,7 @@ pub struct MemorySnapshot {
     /// Virtual memory size in bytes (if available).
     pub vms_bytes: Option<u64>,
     /// Timestamp of the snapshot.
+    #[allow(dead_code)]
     pub timestamp: std::time::Instant,
 }
 
@@ -24,11 +25,7 @@ pub struct MemorySnapshot {
 pub fn capture_memory_snapshot() -> MemorySnapshot {
     let (rss, vms) = get_process_memory();
 
-    MemorySnapshot {
-        rss_bytes: rss,
-        vms_bytes: vms,
-        timestamp: std::time::Instant::now(),
-    }
+    MemorySnapshot { rss_bytes: rss, vms_bytes: vms, timestamp: std::time::Instant::now() }
 }
 
 /// Log the current memory usage.
@@ -98,13 +95,11 @@ pub struct ScopedTimer {
 impl ScopedTimer {
     /// Start a new timer with the given label.
     pub fn new(label: &str) -> Self {
-        Self {
-            label: label.to_string(),
-            start: std::time::Instant::now(),
-        }
+        Self { label: label.to_string(), start: std::time::Instant::now() }
     }
 
     /// Get the elapsed time.
+    #[allow(dead_code)]
     pub fn elapsed(&self) -> std::time::Duration {
         self.start.elapsed()
     }
@@ -113,11 +108,7 @@ impl ScopedTimer {
 impl Drop for ScopedTimer {
     fn drop(&mut self) {
         let elapsed = self.start.elapsed();
-        info!(
-            "[PROFILING] {} completed in {:.2}ms",
-            self.label,
-            elapsed.as_secs_f64() * 1000.0
-        );
+        info!("[PROFILING] {} completed in {:.2}ms", self.label, elapsed.as_secs_f64() * 1000.0);
     }
 }
 

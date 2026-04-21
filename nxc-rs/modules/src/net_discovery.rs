@@ -133,9 +133,12 @@ impl NxcModule for NetDiscovery {
                 let ip = parts[0].trim();
                 if ip.chars().all(|c| c.is_ascii_digit() || c == '.')
                     && ip.matches('.').count() == 3
-                    && !ip.ends_with(".255") && !ip.starts_with("224.") && !ip.starts_with("239.") {
-                        hosts.insert(ip.to_string());
-                    }
+                    && !ip.ends_with(".255")
+                    && !ip.starts_with("224.")
+                    && !ip.starts_with("239.")
+                {
+                    hosts.insert(ip.to_string());
+                }
             }
         }
 

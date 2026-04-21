@@ -612,10 +612,7 @@ pub fn build_cli() -> Command {
                 .value_parser(clap::value_parser!(u16)),
         )
         .arg(
-            Arg::new("enum")
-                .long("enum")
-                .help("Enumerate DNS records")
-                .action(ArgAction::SetTrue),
+            Arg::new("enum").long("enum").help("Enumerate DNS records").action(ArgAction::SetTrue),
         );
 
     let ipmi_cmd = Command::new("ipmi")
@@ -883,6 +880,7 @@ pub fn get_protocol_handler(
         "vnc" => Some(Arc::new(nxc_protocols::vnc::VncProtocol::new())),
         "nfs" => Some(Arc::new(nxc_protocols::nfs::NfsProtocol::new())),
         "adb" => Some(Arc::new(nxc_protocols::adb::AdbProtocol::new())),
+        #[allow(unexpected_cfgs)]
         #[cfg(feature = "opcua-support")]
         "opcua" => Some(Arc::new(nxc_protocols::opcua::OpcUaProtocol::new())),
         "network" | "net" | "wifi" => {
@@ -911,9 +909,7 @@ pub fn get_protocol_handler(
         "docker" => Some(Arc::new(nxc_protocols::docker::DockerProtocol::new())),
         "dns" => Some(Arc::new(nxc_protocols::dns::DnsProtocol::new())),
         "ipmi" => Some(Arc::new(nxc_protocols::ipmi::IpmiProtocol::new())),
-        "kube" | "kubernetes" | "k8s" => {
-            Some(Arc::new(nxc_protocols::kube::KubeProtocol::new()))
-        }
+        "kube" | "kubernetes" | "k8s" => Some(Arc::new(nxc_protocols::kube::KubeProtocol::new())),
         _ => None,
     }
 }

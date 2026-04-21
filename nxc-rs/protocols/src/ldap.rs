@@ -414,7 +414,14 @@ fn decode_sid(sid_bytes: &[u8]) -> String {
     let revision = sid_bytes[0];
     let sub_auth_count = sid_bytes[1] as usize;
     let identifier_authority = u64::from_be_bytes([
-        0, 0, sid_bytes[2], sid_bytes[3], sid_bytes[4], sid_bytes[5], sid_bytes[6], sid_bytes[7],
+        0,
+        0,
+        sid_bytes[2],
+        sid_bytes[3],
+        sid_bytes[4],
+        sid_bytes[5],
+        sid_bytes[6],
+        sid_bytes[7],
     ]);
 
     let expected_len = 8 + sub_auth_count * 4;
@@ -453,8 +460,8 @@ mod tests {
     fn test_decode_sid_well_known() {
         // S-1-5-21-3623811015-3361044348-30300820-1013
         let sid_bytes: Vec<u8> = vec![
-            0x01,                   // Revision 1
-            0x05,                   // 5 sub-authorities
+            0x01, // Revision 1
+            0x05, // 5 sub-authorities
             0x00, 0x00, 0x00, 0x00, 0x00, 0x05, // Authority 5
             0xA7, 0x93, 0xF1, 0xD7, // 3623811015 (LE)
             0xFC, 0x89, 0x6E, 0xC8, // 3361044348 (LE)

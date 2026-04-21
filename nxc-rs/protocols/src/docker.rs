@@ -188,7 +188,7 @@ impl NxcProtocol for DockerProtocol {
         let containers_str = self.enumerate(docker_sess).await?;
         let containers: Vec<serde_json::Value> = serde_json::from_str(&containers_str)
             .map_err(|e| anyhow!("Failed to parse containers JSON: {e}"))?;
-            
+
         let container_id = containers
             .first()
             .and_then(|c| c.get("Id"))
@@ -218,7 +218,9 @@ impl NxcProtocol for DockerProtocol {
         }
 
         let exec_info: serde_json::Value = resp.json().await?;
-        let exec_id = exec_info.get("Id").and_then(|id| id.as_str())
+        let exec_id = exec_info
+            .get("Id")
+            .and_then(|id| id.as_str())
             .ok_or_else(|| anyhow!("Failed to parse exec ID"))?;
 
         // 3. Start Exec Instance and capture output
@@ -240,11 +242,7 @@ impl NxcProtocol for DockerProtocol {
 
         let stdout = resp.text().await?;
 
-        Ok(CommandOutput {
-            stdout,
-            stderr: String::new(),
-            exit_code: Some(0),
-        })
+        Ok(CommandOutput { stdout, stderr: String::new(), exit_code: Some(0) })
     }
 }
 

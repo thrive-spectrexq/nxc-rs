@@ -80,9 +80,8 @@ impl NxcModule for EnumTrusts {
                 "3" => "MIT",
                 _ => "Unknown",
             };
-            output.push_str(&format!(
-                "  [+] {partner} | Direction: {dir_str} | Type: {type_str}\n"
-            ));
+            output
+                .push_str(&format!("  [+] {partner} | Direction: {dir_str} | Type: {type_str}\n"));
             trusts.push(json!({"partner": partner, "direction": dir_str, "type": type_str}));
         }
         if entries.is_empty() {

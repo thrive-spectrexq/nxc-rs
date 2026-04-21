@@ -174,8 +174,7 @@ impl NetworkProtocol {
                             }
                         }
 
-                        dumped_credentials
-                            .push_str(&format!("{profile_name:<30} : {password}\n"));
+                        dumped_credentials.push_str(&format!("{profile_name:<30} : {password}\n"));
                     }
                 }
             }
@@ -227,8 +226,7 @@ impl NetworkProtocol {
                 if !parsed.is_empty() {
                     results.push(format!("  {} -> {}", addr, parsed.join(", ")));
                 } else {
-                    results
-                        .push(format!("  {addr} responded with {len} bytes (unknown format)"));
+                    results.push(format!("  {addr} responded with {len} bytes (unknown format)"));
                 }
             }
         }
@@ -279,8 +277,7 @@ impl NetworkProtocol {
                 if !parsed.is_empty() {
                     results.push(format!("  {} -> {}", addr, parsed.join(", ")));
                 } else {
-                    results
-                        .push(format!("  {addr} responded with {len} bytes (unknown format)"));
+                    results.push(format!("  {addr} responded with {len} bytes (unknown format)"));
                 }
             }
         }
@@ -464,9 +461,7 @@ impl NxcProtocol for NetworkProtocol {
 
         if let Some(ref ssid) = self.connect {
             match self.connect_ssid(ssid).await {
-                Ok(out) => {
-                    final_message.push_str(&format!("\n[Network Connect Result]\n{out}\n"))
-                }
+                Ok(out) => final_message.push_str(&format!("\n[Network Connect Result]\n{out}\n")),
                 Err(e) => {
                     success = false;
                     final_message.push_str(&format!("\n[Network Connect Error] {e}\n"));
@@ -509,9 +504,7 @@ impl NxcProtocol for NetworkProtocol {
 
         if self.mdns {
             match self.discover_mdns().await {
-                Ok(out) => {
-                    final_message.push_str(&format!("\n[mDNS Discovery Results]\n{out}\n"))
-                }
+                Ok(out) => final_message.push_str(&format!("\n[mDNS Discovery Results]\n{out}\n")),
                 Err(e) => {
                     success = false;
                     final_message.push_str(&format!("\n[mDNS Error] {e}\n"));
@@ -521,9 +514,7 @@ impl NxcProtocol for NetworkProtocol {
 
         if self.llmnr {
             match self.discover_llmnr().await {
-                Ok(out) => {
-                    final_message.push_str(&format!("\n[LLMNR Discovery Results]\n{out}\n"))
-                }
+                Ok(out) => final_message.push_str(&format!("\n[LLMNR Discovery Results]\n{out}\n")),
                 Err(e) => {
                     success = false;
                     final_message.push_str(&format!("\n[LLMNR Error] {e}\n"));

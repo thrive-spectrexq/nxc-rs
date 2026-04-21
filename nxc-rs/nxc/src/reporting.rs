@@ -84,14 +84,8 @@ pub fn export_markdown(path: &str, report: &Report) -> Result<()> {
 
     writeln!(file, "## Results")?;
     writeln!(file)?;
-    writeln!(
-        file,
-        "| Target | Username | Success | Admin | Duration (ms) | Message |"
-    )?;
-    writeln!(
-        file,
-        "|--------|----------|---------|-------|---------------|---------|"
-    )?;
+    writeln!(file, "| Target | Username | Success | Admin | Duration (ms) | Message |")?;
+    writeln!(file, "|--------|----------|---------|-------|---------------|---------|")?;
 
     for res in &report.results {
         let success_icon = if res.success { "✅" } else { "❌" };
@@ -197,16 +191,10 @@ pub fn export_html(path: &str, report: &Report) -> Result<()> {
         } else {
             r#"<span class="badge badge-fail">FAILED</span>"#
         };
-        let admin_badge = if res.admin {
-            r#"<span class="badge badge-admin">ADMIN</span>"#
-        } else {
-            "—"
-        };
-        let msg_escaped = res
-            .message
-            .replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;");
+        let admin_badge =
+            if res.admin { r#"<span class="badge badge-admin">ADMIN</span>"# } else { "—" };
+        let msg_escaped =
+            res.message.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
         writeln!(
             file,
             "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}ms</td><td>{}</td></tr>",

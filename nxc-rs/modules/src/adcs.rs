@@ -106,9 +106,8 @@ impl NxcModule for AdcsModule {
 
             // 3. Certificate Templates
             debug!("LDAP: Querying Certificate Templates in {}", config_dn);
-            let template_dn = format!(
-                "CN=Certificate Templates,CN=Public Key Services,CN=Services,{config_dn}"
-            );
+            let template_dn =
+                format!("CN=Certificate Templates,CN=Public Key Services,CN=Services,{config_dn}");
             let template_entries = protocol
                 .search(
                     ldap_sess,

@@ -131,8 +131,7 @@ impl KerberosClient {
 
         if !key.is_empty() {
             let now = GeneralizedTime::from(chrono::Utc::now());
-            let ts_der =
-                rasn::der::encode(&now).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
+            let ts_der = rasn::der::encode(&now).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
             let enc_ts = encrypt_rc4_hmac(&key, 1, &ts_der)?; // Usage 1
 
             padata.push(PaData {
@@ -154,8 +153,7 @@ impl KerberosClient {
             req_body,
         });
 
-        let req_der =
-            rasn::der::encode(&as_req).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
+        let req_der = rasn::der::encode(&as_req).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
         let resp_der = self._send_tcp_req(&req_der)?;
 
         // Parse AS-REP

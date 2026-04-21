@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use nxc_resilience::{CircuitBreaker, RetryPolicy, TimeoutManager};
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::future::Future;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
@@ -84,11 +84,7 @@ impl ConnectionManager {
         let breaker = self.get_breaker(target).await;
         let retry_policy = self.retry_policy.clone();
 
-        breaker
-            .call(|| async {
-                retry_policy.execute(operation).await
-            })
-            .await
+        breaker.call(|| async { retry_policy.execute(operation).await }).await
     }
 
     /// Check if a target is available (circuit not open).
@@ -113,12 +109,7 @@ impl ConnectionManager {
     }
 
     /// Connect to a target with retry, circuit breaker, and timeout support.
-    pub async fn connect(
-        &self,
-        target: &str,
-        port: u16,
-        proxy: Option<&str>,
-    ) -> Result<TcpStream> {
+    pub async fn connect(&self, target: &str, port: u16, proxy: Option<&str>) -> Result<TcpStream> {
         let breaker = self.get_breaker(target).await;
 
         breaker

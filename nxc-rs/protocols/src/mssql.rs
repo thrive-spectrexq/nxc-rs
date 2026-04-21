@@ -149,10 +149,8 @@ impl NxcProtocol for MssqlProtocol {
                 &password,
             ));
             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
-            config.authentication(AuthMethod::sql_server(
-                format!("{domain}\\{username}"),
-                &password,
-            ));
+            config
+                .authentication(AuthMethod::sql_server(format!("{domain}\\{username}"), &password));
         } else {
             config.authentication(AuthMethod::sql_server(&username, &password));
         }

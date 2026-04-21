@@ -73,8 +73,7 @@ impl NxcModule for Pso {
                 .and_then(|v| v.first())
                 .cloned()
                 .unwrap_or_default();
-            output
-                .push_str(&format!("  [+] {name} (MinLen: {min_len}, Lockout: {lockout})\n"));
+            output.push_str(&format!("  [+] {name} (MinLen: {min_len}, Lockout: {lockout})\n"));
             psos.push(json!({"name": name, "min_length": min_len, "lockout_threshold": lockout}));
         }
         if entries.is_empty() {

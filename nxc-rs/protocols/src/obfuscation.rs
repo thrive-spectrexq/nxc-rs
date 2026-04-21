@@ -29,11 +29,7 @@ pub fn obfuscate_multi(s: &str, key: &[u8]) -> Vec<u8> {
     if key.is_empty() {
         return s.as_bytes().to_vec();
     }
-    s.as_bytes()
-        .iter()
-        .enumerate()
-        .map(|(i, &b)| b ^ key[i % key.len()])
-        .collect()
+    s.as_bytes().iter().enumerate().map(|(i, &b)| b ^ key[i % key.len()]).collect()
 }
 
 /// Deobfuscate data encrypted with a multi-byte XOR key.
@@ -41,11 +37,8 @@ pub fn deobfuscate_multi(encoded: &[u8], key: &[u8]) -> String {
     if key.is_empty() {
         return String::from_utf8_lossy(encoded).into_owned();
     }
-    let decoded: Vec<u8> = encoded
-        .iter()
-        .enumerate()
-        .map(|(i, &b)| b ^ key[i % key.len()])
-        .collect();
+    let decoded: Vec<u8> =
+        encoded.iter().enumerate().map(|(i, &b)| b ^ key[i % key.len()]).collect();
     String::from_utf8_lossy(&decoded).into_owned()
 }
 

@@ -19,8 +19,8 @@ pub struct RegistrySecrets;
 impl RegistrySecrets {
     /// Extract the 16-byte Boot Key (System Key) from the SYSTEM hive.
     pub fn get_boot_key(system_hive_data: &[u8]) -> Result<[u8; 16]> {
-        let hive = Hive::new(system_hive_data)
-            .map_err(|e| anyhow!("Failed to parse SYSTEM hive: {e}"))?;
+        let hive =
+            Hive::new(system_hive_data).map_err(|e| anyhow!("Failed to parse SYSTEM hive: {e}"))?;
         let root =
             hive.root_key_node().map_err(|e| anyhow!("No root key node in SYSTEM hive: {e}"))?;
 

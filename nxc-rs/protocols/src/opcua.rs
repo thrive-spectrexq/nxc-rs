@@ -82,9 +82,9 @@ impl NxcProtocol for OpcUaProtocol {
         // Configure OPC-UA Client
         let mut config = ClientConfig::new("NetExec-RS", "nxc-rs");
         config.session_retry_limit = 1;
-        
+
         let client = Client::new(config);
-        
+
         // In OPC-UA, connecting usually involves identifying endpoints first
         // For reconnaissance, we attempt to connect and establish a session later
         Ok(Box::new(OpcUaSession {
@@ -121,7 +121,13 @@ impl NxcProtocol for OpcUaProtocol {
         // Attempt to connect and create session
         // Note: Option 1 (Auto-select highest security) is implicitly handled by async-opcua
         // if we provide the right policy, but for now we go with None (No Security) for initial probe.
-        match client.connect_to_endpoint((url.as_str(), SecurityPolicy::None, MessageSecurityMode::None, identity_token), None).await {
+        match client
+            .connect_to_endpoint(
+                (url.as_str(), SecurityPolicy::None, MessageSecurityMode::None, identity_token),
+                None,
+            )
+            .await
+        {
             Ok(session) => {
                 info!("OPC-UA: Session established on {}:{}", opcua_sess.target, opcua_sess.port);
                 opcua_sess.session = Some(session);
@@ -136,28 +142,24 @@ impl NxcProtocol for OpcUaProtocol {
     }
 
     async fn execute(&self, session: &dyn NxcSession, _cmd: &str) -> Result<CommandOutput> {
-         let opcua_sess = session
+        let opcua_sess = session
             .as_any()
             .downcast_ref::<OpcUaSession>()
             .ok_or_else(|| anyhow!("Invalid session type"))?;
 
         if let Some(ref session_arc) = opcua_sess.session {
             let session = session_arc.lock().await;
-            
+
             // For OPC-UA, "execute" is mapped to reading server metadata
             let server_status = session.read_server_status().await;
-            
+
             match server_status {
                 Ok(status) => {
                     let output = format!(
                         "State: {:?}\nBuildInfo: {:?}\nStartTime: {:?}",
                         status.state, status.build_info, status.start_time
                     );
-                    Ok(CommandOutput {
-                        stdout: output,
-                        stderr: String::new(),
-                        exit_code: Some(0),
-                    })
+                    Ok(CommandOutput { stdout: output, stderr: String::new(), exit_code: Some(0) })
                 }
                 Err(e) => Err(anyhow!("Failed to read server status: {}", e)),
             }

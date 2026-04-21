@@ -43,21 +43,12 @@ impl RetryPolicy {
         max_delay: Duration,
         backoff_factor: f64,
     ) -> Self {
-        Self {
-            max_retries,
-            base_delay,
-            max_delay,
-            backoff_factor,
-            jitter: true,
-        }
+        Self { max_retries, base_delay, max_delay, backoff_factor, jitter: true }
     }
 
     /// Create a policy that never retries (single attempt).
     pub fn no_retry() -> Self {
-        Self {
-            max_retries: 0,
-            ..Default::default()
-        }
+        Self { max_retries: 0, ..Default::default() }
     }
 
     /// Create an aggressive retry policy for critical operations.
@@ -136,11 +127,7 @@ impl RetryPolicy {
             }
         }
 
-        Err(anyhow!(
-            "All {} attempts exhausted. Last error: {}",
-            self.max_retries + 1,
-            last_error
-        ))
+        Err(anyhow!("All {} attempts exhausted. Last error: {}", self.max_retries + 1, last_error))
     }
 
     /// Execute with a custom predicate to decide whether to retry.
@@ -184,11 +171,7 @@ impl RetryPolicy {
             }
         }
 
-        Err(anyhow!(
-            "All {} attempts exhausted. Last error: {}",
-            self.max_retries + 1,
-            last_error
-        ))
+        Err(anyhow!("All {} attempts exhausted. Last error: {}", self.max_retries + 1, last_error))
     }
 }
 
@@ -245,9 +228,7 @@ mod tests {
             jitter: false,
         };
 
-        let result = policy
-            .execute(|| async { Err::<i32, _>(anyhow!("permanent error")) })
-            .await;
+        let result = policy.execute(|| async { Err::<i32, _>(anyhow!("permanent error")) }).await;
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("All 3 attempts exhausted"));

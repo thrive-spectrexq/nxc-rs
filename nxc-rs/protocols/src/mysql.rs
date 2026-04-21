@@ -193,7 +193,9 @@ impl NxcProtocol for MysqlProtocol {
                         let val_opt: Option<mysql_async::Value> = row.get(i);
                         let val_str = match val_opt {
                             Some(mysql_async::Value::NULL) | None => "NULL".to_string(),
-                            Some(mysql_async::Value::Bytes(b)) => String::from_utf8_lossy(&b).to_string(),
+                            Some(mysql_async::Value::Bytes(b)) => {
+                                String::from_utf8_lossy(&b).to_string()
+                            }
                             Some(mysql_async::Value::Int(v)) => v.to_string(),
                             Some(mysql_async::Value::UInt(v)) => v.to_string(),
                             Some(mysql_async::Value::Float(v)) => v.to_string(),

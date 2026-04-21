@@ -73,10 +73,7 @@ where
 
     /// Create a named cache (name appears in logs).
     pub fn with_name(name: &str, default_ttl: Duration, max_entries: usize) -> Self {
-        Self {
-            name: name.to_string(),
-            ..Self::new(default_ttl, max_entries)
-        }
+        Self { name: name.to_string(), ..Self::new(default_ttl, max_entries) }
     }
 
     /// Insert a value with the default TTL.
@@ -93,21 +90,11 @@ where
 
         // If still at capacity after eviction, skip insertion
         if self.entries.len() >= self.max_entries {
-            debug!(
-                "Cache '{}': at capacity ({}), skipping insert",
-                self.name, self.max_entries
-            );
+            debug!("Cache '{}': at capacity ({}), skipping insert", self.name, self.max_entries);
             return;
         }
 
-        self.entries.insert(
-            key,
-            CacheEntry {
-                value,
-                inserted_at: Instant::now(),
-                ttl,
-            },
-        );
+        self.entries.insert(key, CacheEntry { value, inserted_at: Instant::now(), ttl });
     }
 
     /// Get a cached value if it exists and hasn't expired.

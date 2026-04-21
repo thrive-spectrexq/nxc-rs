@@ -109,8 +109,7 @@ impl NxcModule for WebDav {
                 // Attempt cleanup
                 let _ = http_sess.client.request(reqwest::Method::DELETE, &upload_url).send().await;
             } else {
-                output
-                    .push_str(&format!("  [-] File upload failed via PUT (Status: {status}).\n"));
+                output.push_str(&format!("  [-] File upload failed via PUT (Status: {status}).\n"));
             }
         }
 
