@@ -880,7 +880,6 @@ pub fn get_protocol_handler(
         "vnc" => Some(Arc::new(nxc_protocols::vnc::VncProtocol::new())),
         "nfs" => Some(Arc::new(nxc_protocols::nfs::NfsProtocol::new())),
         "adb" => Some(Arc::new(nxc_protocols::adb::AdbProtocol::new())),
-        #[allow(unexpected_cfgs)]
         #[cfg(feature = "opcua-support")]
         "opcua" => Some(Arc::new(nxc_protocols::opcua::OpcUaProtocol::new())),
         "network" | "net" | "wifi" => {

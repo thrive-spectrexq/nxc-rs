@@ -303,7 +303,7 @@ mod tests {
     fn test_invalid_magic() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("bad.ccache");
-        std::fs::write(&path, &[0x05, 0x03, 0x00, 0x00]).unwrap();
+        std::fs::write(&path, [0x05, 0x03, 0x00, 0x00]).unwrap();
         assert!(parse_ccache_v4(path.to_str().unwrap()).is_err());
     }
 }
