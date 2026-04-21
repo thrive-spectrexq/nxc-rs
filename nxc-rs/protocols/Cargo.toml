@@ -38,6 +38,8 @@ url = "2.5.8"
 rasn = "0.28"
 image = "0.25"
 hex.workspace = true
+aes = { workspace = true }
+cipher = { workspace = true }
 opcua = { workspace = true, optional = true }
 
 [features]

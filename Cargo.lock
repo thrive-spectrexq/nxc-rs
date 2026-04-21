@@ -2890,10 +2890,12 @@ dependencies = [
 name = "nxc-protocols"
 version = "0.4.0"
 dependencies = [
+ "aes",
  "anyhow",
  "async-trait",
  "base64 0.22.1",
  "bytes",
+ "cipher 0.4.4",
  "des",
  "hex",
  "image",

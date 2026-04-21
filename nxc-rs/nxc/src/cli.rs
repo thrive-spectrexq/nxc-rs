@@ -146,8 +146,8 @@ pub fn build_cli() -> Command {
     let export_args = vec![
         Arg::new("export")
             .long("export")
-            .help("Export results to a file (json, csv)")
-            .value_parser(["json", "csv"]),
+            .help("Export results to a file (json, csv, html, md, ndjson)")
+            .value_parser(["json", "csv", "html", "md", "ndjson"]),
         Arg::new("export-path")
             .long("export-path")
             .help("Path to save the exported file")
