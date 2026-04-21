@@ -201,7 +201,10 @@ impl NxcProtocol for WinrmProtocol {
             .downcast_mut::<WinrmSession>()
             .ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
         let url = self.build_url(&winrm_sess.target, winrm_sess.port);
-        let client = winrm_sess.client.clone().unwrap_or_else(|| self.build_client(winrm_sess.proxy.as_deref()).unwrap());
+        let client = winrm_sess
+            .client
+            .clone()
+            .unwrap_or_else(|| self.build_client(winrm_sess.proxy.as_deref()).unwrap());
 
         debug!("WinRM: Authenticating {}@{}", creds.username, url);
 
@@ -268,7 +271,10 @@ impl NxcProtocol for WinrmProtocol {
             .downcast_ref::<WinrmSession>()
             .ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
         let url = &winrm_sess.endpoint;
-        let client = winrm_sess.client.clone().unwrap_or_else(|| self.build_client(winrm_sess.proxy.as_deref()).unwrap());
+        let client = winrm_sess
+            .client
+            .clone()
+            .unwrap_or_else(|| self.build_client(winrm_sess.proxy.as_deref()).unwrap());
 
         // For an offensive tool, we inject AMSI and ETW bypasses into the command if it's PowerShell.
         let final_cmd = if cmd.to_lowercase().starts_with("powershell") {
@@ -282,7 +288,9 @@ impl NxcProtocol for WinrmProtocol {
         // 1. Create Shell
         let create_soap = self.build_create_shell_soap();
         let mut req = client.post(url).header("Content-Type", "application/soap+xml;charset=UTF-8");
-        if let Some(ref auth) = winrm_sess.auth_header { req = req.header("Authorization", auth); }
+        if let Some(ref auth) = winrm_sess.auth_header {
+            req = req.header("Authorization", auth);
+        }
         let resp = req.body(create_soap).send().await?;
         let body = resp.text().await?;
         let shell_id = self
@@ -292,7 +300,9 @@ impl NxcProtocol for WinrmProtocol {
         // 2. Run Command
         let command_soap = self.build_command_soap(&shell_id, &final_cmd);
         let mut req = client.post(url).header("Content-Type", "application/soap+xml;charset=UTF-8");
-        if let Some(ref auth) = winrm_sess.auth_header { req = req.header("Authorization", auth); }
+        if let Some(ref auth) = winrm_sess.auth_header {
+            req = req.header("Authorization", auth);
+        }
         let resp = req.body(command_soap).send().await?;
         let body = resp.text().await?;
         let command_id = self
@@ -304,8 +314,11 @@ impl NxcProtocol for WinrmProtocol {
         let stderr = String::new();
         loop {
             let receive_soap = self.build_receive_soap(&shell_id, &command_id);
-            let mut req = client.post(url).header("Content-Type", "application/soap+xml;charset=UTF-8");
-            if let Some(ref auth) = winrm_sess.auth_header { req = req.header("Authorization", auth); }
+            let mut req =
+                client.post(url).header("Content-Type", "application/soap+xml;charset=UTF-8");
+            if let Some(ref auth) = winrm_sess.auth_header {
+                req = req.header("Authorization", auth);
+            }
             let resp = req.body(receive_soap).send().await?;
             let body = resp.text().await?;
 
@@ -324,7 +337,9 @@ impl NxcProtocol for WinrmProtocol {
         // 4. Cleanup Shell
         let delete_soap = self.build_delete_shell_soap(&shell_id);
         let mut req = client.post(url).header("Content-Type", "application/soap+xml;charset=UTF-8");
-        if let Some(ref auth) = winrm_sess.auth_header { req = req.header("Authorization", auth); }
+        if let Some(ref auth) = winrm_sess.auth_header {
+            req = req.header("Authorization", auth);
+        }
         let _ = req.body(delete_soap).send().await?;
 
         Ok(CommandOutput { stdout, stderr, exit_code: Some(0) })

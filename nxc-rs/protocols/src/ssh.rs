@@ -219,9 +219,7 @@ impl NxcProtocol for SshProtocol {
                 crate::socks::SocksProxy::connect_blocking(&p, &addr)?
             } else {
                 TcpStream::connect_timeout(
-                    &addr
-                        .parse()
-                        .map_err(|e| anyhow::anyhow!("Invalid address {addr}: {e}"))?,
+                    &addr.parse().map_err(|e| anyhow::anyhow!("Invalid address {addr}: {e}"))?,
                     timeout,
                 )?
             };

@@ -182,14 +182,30 @@ impl SmbProtocol {
         buf.extend_from_slice(&Smb2Header::new(0x0001).to_bytes()); // SESSION_SETUP
         let ntlm_t1 = b"NTLMSSP\0\x01\x00\x00\x00\x07\x82\x08\xa2\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
         buf.extend_from_slice(&[
-            25, 0, // Structure Size
-            0,     // Flags
-            1,     // SecurityMode
-            0, 0, 0, 0, // Capabilities
-            0, 0, 0, 0, // Channel
-            88, 0, // SecurityBufferOffset
-            (ntlm_t1.len() as u16) as u8, 0, // SecurityBufferLength
-            0, 0, 0, 0, 0, 0, 0, 0, // PreviousSessionId
+            25,
+            0, // Structure Size
+            0, // Flags
+            1, // SecurityMode
+            0,
+            0,
+            0,
+            0, // Capabilities
+            0,
+            0,
+            0,
+            0, // Channel
+            88,
+            0, // SecurityBufferOffset
+            (ntlm_t1.len() as u16) as u8,
+            0, // SecurityBufferLength
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0, // PreviousSessionId
         ]);
         buf.extend_from_slice(ntlm_t1);
 
@@ -824,7 +840,7 @@ impl SmbProtocol {
                 name: name.clone(),
                 share_type: type_str.to_string(),
                 remark: remarks.get(i).cloned().unwrap_or_default(),
-                read_access: false,  // Will be checked via TreeConnect
+                read_access: false, // Will be checked via TreeConnect
                 write_access: false,
             });
         }

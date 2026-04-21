@@ -188,9 +188,8 @@ impl NxcModule for WebFuzzer {
 
         for task in tasks {
             if let Ok(Some((path, status, len))) = task.await {
-                output.push_str(&format!(
-                    "  [+] {path:<20} [Status: {status}, Size: {len} bytes]\n"
-                ));
+                output
+                    .push_str(&format!("  [+] {path:<20} [Status: {status}, Size: {len} bytes]\n"));
                 found_list.push(json!({ "path": path, "status": status, "size": len }));
             }
         }

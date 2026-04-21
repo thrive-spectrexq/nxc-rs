@@ -100,8 +100,7 @@ impl NxcModule for Asreproasting {
                     let checksum = hex::encode(&tgt.ticket_data[0..16.min(tgt.ticket_data.len())]);
                     let cipher = hex::encode(&tgt.ticket_data[16.min(tgt.ticket_data.len())..]);
 
-                    hash_output =
-                        format!("$krb5asrep$23${sam}@{domain}:{checksum}${cipher}");
+                    hash_output = format!("$krb5asrep$23${sam}@{domain}:{checksum}${cipher}");
                     tracing::info!("Extracted AS-REP Hash: {}", hash_output);
                 } else {
                     hash_output = "AS-REQ Failed (mocked)".to_string();

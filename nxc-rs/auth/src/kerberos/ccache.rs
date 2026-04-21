@@ -17,7 +17,11 @@ pub fn parse_ccache_v4(path: &str) -> Result<Vec<KerberosTicket>> {
     file.read_exact(&mut magic)?;
 
     if magic != [0x05, 0x04] {
-        anyhow::bail!("Unsupported CCache version. Expected 0x0504, got 0x{:02x}{:02x}.", magic[0], magic[1]);
+        anyhow::bail!(
+            "Unsupported CCache version. Expected 0x0504, got 0x{:02x}{:02x}.",
+            magic[0],
+            magic[1]
+        );
     }
 
     // Read header length (big-endian u16)

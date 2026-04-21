@@ -41,10 +41,10 @@ pub mod mysql_enum;
 pub mod net_discovery;
 pub mod nopac;
 pub mod ntds;
-pub mod petitpotam;
-pub mod pg_enum;
 #[cfg(feature = "opcua-support")]
 pub mod opcua_enum;
+pub mod petitpotam;
+pub mod pg_enum;
 pub mod printerbug;
 pub mod psrp;
 pub mod put;

@@ -136,9 +136,8 @@ impl NxcModule for Laps {
                     continue;
                 };
 
-                let line = format!(
-                    "{name:<15} | {version:<12} | Exp: {expiration:<19} | Pwd: {password}"
-                );
+                let line =
+                    format!("{name:<15} | {version:<12} | Exp: {expiration:<19} | Pwd: {password}");
                 output_lines.push(line);
 
                 laps_results.push(serde_json::json!({

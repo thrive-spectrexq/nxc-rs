@@ -23,17 +23,15 @@ impl CertificateAuth {
         let pass = password.unwrap_or("");
 
         // Extract certificates from the PFX vault
-        let certs = pfx
-            .cert_x509_bags(pass)
-            .map_err(|e| anyhow!("Failed to extract cert bags: {e:?}"))?;
+        let certs =
+            pfx.cert_x509_bags(pass).map_err(|e| anyhow!("Failed to extract cert bags: {e:?}"))?;
 
         if let Some(cert) = certs.into_iter().next() {
             self.certificate = Some(cert);
         }
 
         // Extract private keys from the PFX vault
-        let keys =
-            pfx.key_bags(pass).map_err(|e| anyhow!("Failed to extract key bags: {e:?}"))?;
+        let keys = pfx.key_bags(pass).map_err(|e| anyhow!("Failed to extract key bags: {e:?}"))?;
 
         if let Some(key) = keys.into_iter().next() {
             self.private_key = Some(key);

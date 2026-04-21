@@ -10,21 +10,19 @@ mod profiling;
 mod relay;
 mod reporting;
 
+use crate::profiling::{log_memory_usage, ScopedTimer};
 use anyhow::Result;
 use chrono::Utc;
 use cli::{build_cli, build_credentials, get_protocol_handler, CODENAME, VERSION};
 use colored::Colorize;
 use handlers::handle_ai_mode;
-use nxc_auth::Credentials;
 use nxc_db::NxcDb;
 use nxc_modules::ModuleRegistry;
-use nxc_protocols::connection::ConnectionManager;
 use nxc_protocols::Protocol;
-use nxc_targets::{parse_targets, ExecutionEngine, ExecutionOpts, Target};
+use nxc_targets::{parse_targets, ExecutionEngine, ExecutionOpts};
 use output::{NxcGlobalOutput, NxcOutput};
 use std::sync::Arc;
 use std::time::Duration;
-use crate::profiling::{capture_memory_snapshot, log_memory_usage, ScopedTimer};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -71,9 +69,7 @@ async fn main() -> Result<()> {
         let registry = ModuleRegistry::new();
         let modules = registry.list(Some(protocol_name));
         if modules.is_empty() {
-            NxcGlobalOutput::info(&format!(
-                "No modules available for protocol '{protocol_name}'"
-            ));
+            NxcGlobalOutput::info(&format!("No modules available for protocol '{protocol_name}'"));
         } else {
             NxcGlobalOutput::info(&format!(
                 "Modules for '{}' protocol:",
@@ -322,11 +318,8 @@ async fn main() -> Result<()> {
         engine = engine.with_db(d);
     }
 
-    let _timer = if profiling_enabled {
-        Some(ScopedTimer::new("ExecutionEngine::run"))
-    } else {
-        None
-    };
+    let _timer =
+        if profiling_enabled { Some(ScopedTimer::new("ExecutionEngine::run")) } else { None };
 
     let results = engine.run(protocol, all_targets, creds).await;
 

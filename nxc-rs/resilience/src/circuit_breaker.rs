@@ -114,20 +114,14 @@ impl CircuitBreaker {
 
             match inner.state {
                 CircuitState::Open => {
-                    debug!(
-                        "Circuit breaker '{}' is OPEN, fast-failing request",
-                        self.name
-                    );
+                    debug!("Circuit breaker '{}' is OPEN, fast-failing request", self.name);
                     return Err(anyhow!(
                         "Circuit breaker '{}' is open — target unreachable",
                         self.name
                     ));
                 }
                 CircuitState::HalfOpen => {
-                    debug!(
-                        "Circuit breaker '{}' is HALF-OPEN, allowing probe request",
-                        self.name
-                    );
+                    debug!("Circuit breaker '{}' is HALF-OPEN, allowing probe request", self.name);
                 }
                 CircuitState::Closed => {}
             }
@@ -243,9 +237,7 @@ mod tests {
         let cb = CircuitBreaker::new(3, Duration::from_secs(10));
 
         for _ in 0..3 {
-            let _ = cb
-                .call(|| async { Err::<i32, _>(anyhow!("fail")) })
-                .await;
+            let _ = cb.call(|| async { Err::<i32, _>(anyhow!("fail")) }).await;
         }
 
         assert_eq!(cb.state().await, CircuitState::Open);
@@ -257,9 +249,7 @@ mod tests {
 
         // Trip the breaker
         for _ in 0..2 {
-            let _ = cb
-                .call(|| async { Err::<i32, _>(anyhow!("fail")) })
-                .await;
+            let _ = cb.call(|| async { Err::<i32, _>(anyhow!("fail")) }).await;
         }
 
         // Should fast-fail without calling the operation
@@ -274,9 +264,7 @@ mod tests {
 
         // Trip the breaker
         for _ in 0..2 {
-            let _ = cb
-                .call(|| async { Err::<i32, _>(anyhow!("fail")) })
-                .await;
+            let _ = cb.call(|| async { Err::<i32, _>(anyhow!("fail")) }).await;
         }
 
         assert_eq!(cb.state().await, CircuitState::Open);
@@ -293,9 +281,7 @@ mod tests {
 
         // Trip the breaker
         for _ in 0..2 {
-            let _ = cb
-                .call(|| async { Err::<i32, _>(anyhow!("fail")) })
-                .await;
+            let _ = cb.call(|| async { Err::<i32, _>(anyhow!("fail")) }).await;
         }
 
         // Wait for half-open
@@ -311,9 +297,7 @@ mod tests {
     async fn test_manual_reset() {
         let cb = CircuitBreaker::new(1, Duration::from_secs(60));
 
-        let _ = cb
-            .call(|| async { Err::<i32, _>(anyhow!("fail")) })
-            .await;
+        let _ = cb.call(|| async { Err::<i32, _>(anyhow!("fail")) }).await;
         assert_eq!(cb.state().await, CircuitState::Open);
 
         cb.reset().await;
@@ -326,9 +310,7 @@ mod tests {
 
         let _ = cb.call(|| async { Ok::<_, anyhow::Error>(1) }).await;
         let _ = cb.call(|| async { Ok::<_, anyhow::Error>(2) }).await;
-        let _ = cb
-            .call(|| async { Err::<i32, _>(anyhow!("fail")) })
-            .await;
+        let _ = cb.call(|| async { Err::<i32, _>(anyhow!("fail")) }).await;
 
         let stats = cb.stats().await;
         assert_eq!(stats.total_successes, 2);

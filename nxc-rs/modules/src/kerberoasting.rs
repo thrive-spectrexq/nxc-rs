@@ -123,9 +123,8 @@ impl NxcModule for Kerberoasting {
                             hex::encode(&tgs.ticket_data[0..16.min(tgs.ticket_data.len())]);
                         let cipher = hex::encode(&tgs.ticket_data[16.min(tgs.ticket_data.len())..]);
 
-                        hash_output = format!(
-                            "$krb5tgs$23$*{sam}*{domain}${spn}*{checksum}*{cipher}"
-                        );
+                        hash_output =
+                            format!("$krb5tgs$23$*{sam}*{domain}${spn}*{checksum}*{cipher}");
 
                         // Log exactly what hashcat needs
                         tracing::info!("Extracted Hash: {}", hash_output);

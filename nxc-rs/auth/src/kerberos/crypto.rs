@@ -174,8 +174,8 @@ pub fn decrypt_aes(
     let checksum = &ciphertext[enc_len..];
 
     // 2. Verify HMAC-SHA1-96
-    let mut hmac = HmacSha1::new_from_slice(key)
-        .map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
+    let mut hmac =
+        HmacSha1::new_from_slice(key).map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
     hmac.update(&key_usage.to_be_bytes()); // Simplified usage derivation
     hmac.update(enc_data);
     let full_mac = hmac.finalize().into_bytes();
@@ -245,8 +245,8 @@ pub fn encrypt_aes(
     }
 
     // Checksum: HMAC-SHA1-96(key, usage, enc_data)
-    let mut hmac = HmacSha1::new_from_slice(key)
-        .map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
+    let mut hmac =
+        HmacSha1::new_from_slice(key).map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
     hmac.update(&key_usage.to_be_bytes());
     hmac.update(&enc_data);
     let full_mac = hmac.finalize().into_bytes();

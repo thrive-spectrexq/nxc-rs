@@ -259,17 +259,13 @@ pub struct ExecutionEngine {
 
 impl ExecutionEngine {
     pub fn new(opts: ExecutionOpts) -> Self {
-        let manager = ConnectionManager::new()
-            .with_timeout_manager(nxc_resilience::TimeoutManager {
+        let manager =
+            ConnectionManager::new().with_timeout_manager(nxc_resilience::TimeoutManager {
                 connect: opts.timeout,
                 ..Default::default()
             });
 
-        Self {
-            opts,
-            db: None,
-            manager: Arc::new(manager),
-        }
+        Self { opts, db: None, manager: Arc::new(manager) }
     }
 
     pub fn with_db(mut self, db: Arc<NxcDb>) -> Self {

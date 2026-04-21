@@ -23,10 +23,8 @@ impl SocksUrl {
     ///   `socks5://user:pass@host:port`
     ///   `host:port` (plain format)
     pub fn parse(url: &str) -> Result<Self> {
-        let stripped = url
-            .strip_prefix("socks5://")
-            .or_else(|| url.strip_prefix("socks5h://"))
-            .unwrap_or(url);
+        let stripped =
+            url.strip_prefix("socks5://").or_else(|| url.strip_prefix("socks5h://")).unwrap_or(url);
 
         // Check if there are credentials (user:pass@host:port)
         if let Some(at_pos) = stripped.rfind('@') {
@@ -34,38 +32,24 @@ impl SocksUrl {
             let addr_part = &stripped[at_pos + 1..];
 
             let (username, password) = if let Some(colon_pos) = cred_part.find(':') {
-                (
-                    cred_part[..colon_pos].to_string(),
-                    cred_part[colon_pos + 1..].to_string(),
-                )
+                (cred_part[..colon_pos].to_string(), cred_part[colon_pos + 1..].to_string())
             } else {
                 (cred_part.to_string(), String::new())
             };
 
             let (host, port) = Self::parse_host_port(addr_part)?;
-            Ok(SocksUrl {
-                host,
-                port,
-                username: Some(username),
-                password: Some(password),
-            })
+            Ok(SocksUrl { host, port, username: Some(username), password: Some(password) })
         } else {
             let (host, port) = Self::parse_host_port(stripped)?;
-            Ok(SocksUrl {
-                host,
-                port,
-                username: None,
-                password: None,
-            })
+            Ok(SocksUrl { host, port, username: None, password: None })
         }
     }
 
     fn parse_host_port(addr: &str) -> Result<(String, u16)> {
         if let Some(colon_pos) = addr.rfind(':') {
             let host = addr[..colon_pos].to_string();
-            let port: u16 = addr[colon_pos + 1..]
-                .parse()
-                .map_err(|e| anyhow::anyhow!("Invalid port: {e}"))?;
+            let port: u16 =
+                addr[colon_pos + 1..].parse().map_err(|e| anyhow::anyhow!("Invalid port: {e}"))?;
             Ok((host, port))
         } else {
             Ok((addr.to_string(), 1080)) // Default SOCKS5 port
@@ -128,8 +112,7 @@ impl SocksProxy {
         let target: SocketAddr =
             target_addr.parse().map_err(|e| anyhow::anyhow!("Invalid target address: {e}"))?;
 
-        let stream =
-            Socks5Stream::connect_with_password(proxy, target, username, password).await?;
+        let stream = Socks5Stream::connect_with_password(proxy, target, username, password).await?;
         Ok(stream.into_inner())
     }
 
