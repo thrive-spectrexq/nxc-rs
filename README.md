@@ -7,7 +7,7 @@
 
 ---
 
-**NetExec-RS (nxc-rs)** is a modern, high-performance **Rust implementation inspired by the original Python-based [NetExec](https://github.com/Pennyw0rth/NetExec.git)**.
+## **NetExec-RS (nxc-rs)** is a modern, high-performance **Rust implementation inspired by the original Python-based [NetExec](https://github.com/Pennyw0rth/NetExec.git)**.
 
 By leveraging Rust, NetExec-RS benefits from:
 
