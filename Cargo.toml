@@ -53,8 +53,8 @@ once_cell = "1.18"
 dashmap = "6"
 
 # NetExec-RS dependencies
-md4 = "0.10"
-hmac = "0.13"
+md4 = "0.11"
+hmac = "0.12"
 md-5 = "0.10"
 rc4 = "0.2"
 aes = "0.9"
