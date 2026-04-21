@@ -111,9 +111,17 @@ impl NxcProtocol for OpcUaProtocol {
 
         // Identity Token setup
         let identity_token = if let Some(ref pass) = creds.password {
-            IdentityToken::user_pass(&creds.username, pass)
+            IdentityToken::UserName(UserNameIdentityToken {
+                user_name: creds.username.clone(),
+                password: pass.clone(),
+                ..Default::default()
+            })
         } else if !creds.username.is_empty() {
-            IdentityToken::user_pass(&creds.username, "")
+            IdentityToken::UserName(UserNameIdentityToken {
+                user_name: creds.username.clone(),
+                password: String::new(),
+                ..Default::default()
+            })
         } else {
             IdentityToken::Anonymous
         };
@@ -122,10 +130,7 @@ impl NxcProtocol for OpcUaProtocol {
         // Note: Option 1 (Auto-select highest security) is implicitly handled by async-opcua
         // if we provide the right policy, but for now we go with None (No Security) for initial probe.
         match client
-            .connect_to_endpoint(
-                (url.as_str(), SecurityPolicy::None, MessageSecurityMode::None, identity_token),
-                None,
-            )
+            .connect_to_endpoint(&url, SecurityPolicy::None.to_string(), identity_token)
             .await
         {
             Ok(session) => {
@@ -151,14 +156,11 @@ impl NxcProtocol for OpcUaProtocol {
             let session = session_arc.lock().await;
 
             // For OPC-UA, "execute" is mapped to reading server metadata
-            let server_status = session.read_server_status().await;
+            let result = session.read_attribute(&NodeId::server_status(), AttributeId::Value).await;
 
-            match server_status {
-                Ok(status) => {
-                    let output = format!(
-                        "State: {:?}\nBuildInfo: {:?}\nStartTime: {:?}",
-                        status.state, status.build_info, status.start_time
-                    );
+            match result {
+                Ok(data_value) => {
+                    let output = format!("Server Status: {:?}", data_value);
                     Ok(CommandOutput { stdout: output, stderr: String::new(), exit_code: Some(0) })
                 }
                 Err(e) => Err(anyhow!("Failed to read server status: {}", e)),
