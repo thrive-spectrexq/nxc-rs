@@ -785,6 +785,7 @@ mod tests {
             modules: Vec::new(),
             module_opts: std::collections::HashMap::new(),
             verify_ssl: false,
+            ..Default::default()
         };
 
         let engine = ExecutionEngine::new(opts);

@@ -10,6 +10,7 @@ use tracing::{debug, error, info, warn};
 
 /// Captured NTLM hash from a relayed authentication.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CapturedHash {
     /// Source IP of the authenticating client.
     pub client_ip: String,
@@ -23,6 +24,7 @@ pub struct CapturedHash {
 
 /// NTLM Relay server configuration.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RelayConfig {
     /// Address to bind the HTTP listener (e.g., "0.0.0.0:80").
     pub bind_addr: String,
@@ -44,6 +46,7 @@ impl Default for RelayConfig {
 
 /// NTLM Relay server — HTTP listener that triggers NTLM authentication
 /// and captures/relays the resulting credentials.
+#[allow(dead_code)]
 pub struct RelayServer {
     config: RelayConfig,
     captured: std::sync::Arc<tokio::sync::Mutex<Vec<CapturedHash>>>,
