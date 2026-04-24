@@ -13,6 +13,7 @@ pub mod adb;
 pub mod connection;
 pub mod dns;
 pub mod docker;
+pub mod errors;
 pub mod ftp;
 pub mod http;
 pub mod ilo;

@@ -11,7 +11,9 @@ use nxc_protocols::connection::ConnectionManager;
 use nxc_protocols::NxcProtocol;
 use nxc_resilience::RetryPolicy;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::net::IpAddr;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
@@ -213,8 +215,14 @@ pub struct ExecutionOpts {
     pub continue_on_success: bool,
     pub no_bruteforce: bool,
     pub modules: Vec<String>,
-    pub module_opts: std::collections::HashMap<String, String>,
+    pub module_opts: HashMap<String, String>,
     pub verify_ssl: bool,
+    /// Max failed login attempts globally before stopping.
+    pub gfail_limit: Option<u32>,
+    /// Max failed login attempts per username before skipping that user.
+    pub ufail_limit: Option<u32>,
+    /// Max failed login attempts per host before skipping that host.
+    pub fail_limit: Option<u32>,
 }
 
 impl Default for ExecutionOpts {
@@ -228,8 +236,11 @@ impl Default for ExecutionOpts {
             continue_on_success: false,
             no_bruteforce: false,
             modules: Vec::new(),
-            module_opts: std::collections::HashMap::new(),
+            module_opts: HashMap::new(),
             verify_ssl: false,
+            gfail_limit: None,
+            ufail_limit: None,
+            fail_limit: None,
         }
     }
 }
@@ -244,7 +255,7 @@ pub struct ExecutionResult {
     pub admin: bool,
     pub message: String,
     pub duration_ms: u64,
-    pub module_data: std::collections::HashMap<String, serde_json::Value>,
+    pub module_data: HashMap<String, serde_json::Value>,
 }
 
 /// The concurrent execution engine.
@@ -308,6 +319,18 @@ impl ExecutionEngine {
             targets.shuffle(&mut rng);
         }
 
+        // ── Fail-limit counters (thread-safe atomics) ──
+        let global_fails = Arc::new(AtomicU32::new(0));
+        let gfail_limit = self.opts.gfail_limit;
+        let ufail_limit = self.opts.ufail_limit;
+        let fail_limit = self.opts.fail_limit;
+
+        // Per-user and per-host counters keyed by string
+        let user_fails: Arc<dashmap::DashMap<String, AtomicU32>> =
+            Arc::new(dashmap::DashMap::new());
+        let host_fails: Arc<dashmap::DashMap<String, AtomicU32>> =
+            Arc::new(dashmap::DashMap::new());
+
         let total_tasks = targets.len() * creds.len();
         let pb = if total_tasks > 1 {
             let pb = indicatif::ProgressBar::new(total_tasks as u64);
@@ -340,6 +363,49 @@ impl ExecutionEngine {
             }
 
             for cred in creds.iter() {
+                // ── Pre-flight fail-limit checks ──
+                // Global limit
+                if let Some(limit) = gfail_limit {
+                    if global_fails.load(Ordering::Relaxed) >= limit {
+                        tracing::warn!("Global fail limit ({limit}) reached — stopping");
+                        if let Some(ref p) = pb {
+                            p.inc(1);
+                        }
+                        continue;
+                    }
+                }
+                // Per-user limit
+                if let Some(limit) = ufail_limit {
+                    let count = user_fails
+                        .entry(cred.username.clone())
+                        .or_insert_with(|| AtomicU32::new(0));
+                    if count.load(Ordering::Relaxed) >= limit {
+                        tracing::debug!(
+                            "User fail limit ({limit}) reached for {} — skipping",
+                            cred.username
+                        );
+                        if let Some(ref p) = pb {
+                            p.inc(1);
+                        }
+                        continue;
+                    }
+                }
+                // Per-host limit
+                if let Some(limit) = fail_limit {
+                    let count = host_fails
+                        .entry(target_str.clone())
+                        .or_insert_with(|| AtomicU32::new(0));
+                    if count.load(Ordering::Relaxed) >= limit {
+                        tracing::debug!(
+                            "Host fail limit ({limit}) reached for {target_str} — skipping"
+                        );
+                        if let Some(ref p) = pb {
+                            p.inc(1);
+                        }
+                        continue;
+                    }
+                }
+
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
                 let protocol_clone = protocol.clone();
                 let target_clone = target.clone();
@@ -348,6 +414,9 @@ impl ExecutionEngine {
                 let db_clone = db.clone();
                 let pb_clone = pb.clone();
                 let manager_clone = manager.clone();
+                let global_fails_clone = global_fails.clone();
+                let user_fails_clone = user_fails.clone();
+                let host_fails_clone = host_fails.clone();
 
                 let handle = tokio::spawn(async move {
                     let start_time = std::time::Instant::now();
@@ -528,15 +597,28 @@ impl ExecutionEngine {
                                     module_data,
                                 }
                             }
-                            Err(e) => ExecutionResult {
-                                target: target_str,
-                                protocol: protocol_clone.name().to_string(),
-                                username: cred_clone.username.clone(),
-                                success: false,
-                                admin: false,
-                                message: format!("Auth error: {e}"),
-                                duration_ms: start_time.elapsed().as_millis() as u64,
-                                module_data: std::collections::HashMap::new(),
+                            Err(e) => {
+                                // Increment fail counters on auth error
+                                global_fails_clone.fetch_add(1, Ordering::Relaxed);
+                                user_fails_clone
+                                    .entry(cred_clone.username.clone())
+                                    .or_insert_with(|| AtomicU32::new(0))
+                                    .fetch_add(1, Ordering::Relaxed);
+                                host_fails_clone
+                                    .entry(target_str.clone())
+                                    .or_insert_with(|| AtomicU32::new(0))
+                                    .fetch_add(1, Ordering::Relaxed);
+
+                                ExecutionResult {
+                                    target: target_str,
+                                    protocol: protocol_clone.name().to_string(),
+                                    username: cred_clone.username.clone(),
+                                    success: false,
+                                    admin: false,
+                                    message: format!("Auth error: {e}"),
+                                    duration_ms: start_time.elapsed().as_millis() as u64,
+                                    module_data: HashMap::new(),
+                                }
                             },
                         }
                     })

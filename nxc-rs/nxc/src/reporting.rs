@@ -63,6 +63,66 @@ pub fn export_ndjson(path: &str, results: &[ExecutionResult]) -> Result<()> {
     Ok(())
 }
 
+/// Export results as Metasploit-compatible XML.
+pub fn export_xml(path: &str, report: &Report) -> Result<()> {
+    let mut file = File::create(path)?;
+    writeln!(file, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>")?;
+    writeln!(file, "<MetasploitV4>")?;
+    writeln!(file, "  <hosts>")?;
+
+    // Group by target
+    let mut hosts_map: std::collections::HashMap<&str, Vec<&ExecutionResult>> = std::collections::HashMap::new();
+    for res in &report.results {
+        hosts_map.entry(&res.target).or_default().push(res);
+    }
+
+    for (target, results) in hosts_map {
+        writeln!(file, "    <host>")?;
+        writeln!(file, "      <address>{}</address>", target)?;
+        writeln!(file, "      <services>")?;
+        
+        let protocol = report.protocol.to_uppercase();
+        let port = match protocol.as_str() {
+            "SMB" => 445,
+            "SSH" => 22,
+            "LDAP" => 389,
+            "WINRM" => 5985,
+            "MSSQL" => 1433,
+            "RDP" => 3389,
+            "FTP" => 21,
+            "VNC" => 5900,
+            _ => 0,
+        };
+
+        writeln!(file, "        <service>")?;
+        writeln!(file, "          <port>{}</port>", port)?;
+        writeln!(file, "          <proto>tcp</proto>")?;
+        writeln!(file, "          <name>{}</name>", protocol)?;
+        writeln!(file, "          <state>open</state>")?;
+        writeln!(file, "        </service>")?;
+        writeln!(file, "      </services>")?;
+
+        writeln!(file, "      <vulns>")?;
+        for res in results {
+            if res.success {
+                writeln!(file, "        <vuln>")?;
+                writeln!(file, "          <name>{} Auth bypass/credentials</name>", protocol)?;
+                writeln!(file, "          <info>Username: {} | Admin: {} | Message: {}</info>", 
+                    res.username, res.admin, res.message.replace("<", "&lt;").replace(">", "&gt;"))?;
+                writeln!(file, "        </vuln>")?;
+            }
+        }
+        writeln!(file, "      </vulns>")?;
+        writeln!(file, "    </host>")?;
+    }
+
+    writeln!(file, "  </hosts>")?;
+    writeln!(file, "</MetasploitV4>")?;
+    
+    file.flush()?;
+    Ok(())
+}
+
 /// Export results as a Markdown report with summary and table.
 pub fn export_markdown(path: &str, report: &Report) -> Result<()> {
     let mut file = File::create(path)?;

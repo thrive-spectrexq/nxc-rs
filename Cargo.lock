@@ -2962,6 +2962,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "dashmap",
  "indicatif",
  "nxc-auth",
  "nxc-db",
