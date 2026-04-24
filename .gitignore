@@ -55,7 +55,6 @@ $RECYCLE.BIN/
 
 # Project specific
 ._reference/
-.gemini/
 .agents/
 docs/_site/
 
