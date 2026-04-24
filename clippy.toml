@@ -3,3 +3,10 @@
 msrv = "1.82.0"
 cognitive-complexity-threshold = 30
 too-many-arguments-threshold = 8
+
+# Allow .unwrap() and .expect() in test code — they're fine for assertions
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
+
+# Accommodate richer error variants (uses 256)
+large-error-threshold = 256

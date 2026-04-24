@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 description = "NetExec-RS module system — secretsdump, BloodHound, Kerberoast, and more"
 
+[lints]
+workspace = true
+
 [dependencies]
 
 nxc-protocols = { path = "../protocols" }

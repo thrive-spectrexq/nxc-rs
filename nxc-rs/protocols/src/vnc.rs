@@ -325,18 +325,18 @@ fn vnc_encrypt(password: &str, challenge: &[u8; 16]) -> [u8; 16] {
     // SECURITY: VNC authentication MANDATES the use of the legacy DES algorithm
     // for its standard challenge-response handshake. This is insecure but
     // required for compatibility with standard VNC servers.
-    use des::cipher::{BlockCipherEncrypt, KeyInit};
+    use des::cipher::{BlockEncrypt, KeyInit};
     use des::Des;
 
-    let key_arr: &des::cipher::Key<Des> = (&key).into();
+    let key_arr = des::cipher::generic_array::GenericArray::from_slice(&key);
     let cipher = Des::new(key_arr);
 
     let mut out = [0u8; 16];
-    let challenge_block1: &des::cipher::Block<Des> = (&challenge[0..8]).try_into().unwrap();
-    let out_block1: &mut des::cipher::Block<Des> = (&mut out[0..8]).try_into().unwrap();
+    let challenge_block1 = des::cipher::generic_array::GenericArray::from_slice(&challenge[0..8]);
+    let out_block1 = des::cipher::generic_array::GenericArray::from_mut_slice(&mut out[0..8]);
     cipher.encrypt_block_b2b(challenge_block1, out_block1);
-    let challenge_block2: &des::cipher::Block<Des> = (&challenge[8..16]).try_into().unwrap();
-    let out_block2: &mut des::cipher::Block<Des> = (&mut out[8..16]).try_into().unwrap();
+    let challenge_block2 = des::cipher::generic_array::GenericArray::from_slice(&challenge[8..16]);
+    let out_block2 = des::cipher::generic_array::GenericArray::from_mut_slice(&mut out[8..16]);
     cipher.encrypt_block_b2b(challenge_block2, out_block2);
     out
 }

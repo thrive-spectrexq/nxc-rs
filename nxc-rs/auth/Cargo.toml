@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 description = "NetExec-RS authentication engine — NTLM SSP, Kerberos V5, certificate auth"
 
+[lints]
+workspace = true
+
 [dependencies]
 
 async-trait = { workspace = true }

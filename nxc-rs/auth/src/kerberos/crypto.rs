@@ -11,7 +11,8 @@ type HmacMd5 = Hmac<Md5>;
 type HmacSha1 = Hmac<Sha1>;
 
 use aes::Aes256;
-use cbc::cipher::KeyIvInit;
+use cbc::cipher::block_padding::NoPadding;
+use cbc::cipher::{BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 
 use serde::{Deserialize, Serialize};
 
@@ -186,24 +187,23 @@ pub fn decrypt_aes(
     // 3. Decrypt data (AES-CBC with CTS)
     // Simplified: Standard CBC for now until full CTS manual implementation is needed
     // (Most Kerberos ASN.1 payloads are padded to 16 bytes anyway)
-    let mut decrypted = enc_data.to_vec();
+    let decrypted = enc_data.to_vec();
 
-    if is_aes256 {
+    let decrypted = if is_aes256 {
         let key_arr: &[u8; 32] = key[..32].try_into()?;
         let iv = [0u8; 16];
-        let mut cipher = cbc::Decryptor::<Aes256>::new(key_arr.into(), &iv.into());
         // For CTS, if length is not multiple of 16, we'd need special handling.
         // AD usually pads.
         if decrypted.len() % 16 == 0 {
-            use cbc::cipher::BlockModeDecrypt;
-            cipher.decrypt_blocks(unsafe {
-                std::slice::from_raw_parts_mut(
-                    decrypted.as_mut_ptr() as *mut _,
-                    decrypted.len() / 16,
-                )
-            });
+            cbc::Decryptor::<Aes256>::new(key_arr.into(), &iv.into())
+                .decrypt_padded_vec_mut::<NoPadding>(&decrypted)
+                .map_err(|e| anyhow::anyhow!("AES-CBC decrypt failed: {e}"))?
+        } else {
+            decrypted
         }
-    }
+    } else {
+        decrypted
+    };
 
     if decrypted.len() < 16 {
         anyhow::bail!("Decrypted payload too short (no confounder)");
@@ -231,18 +231,14 @@ pub fn encrypt_aes(
         data.push(0);
     }
 
-    let mut enc_data = data.clone();
-    if is_aes256 {
+    let enc_data = if is_aes256 {
         let key_arr: &[u8; 32] = key[..32].try_into()?;
         let iv = [0u8; 16];
-        let mut cipher = cbc::Encryptor::<Aes256>::new(key_arr.into(), &iv.into());
-        {
-            use cbc::cipher::BlockModeEncrypt;
-            cipher.encrypt_blocks(unsafe {
-                std::slice::from_raw_parts_mut(enc_data.as_mut_ptr() as *mut _, enc_data.len() / 16)
-            });
-        }
-    }
+        cbc::Encryptor::<Aes256>::new(key_arr.into(), &iv.into())
+            .encrypt_padded_vec_mut::<NoPadding>(&data)
+    } else {
+        data
+    };
 
     // Checksum: HMAC-SHA1-96(key, usage, enc_data)
     let mut hmac =

@@ -3,6 +3,9 @@ name = "nxc-ai"
 version.workspace = true
 edition.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 tokio = { workspace = true }
 reqwest = { workspace = true }

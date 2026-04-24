@@ -6,6 +6,9 @@ description = "NetExec-RS — Network Execution Tool"
 license.workspace = true
 repository.workspace = true
 
+[lints]
+workspace = true
+
 [package.metadata.deb]
 maintainer = "thrive-spectrexq>"
 copyright = "2026, thrive-spectrexq"
