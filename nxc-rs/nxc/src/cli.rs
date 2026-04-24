@@ -146,8 +146,8 @@ pub fn build_cli() -> Command {
     let export_args = vec![
         Arg::new("export")
             .long("export")
-            .help("Export results to a file (json, csv, html, md, ndjson)")
-            .value_parser(["json", "csv", "html", "md", "ndjson"]),
+            .help("Export results to a file (json, csv, html, md, ndjson, xml)")
+            .value_parser(["json", "csv", "html", "md", "ndjson", "xml"]),
         Arg::new("export-path")
             .long("export-path")
             .help("Path to save the exported file")
@@ -752,6 +752,22 @@ pub fn build_cli() -> Command {
         .subcommand(rdp_cmd)
         .subcommand(ftp_cmd)
         .subcommand(vnc_cmd)
+        .subcommand(
+            Command::new("relay")
+                .about("Start NTLM relay / capture server")
+                .arg(
+                    Arg::new("bind-addr")
+                        .long("bind-addr")
+                        .help("Address to bind the HTTP listener (e.g. 0.0.0.0:80)")
+                        .default_value("0.0.0.0:80"),
+                )
+                .arg(
+                    Arg::new("target")
+                        .long("target")
+                        .short('t')
+                        .help("Target to relay authentication to (omit for capture-only mode)"),
+                )
+        )
         .subcommand(wmi_cmd)
         .subcommand(mysql_cmd)
         .subcommand(snmp_cmd)

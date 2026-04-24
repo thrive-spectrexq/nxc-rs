@@ -53,6 +53,19 @@ async fn main() -> Result<()> {
             handle_ai_mode(initial_prompt, provider_name, model).await?;
             return Ok(());
         }
+        Some(("relay", relay_matches)) => {
+            let bind_addr = relay_matches.get_one::<String>("bind-addr").unwrap();
+            
+            let config = relay::RelayConfig {
+                bind_addr: bind_addr.clone(),
+                relay_target: relay_matches.get_one::<String>("target").cloned(),
+                capture_only: relay_matches.get_one::<String>("target").is_none(),
+            };
+            
+            let server = relay::RelayServer::new(config);
+            server.start().await?;
+            return Ok(());
+        }
         Some((name, sub_m)) => (name, sub_m),
         None => {
             NxcGlobalOutput::banner(VERSION, CODENAME);
@@ -229,6 +242,9 @@ async fn main() -> Result<()> {
         modules,
         module_opts,
         verify_ssl,
+        gfail_limit: sub_matches.get_one::<u32>("gfail-limit").copied(),
+        ufail_limit: sub_matches.get_one::<u32>("ufail-limit").copied(),
+        fail_limit: sub_matches.get_one::<u32>("fail-limit").copied(),
     };
 
     // ── Setup Database ──
@@ -407,6 +423,7 @@ async fn main() -> Result<()> {
             "html" => reporting::export_html(&path, &report),
             "md" => reporting::export_markdown(&path, &report),
             "ndjson" => reporting::export_ndjson(&path, &results),
+            "xml" => reporting::export_xml(&path, &report),
             _ => unreachable!(),
         };
 

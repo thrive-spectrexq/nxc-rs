@@ -61,6 +61,17 @@ CREATE TABLE IF NOT EXISTS nxc_shares (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_nxc_creds_unique ON nxc_credentials(workspace, username, domain);
+
+CREATE TABLE IF NOT EXISTS nxc_loot (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace  TEXT NOT NULL DEFAULT 'default',
+    host_id    INTEGER REFERENCES nxc_hosts(id),
+    name       TEXT NOT NULL,
+    loot_type  TEXT NOT NULL,
+    path       TEXT,
+    content    TEXT,
+    created_at INTEGER NOT NULL
+);
 "#;
 
 // ─── Data Types ─────────────────────────────────────────────────
@@ -94,6 +105,29 @@ pub struct Credential {
     pub aes_256: Option<String>,
     pub source: Option<String>,
     pub host_id: Option<i64>,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthResultRecord {
+    pub id: Option<i64>,
+    pub host_id: i64,
+    pub credential_id: Option<i64>,
+    pub protocol: String,
+    pub status: String, // "success", "failed", "locked"
+    pub admin: bool,
+    pub attempted_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Loot {
+    pub id: Option<i64>,
+    pub workspace: String,
+    pub host_id: Option<i64>,
+    pub name: String,
+    pub loot_type: String, // e.g., "hash", "file", "registry"
+    pub path: Option<String>,
+    pub content: Option<String>,
     pub created_at: i64,
 }
 
@@ -399,6 +433,57 @@ impl NxcDb {
             .execute("DELETE FROM nxc_hosts WHERE workspace = ?1", rusqlite::params![workspace])?;
 
         Ok((cred_rows + host_rows) as u64)
+    }
+
+    // ── Loot operations ──
+
+    /// Add a new loot item (e.g., captured hash, downloaded file)
+    pub fn add_loot(&self, loot: &Loot) -> Result<i64> {
+        let conn = self.pool.get()?;
+        let now = chrono::Utc::now().timestamp();
+        conn.execute(
+            "INSERT INTO nxc_loot (workspace, host_id, name, loot_type, path, content, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                self.workspace,
+                loot.host_id,
+                loot.name,
+                loot.loot_type,
+                loot.path,
+                loot.content,
+                now,
+            ],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    /// List all loot in the current workspace
+    pub fn list_loot(&self) -> Result<Vec<Loot>> {
+        let conn = self.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, workspace, host_id, name, loot_type, path, content, created_at
+             FROM nxc_loot WHERE workspace = ?1 ORDER BY created_at DESC",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![self.workspace], |row| {
+            Ok(Loot {
+                id: Some(row.get(0)?),
+                workspace: row.get(1)?,
+                host_id: row.get(2)?,
+                name: row.get(3)?,
+                loot_type: row.get(4)?,
+                path: row.get(5)?,
+                content: row.get(6)?,
+                created_at: row.get(7)?,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    /// Delete a specific loot item
+    pub fn delete_loot(&self, loot_id: i64) -> Result<bool> {
+        let conn = self.pool.get()?;
+        let rows = conn.execute("DELETE FROM nxc_loot WHERE id = ?1", rusqlite::params![loot_id])?;
+        Ok(rows > 0)
     }
 
     // ── Search operations ──

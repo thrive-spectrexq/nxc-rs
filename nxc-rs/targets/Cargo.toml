@@ -24,6 +24,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 indicatif = { workspace = true }
 rand = { workspace = true }
+dashmap = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.10"
