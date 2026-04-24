@@ -3673,9 +3673,9 @@ dependencies = [
 
 [[package]]
 name = "rasn"
-version = "0.28.12"
+version = "0.28.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b5124d11b83affd994615edb202e27cb7990ea64241255fe3b72c03f311d108"
+checksum = "88235e585f2f3fc26ad809c79a84dd77e6a7203eb7d12e5bcaab89fc036d3d90"
 dependencies = [
  "bitvec",
  "bitvec-nom2",
