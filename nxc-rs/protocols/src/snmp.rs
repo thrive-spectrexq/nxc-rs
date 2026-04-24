@@ -100,7 +100,7 @@ impl NxcProtocol for SnmpProtocol {
         creds: &Credentials,
     ) -> Result<AuthResult> {
         let snmp_sess = match session.protocol() {
-            "snmp" => unsafe { &mut *(session as *mut dyn NxcSession as *mut SnmpSession) },
+            "snmp" => session.as_any_mut().downcast_mut::<SnmpSession>().ok_or_else(|| anyhow!("Invalid session type"))?,
             _ => return Err(anyhow!("Invalid session type")),
         };
 
