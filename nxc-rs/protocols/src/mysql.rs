@@ -108,7 +108,7 @@ impl NxcProtocol for MysqlProtocol {
         creds: &Credentials,
     ) -> Result<AuthResult> {
         let mysql_sess = match session.protocol() {
-            "mysql" => unsafe { &mut *(session as *mut dyn NxcSession as *mut MysqlSession) },
+            "mysql" => session.as_any_mut().downcast_mut::<MysqlSession>().ok_or_else(|| anyhow!("Invalid session type"))?,
             _ => return Err(anyhow!("Invalid session type")),
         };
 
@@ -165,7 +165,7 @@ impl NxcProtocol for MysqlProtocol {
 
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput> {
         let mysql_sess = match session.protocol() {
-            "mysql" => unsafe { &*(session as *const dyn NxcSession as *const MysqlSession) },
+            "mysql" => session.as_any().downcast_ref::<MysqlSession>().ok_or_else(|| anyhow!("Invalid session type"))?,
             _ => return Err(anyhow!("Invalid session type")),
         };
 

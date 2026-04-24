@@ -129,7 +129,7 @@ impl NxcProtocol for RedisProtocol {
         creds: &Credentials,
     ) -> Result<AuthResult> {
         let redis_sess = match session.protocol() {
-            "redis" => unsafe { &mut *(session as *mut dyn NxcSession as *mut RedisSession) },
+            "redis" => session.as_any_mut().downcast_mut::<RedisSession>().ok_or_else(|| anyhow!("Invalid session type"))?,
             _ => return Err(anyhow!("Invalid session type")),
         };
 
