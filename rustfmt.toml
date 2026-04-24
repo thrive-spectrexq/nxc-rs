@@ -1,5 +1,6 @@
 edition = "2021"
 max_width = 100
 use_small_heuristics = "Max"
-imports_granularity = "Crate"
+# Uses "Item" for cleaner diffs (each import on its own line)
+imports_granularity = "Item"
 group_imports = "StdExternalCrate"
