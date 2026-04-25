@@ -44,7 +44,7 @@ impl NxcModule for MssqlEnum {
         _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let mssql_session = match session.protocol() {
-            "mssql" => unsafe { &*(session as *const dyn NxcSession as *const MssqlSession) },
+            "mssql" => session.as_any().downcast_ref::<MssqlSession>().ok_or_else(|| anyhow::anyhow!("Invalid session type"))?,
             _ => return Err(anyhow::anyhow!("Module only supports MSSQL")),
         };
 
