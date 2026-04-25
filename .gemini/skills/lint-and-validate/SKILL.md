@@ -17,33 +17,28 @@ date_added: "2026-02-27"
 2. **Types:** `npx tsc --noEmit`
 3. **Security:** `npm audit --audit-level=high`
 
-#### Python
-1. **Linter (Ruff):** `ruff check "path" --fix` (Fast & Modern)
-2. **Security (Bandit):** `bandit -r "path" -ll`
-3. **Types (MyPy):** `mypy "path"`
+#### Rust
+1. **Linter (Clippy):** `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+2. **Format (Rustfmt):** `cargo fmt --all`
+3. **Build/Check:** `cargo check --workspace --all-targets`
 
 ## The Quality Loop
 1. **Write/Edit Code**
-2. **Run Audit:** `npm run lint && npx tsc --noEmit`
-3. **Analyze Report:** Check the "FINAL AUDIT REPORT" section.
-4. **Fix & Repeat:** Submitting code with "FINAL AUDIT" failures is NOT allowed.
+2. **Run Audit:** `cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings`
+3. **Analyze Report:** Check the compiler and linter output.
+4. **Fix & Repeat:** Submitting code with compilation or clippy failures is NOT allowed.
 
 ## Error Handling
-- If `lint` fails: Fix the style or syntax issues immediately.
-- If `tsc` fails: Correct type mismatches before proceeding.
-- If no tool is configured: Check the project root for `.eslintrc`, `tsconfig.json`, `pyproject.toml` and suggest creating one.
+- If `cargo clippy` fails: Fix the style or safety issues immediately.
+- If `cargo check` fails: Correct compiler errors before proceeding.
+- If no tool is configured: Check the project root for `Cargo.toml`.
 
 ---
 **Strict Rule:** No code should be committed or reported as "done" without passing these checks.
 
 ---
 
-## Scripts
 
-| Script | Purpose | Command |
-|--------|---------|---------|
-| `scripts/lint_runner.py` | Unified lint check | `python scripts/lint_runner.py <project_path>` |
-| `scripts/type_coverage.py` | Type coverage analysis | `python scripts/type_coverage.py <project_path>` |
 
 ## When to Use
 This skill is applicable to execute the workflow or actions described in the overview.

@@ -110,7 +110,7 @@ Master code reviewer focused on ensuring code quality, security, performance, an
 
 ### Language-Specific Expertise
 - JavaScript/TypeScript modern patterns and React/Vue best practices
-- Python code quality with PEP 8 compliance and performance optimization
+- Rust code quality with Clippy compliance and idiomatic idioms
 - Java enterprise patterns and Spring framework best practices
 - Go concurrent programming and performance optimization
 - Rust memory safety and performance critical code review
