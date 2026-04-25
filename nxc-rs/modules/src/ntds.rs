@@ -47,9 +47,7 @@ impl NxcModule for Ntds {
         _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let smb_session = match session.protocol() {
-            "smb" => unsafe {
-                &*(session as *const dyn NxcSession as *const nxc_protocols::smb::SmbSession)
-            },
+            "smb" => session.as_any().downcast_ref::<nxc_protocols::smb::SmbSession>().ok_or_else(|| anyhow::anyhow!("Invalid session type"))?,
             _ => return Err(anyhow::anyhow!("Module only supports SMB (DRSUAPI over RPC)")),
         };
 
