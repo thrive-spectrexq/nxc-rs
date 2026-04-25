@@ -52,6 +52,7 @@ pub struct RelayServer {
     captured: std::sync::Arc<tokio::sync::Mutex<Vec<CapturedHash>>>,
 }
 
+#[allow(dead_code)]
 impl RelayServer {
     pub fn new(config: RelayConfig) -> Self {
         Self {
