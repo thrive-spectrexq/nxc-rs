@@ -11,11 +11,11 @@
 
 ## 🚀 Key Features
 
-*   **⚡ Blazing Performance**: Engineered with Tokio's async runtime for massive concurrency across large-scale networks.
-*   **🦀 Pure Rust Core**: Zero Python or Impacket dependencies. Native, safe implementations of NTLM SSP, Kerberos, and SMB.
-*   **🤖 AI Mission Orchestrator**: Control missions with natural language via the **Elite Reaper** AI engine (Gemini, OpenAI, Anthropic, or Ollama).
-*   **🛡️ Stealth & Resilience**: Built-in lockout protection, configurable jitter, random delays, and secure TLS handling.
-*   **🔍 Advanced Reconnaissance**: Native AD CS enumeration, BloodHound integration, WMI recon, and more.
+*   **Blazing Performance**: Engineered with Tokio's async runtime for massive concurrency across large-scale networks.
+*   **Pure Rust Core**: Zero Python or Impacket dependencies. Native, safe implementations of NTLM SSP, Kerberos, and SMB.
+*   **AI Mission Orchestrator**: Control missions with natural language via the **Elite Reaper** AI engine (Gemini, OpenAI, Anthropic, or Ollama).
+*   **Stealth & Resilience**: Built-in lockout protection, configurable jitter, random delays, and secure TLS handling.
+*   **Advanced Reconnaissance**: Native AD CS enumeration, BloodHound integration, WMI recon, and more.
 
 ---
 
@@ -63,9 +63,9 @@ cargo build --release --package nxc
 
 ---
 
-## 🎮 Usage & Examples
+## Usage & Examples
 
-### 📖 Getting Help
+### Getting Help
 To see all available protocols and global options:
 ```bash
 nxc --help
@@ -77,7 +77,7 @@ nxc smb --help
 nxc winrm --help
 ```
 
-### 🎯 Command Examples
+### Command Examples
 
 **WinRM PSRP Execution:**
 ```powershell
@@ -96,7 +96,7 @@ nxc nfs <target> --enum-shares
 
 ---
 
-## 🧠 AI Mission Control
+## AI Mission Control
 
 The **Elite Reaper** allows you to orchestrate complex attacks using natural language.
 
@@ -117,7 +117,7 @@ nxc ai "Find hosts with SMB signing disabled on 192.168.1.0/24"
 
 ---
 
-## 🏗 Architecture
+## Architecture
 
 The project is structured as a modular workspace for maximum maintainability:
 
@@ -130,7 +130,7 @@ The project is structured as a modular workspace for maximum maintainability:
 
 ---
 
-## ⚖️ License & Disclaimer
+## License & Disclaimer
 
 Distributed under the **BSD 2-Clause License**. See [LICENSE](LICENSE) for details.
 
