@@ -67,7 +67,7 @@ hex = "0.4"
 # Kerberos, encryption & registry parsing
 kerberos_asn1 = "0.2"
 kerberos_constants = "0.0.9"
-pbkdf2 = { version = "0.12", features = ["hmac"] }
+pbkdf2 = { version = "0.13", features = ["hmac"] }
 rasn = "0.28"
 sha1 = "0.10"
 sha2 = "0.10"
