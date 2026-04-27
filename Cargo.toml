@@ -54,7 +54,7 @@ dashmap = "6"
 
 # NetExec-RS dependencies (unified on digest 0.10.x for p12 compatibility)
 md4 = "0.10"
-hmac = "0.12"
+hmac = "0.13"
 md-5 = "0.10"
 rc4 = "0.2"
 aes = "0.8"

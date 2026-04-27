@@ -2836,7 +2836,7 @@ dependencies = [
  "des",
  "digest 0.10.7",
  "hex",
- "hmac 0.12.1",
+ "hmac 0.13.0",
  "hostname",
  "md-5 0.10.6",
  "md4",
