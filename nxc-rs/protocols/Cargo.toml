@@ -12,7 +12,7 @@ ldap3 = "0.12"
 
 base64 = "0.22"
 tokio-rustls = "0.26"
-rustls-pki-types = "1.0"
+rustls-pki-types = "1.14"
 nxc-auth = { path = "../auth" }
 nxc-resilience = { path = "../resilience" }
 async-trait = { workspace = true }
