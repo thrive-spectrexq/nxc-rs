@@ -98,7 +98,7 @@ impl NxcModule for ExecuteAssembly {
         let total_chunks = b64_payload.len().div_ceil(chunk_size);
 
         for (i, chunk) in b64_payload.as_bytes().chunks(chunk_size).enumerate() {
-            let chunk_str = std::str::from_utf8(chunk).unwrap();
+            let chunk_str = std::str::from_utf8(chunk).unwrap_or_else(|_| panic!("invalid utf-8"));
             let cmd = format!(
                 "powershell -c \"Add-Content -Path '{target_file}' -Value '{chunk_str}' -NoNewline\""
             );

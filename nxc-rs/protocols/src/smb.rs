@@ -55,7 +55,7 @@ pub struct Smb2Header {
 impl Smb2Header {
     pub fn new(command: u16) -> Self {
         Self {
-            protocol_id: SMB2_MAGIC.try_into().unwrap(),
+            protocol_id: SMB2_MAGIC.try_into().unwrap_or_else(|_| panic!("Invalid MAGIC")),
             structure_size: 64,
             credit_charge: 0,
             status: 0,

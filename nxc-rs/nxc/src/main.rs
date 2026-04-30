@@ -54,7 +54,7 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(("relay", relay_matches)) => {
-            let bind_addr = relay_matches.get_one::<String>("bind-addr").unwrap();
+            let bind_addr = relay_matches.get_one::<String>("bind-addr").unwrap_or_else(|| panic!("bind-addr is required"));
 
             let config = relay::RelayConfig {
                 bind_addr: bind_addr.clone(),
@@ -401,7 +401,7 @@ async fn main() -> Result<()> {
             let filename =
                 format!("report_{}_{}.json", protocol_name, Utc::now().format("%Y%m%d_%H%M%S"));
             let report_path = ws_reports_dir.join(filename);
-            if let Err(e) = reporting::export_json(report_path.to_str().unwrap(), &report) {
+            if let Err(e) = reporting::export_json(report_path.to_str().unwrap_or_else(|| panic!("report_path is invalid utf-8")), &report) {
                 NxcGlobalOutput::warn(&format!("Failed to save workspace report: {e}"));
             }
         }
@@ -494,8 +494,8 @@ mod tests {
             "pass",
         ]);
         let (_, sub_m) = matches.subcommand().unwrap();
-        let targets: Vec<&String> = sub_m.get_many::<String>("target").unwrap().collect();
-        assert_eq!(targets.len(), 2);
+        let targets = sub_m.get_many::<String>("target").unwrap();
+        assert_eq!(targets.count(), 2);
     }
 
     #[test]

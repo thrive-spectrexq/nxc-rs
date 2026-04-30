@@ -72,7 +72,7 @@ impl NxcModule for WebVuln {
         let mut tasks = Vec::new();
 
         for (path, signature, desc) in checks {
-            let permit = sem.clone().acquire_owned().await.unwrap();
+            let permit = sem.clone().acquire_owned().await.unwrap_or_else(|_| panic!("Failed to acquire semaphore"));
             let url = format!("{base_url}{path}");
             let client = http_sess.client.clone();
             let creds = http_sess.credentials.clone();
