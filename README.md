@@ -15,8 +15,6 @@ Inspired by CrackMapExec and NetExec, nxc-rs reimagines network exploitation wit
 - intelligent orchestration
 - memory-safe native implementations
 
-This is not just a rewrite — it’s a next-generation execution engine built for speed, stealth, and extensibility.
-
 ## Why nxc-rs?
 
 Traditional tooling in this space is:
