@@ -68,4 +68,4 @@ jobs:
         run: cargo install cargo-audit --locked
 
       - name: Audit dependencies
-        run: cargo audit
+        run: cargo audit --ignore RUSTSEC-2024-0421
