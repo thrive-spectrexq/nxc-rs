@@ -5,55 +5,101 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/thrive-spectrexq/nxc-rs/build-binaries.yml?branch=master&style=flat-square)](https://github.com/thrive-spectrexq/nxc-rs/actions)
 [![License](https://img.shields.io/badge/license-BSD--2--Clause-blue.svg?style=flat-square)](LICENSE)
 
----
+⚡ High-Performance Network Execution Framework (Rust)
 
-**NetExec-RS (nxc-rs)** is a modern, high-performance network execution tool built in Rust. Inspired by CrackMapExec and Pennyw0rth [NetExec](https://github.com/Pennyw0rth/NetExec.git), it brings blazing-fast concurrency, memory safety, and native protocol implementations to the modern red-teaming toolkit.
+NetExec-RS (nxc-rs) is a high-performance network execution framework built in Rust, designed for modern red team operations at scale.
 
-## 🚀 Key Features
+Inspired by CrackMapExec and NetExec, nxc-rs reimagines network exploitation with:
 
-*   **Blazing Performance**: Engineered with Tokio's async runtime for massive concurrency across large-scale networks.
-*   **Pure Rust Core**: Zero Python or Impacket dependencies. Native, safe implementations of NTLM SSP, Kerberos, and SMB.
-*   **AI Mission Orchestrator**: Control missions with natural language via the **Elite Reaper** AI engine (Gemini, OpenAI, Anthropic, or Ollama).
-*   **Stealth & Resilience**: Built-in lockout protection, configurable jitter, random delays, and secure TLS handling.
-*   **Advanced Reconnaissance**: Native AD CS enumeration, BloodHound integration, WMI recon, and more.
+- massive concurrency
+- intelligent orchestration
+- memory-safe native implementations
 
----
+This is not just a rewrite — it’s a next-generation execution engine built for speed, stealth, and extensibility.
 
-## 🛠 Protocols & Capabilities
+## 🚀 Why nxc-rs?
 
-`nxc-rs` supports **22 protocols** and **135+ offensive modules**, all optimized for speed and reliability.
+Traditional tooling in this space is:
 
-| Protocol | Status | Highlights |
+- Python-heavy
+- dependency-fragile
+- slow at scale
+
+nxc-rs changes that:
+
+- Pure Rust core → zero runtime dependencies
+- Async-first architecture → scan and execute across thousands of hosts
+- Protocol-native implementations → no wrappers, no overhead
+- Designed for automation → integrates seamlessly into pipelines and AI workflows
+
+## 🔥 Key Features
+
+### ⚡ Performance & Reliability
+- Tokio-powered async runtime for extreme concurrency
+- Optimized for large enterprise network operations
+- Low memory footprint with predictable performance
+
+### 🧱 Native Rust Core
+- No Python, no Impacket
+- Native implementations of:
+  - NTLM SSP
+  - Kerberos
+  - SMB protocol stack
+
+### 🤖 AI Mission Orchestrator
+- Built-in Elite Reaper engine
+- Control operations using natural language
+- Supports:
+  - Gemini
+  - OpenAI
+  - Anthropic
+  - Ollama
+
+### 🥷 Stealth & Evasion
+- Lockout-aware authentication strategies
+- Configurable jitter and randomized delays
+- Secure TLS handling
+- Reduced detection footprint
+
+### 🔎 Advanced Reconnaissance
+- Active Directory enumeration (LDAP, AD CS)
+- BloodHound data collection
+- WMI-based system intelligence
+- Credential and privilege discovery
+
+## 📡 Protocols & Capabilities
+
+nxc-rs supports 22 protocols and 135+ modules, built for both reconnaissance and post-exploitation.
+
+| Protocol | Status | Capabilities |
 | :--- | :--- | :--- |
-| **SMB** | ✅ | NTLM SSP, Shares, smbexec, lsassy, DCShadow, NTDS dumping |
-| **LDAP** | ✅ | AD CS, BloodHound, gMSA/LAPS enum, Roasting |
-| **WinRM** | ✅ | NTLM/Kerberos auth, PSRP command execution |
-| **MSSQL** | ✅ | Queries, xp_cmdshell, impersonation checks |
-| **WMI** | ✅ | System enumeration and command execution |
-| **SSH** | ✅ | Auth auditing, exec, and sudo verification |
-| **ADB/RDP/VNC** | ✅ | Shell access and automated screenshots |
-| **Web/DNS/FTP** | ✅ | High-speed reconnaissance and enumeration |
-| **Cloud/Kube** | ✅ | Redfish probing, Kubernetes cluster enumeration |
-
----
+| **SMB** | ✅ | NTLM auth, shares, smbexec, lsassy, NTDS dumping |
+| **LDAP** | ✅ | AD CS, BloodHound, LAPS/gMSA, Kerberoasting |
+| **WinRM** | ✅ | NTLM/Kerberos, PSRP execution |
+| **MSSQL** | ✅ | Query execution, xp_cmdshell, impersonation |
+| **WMI** | ✅ | Remote execution & system enumeration |
+| **SSH** | ✅ | Auth auditing, command execution |
+| **RDP / VNC / ADB** | ✅ | Remote access, screenshots |
+| **Web / DNS / FTP** | ✅ | Enumeration & recon |
+| **Cloud / Kube** | ✅ | Kubernetes & infrastructure probing |
 
 ## 📦 Installation
 
-### Quick Install (Recommended)
+### ⚡ Quick Install
 
-**Linux / macOS:**
+**Linux / macOS**
 ```bash
 curl -sSf https://raw.githubusercontent.com/thrive-spectrexq/nxc-rs/master/install.sh | bash
 ```
 
-**Windows (PowerShell):**
+**Windows (PowerShell)**
 ```powershell
 iex (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/thrive-spectrexq/nxc-rs/master/install.ps1')
 ```
 
-### From Source
+### 🛠 Build from Source
 
-Requires `rustc 1.94.0` or newer.
+Requires Rust 1.94.0+
 
 ```bash
 git clone https://github.com/thrive-spectrexq/nxc-rs.git
@@ -61,78 +107,100 @@ cd nxc-rs
 cargo build --release --package nxc
 ```
 
----
+## 📖 Usage
 
-## Usage & Examples
-
-### Getting Help
-To see all available protocols and global options:
+### Help & Discovery
 ```bash
 nxc --help
 ```
 
-To see protocol-specific flags (e.g., SMB or WinRM):
+Protocol-specific help:
 ```bash
 nxc smb --help
 nxc winrm --help
 ```
 
-### Command Examples
+### Examples
 
-**WinRM PSRP Execution:**
-```powershell
+**WinRM Command Execution**
+```bash
 nxc winrm <target> -u Admin -p Pass123 -x "Get-Process"
 ```
 
-**SMB LSA Dumping (lsassy):**
-```powershell
+**SMB Credential Dumping**
+```bash
 nxc smb 192.168.1.0/24 -u Admin -H <hash> -M lsassy
 ```
 
-**NFS Share Enumeration:**
-```powershell
+**NFS Enumeration**
+```bash
 nxc nfs <target> --enum-shares
 ```
 
----
+### AI Mission Control (Elite Reaper)
 
-## AI Mission Control
+Control operations using natural language.
 
-The **Elite Reaper** allows you to orchestrate complex attacks using natural language.
+#### ⚙️ Setup
 
-### Setup
-Set one of the following environment variables:
-*   `GEMINI_API_KEY` (Default)
-*   `OPENAI_API_KEY`
-*   `ANTHROPIC_API_KEY`
-*   `OLLAMA_API_BASE`
+Set one provider:
 
-### Examples
-Launch an interactive mission directly from your terminal:
 ```bash
-nxc ai "Scan 10.0.0.0/24 for port 445 and identify OS versions"
-nxc ai "Enumerate all GPO names from the domain using ldap"
-nxc ai "Find hosts with SMB signing disabled on 192.168.1.0/24"
+export GEMINI_API_KEY=...
+export OPENAI_API_KEY=...
+export ANTHROPIC_API_KEY=...
+export OLLAMA_API_BASE=...
 ```
 
----
+#### 💡 Examples
+```bash
+nxc ai "Scan 10.0.0.0/24 for port 445 and identify OS versions"
+nxc ai "Enumerate all GPO names using LDAP"
+nxc ai "Find hosts with SMB signing disabled"
+```
 
-## Architecture
+## 🏗 Architecture
 
-The project is structured as a modular workspace for maximum maintainability:
+nxc-rs is built as a modular Rust workspace:
 
-*   **[`nxc`](nxc-rs/nxc)**: Main CLI entry point and orchestration layer.
-*   **[`nxc-protocols`](nxc-rs/protocols)**: Core network handling (SMB, LDAP, SSH, etc.).
-*   **[`nxc-auth`](nxc-rs/auth)**: Unified authentication engine (NTLM, Kerberos).
-*   **[`nxc-ai`](nxc-rs/ai)**: The Elite Reaper LLM orchestration engine.
-*   **[`nxc-modules`](nxc-rs/modules)**: Post-exploitation and reconnaissance modules.
-*   **[`nxc-db`](nxc-rs/db)**: SQLite-backed credential and workspace management.
+- `/nxc` → CLI + orchestration
+- `/protocols` → SMB, LDAP, SSH, etc.
+- `/auth` → NTLM, Kerberos engine
+- `/ai` → Elite Reaper AI engine
+- `/modules` → Recon & post-exploitation modules
+- `/db` → Credential storage (SQLite)
 
----
+### Design Principles
+- Modular & extensible
+- Async-first
+- Protocol-driven architecture
+- Clean separation of concerns
 
-## License & Disclaimer
+## 🗺️ Roadmap
+- Plugin / external module system
+- Distributed execution (multi-node ops)
+- Advanced evasion techniques
+- Web UI / dashboard
+- Blue-team simulation mode
 
-Distributed under the **BSD 2-Clause License**. See [LICENSE](LICENSE) for details.
+## 🤝 Contributing
 
-### ⚠️ Legal Disclaimer
-**NetExec-RS is for authorized security testing and educational purposes only.** Use of this tool against targets without prior mutual consent is illegal. The developers assume no liability for misuse or damage caused by this program.
+Contributions are welcome.
+
+1. Fork the repo
+2. Create a feature branch
+3. Submit a PR
+
+For major changes, open an issue first.
+
+## 📄 License
+
+Licensed under the BSD 2-Clause License.
+See [LICENSE](LICENSE) for details.
+
+## ⚠️ Legal Disclaimer
+
+This tool is intended strictly for authorized security testing and educational purposes.
+
+- Unauthorized use against systems without explicit permission is illegal.
+- The authors are not responsible for misuse or damages.
