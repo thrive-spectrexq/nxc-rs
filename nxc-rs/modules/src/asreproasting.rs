@@ -47,7 +47,9 @@ impl NxcModule for Asreproasting {
         _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let ldap_session = match session.protocol() {
-            "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap_or_else(|| panic!("session downcast failed")),
+            "ldap" => session
+                .downcast_mut::<nxc_protocols::ldap::LdapSession>()
+                .unwrap_or_else(|| panic!("session downcast failed")),
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 

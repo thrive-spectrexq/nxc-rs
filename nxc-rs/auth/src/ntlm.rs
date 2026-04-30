@@ -312,7 +312,9 @@ impl NtlmAuthenticator {
         let (exported_session_key, encrypted_random_session_key) =
             if negotiate_flags & NTLMSSP_NEGOTIATE_KEY_EXCH != 0 {
                 let exported_key: [u8; 16] = rand::random();
-                let key_array: &[u8; 16] = session_base_key[..16].try_into().unwrap_or_else(|_| panic!("key_array try_into failed"));
+                let key_array: &[u8; 16] = session_base_key[..16]
+                    .try_into()
+                    .unwrap_or_else(|_| panic!("key_array try_into failed"));
                 let mut rc4_key = Rc4::new_from_slice(key_array)
                     .map_err(|e| anyhow::anyhow!("RC4 init fail: {e}"))?;
                 let mut encrypted = exported_key;
@@ -490,13 +492,15 @@ impl NtlmSessionSecurity {
         let sealing_key = self.client_sealing_key();
 
         // HMAC-MD5(SigningKey, SeqNum + Message)
-        let mut hmac = <HmacMd5 as Mac>::new_from_slice(&signing_key).unwrap_or_else(|_| panic!("HMAC key"));
+        let mut hmac =
+            <HmacMd5 as Mac>::new_from_slice(&signing_key).unwrap_or_else(|_| panic!("HMAC key"));
         hmac.update(&seq_num.to_le_bytes());
         hmac.update(message);
         let mac = hmac.finalize().into_bytes();
 
         // Encrypt first 8 bytes of HMAC with RC4(SealingKey)
-        let key_array: &[u8; 16] = sealing_key[..16].try_into().unwrap_or_else(|_| panic!("sealing_key try_into failed"));
+        let key_array: &[u8; 16] =
+            sealing_key[..16].try_into().unwrap_or_else(|_| panic!("sealing_key try_into failed"));
         let mut rc4 = Rc4::new_from_slice(key_array).unwrap_or_else(|_| panic!("RC4 init fail"));
         let mut encrypted_mac = [0u8; 8];
         encrypted_mac.copy_from_slice(&mac[..8]);
@@ -524,8 +528,8 @@ pub fn calculate_nt_hash(password: &str) -> [u8; 16] {
 
 /// Calculate NTLMv2 hash: HMAC-MD5(NT_Hash, UPPERCASE(user) + UPPERCASE(domain)).
 pub fn calculate_v2_hash(username: &str, domain: &str, nt_hash: &[u8; 16]) -> [u8; 16] {
-    let mut hmac =
-        <HmacMd5 as Mac>::new_from_slice(nt_hash).unwrap_or_else(|_| panic!("HMAC can take key of any size"));
+    let mut hmac = <HmacMd5 as Mac>::new_from_slice(nt_hash)
+        .unwrap_or_else(|_| panic!("HMAC can take key of any size"));
     let identity = format!("{}{}", username.to_uppercase(), domain.to_uppercase());
     let utf16: Vec<u16> = identity.encode_utf16().collect();
     let bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();

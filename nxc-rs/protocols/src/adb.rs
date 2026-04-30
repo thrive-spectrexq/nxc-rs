@@ -97,12 +97,24 @@ impl AdbProtocol {
         let mut header = [0u8; 24];
         stream.read_exact(&mut header).await?;
 
-        let cmd = u32::from_le_bytes(header[0..4].try_into().unwrap_or_else(|_| panic!("Invalid bytes length")));
-        let arg0 = u32::from_le_bytes(header[4..8].try_into().unwrap_or_else(|_| panic!("Invalid bytes length")));
-        let arg1 = u32::from_le_bytes(header[8..12].try_into().unwrap_or_else(|_| panic!("Invalid bytes length")));
-        let len = u32::from_le_bytes(header[12..16].try_into().unwrap_or_else(|_| panic!("Invalid bytes length")));
-        let crc = u32::from_le_bytes(header[16..20].try_into().unwrap_or_else(|_| panic!("Invalid bytes length")));
-        let magic_val = u32::from_le_bytes(header[20..24].try_into().unwrap_or_else(|_| panic!("Invalid bytes length")));
+        let cmd = u32::from_le_bytes(
+            header[0..4].try_into().unwrap_or_else(|_| panic!("Invalid bytes length")),
+        );
+        let arg0 = u32::from_le_bytes(
+            header[4..8].try_into().unwrap_or_else(|_| panic!("Invalid bytes length")),
+        );
+        let arg1 = u32::from_le_bytes(
+            header[8..12].try_into().unwrap_or_else(|_| panic!("Invalid bytes length")),
+        );
+        let len = u32::from_le_bytes(
+            header[12..16].try_into().unwrap_or_else(|_| panic!("Invalid bytes length")),
+        );
+        let crc = u32::from_le_bytes(
+            header[16..20].try_into().unwrap_or_else(|_| panic!("Invalid bytes length")),
+        );
+        let magic_val = u32::from_le_bytes(
+            header[20..24].try_into().unwrap_or_else(|_| panic!("Invalid bytes length")),
+        );
 
         if magic_val != magic(cmd) {
             return Err(anyhow!("Invalid ADB packet magic number"));
