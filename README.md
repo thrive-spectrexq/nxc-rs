@@ -5,7 +5,7 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/thrive-spectrexq/nxc-rs/build-binaries.yml?branch=master&style=flat-square)](https://github.com/thrive-spectrexq/nxc-rs/actions)
 [![License](https://img.shields.io/badge/license-BSD--2--Clause-blue.svg?style=flat-square)](LICENSE)
 
-⚡ High-Performance Network Execution Framework (Rust)
+High-Performance Network Execution Framework (Rust)
 
 NetExec-RS (nxc-rs) is a high-performance network execution framework built in Rust, designed for modern red team operations at scale.
 
@@ -17,7 +17,7 @@ Inspired by CrackMapExec and NetExec, nxc-rs reimagines network exploitation wit
 
 This is not just a rewrite — it’s a next-generation execution engine built for speed, stealth, and extensibility.
 
-## 🚀 Why nxc-rs?
+## Why nxc-rs?
 
 Traditional tooling in this space is:
 
@@ -32,21 +32,21 @@ nxc-rs changes that:
 - Protocol-native implementations → no wrappers, no overhead
 - Designed for automation → integrates seamlessly into pipelines and AI workflows
 
-## 🔥 Key Features
+## Key Features
 
 ### ⚡ Performance & Reliability
 - Tokio-powered async runtime for extreme concurrency
 - Optimized for large enterprise network operations
 - Low memory footprint with predictable performance
 
-### 🧱 Native Rust Core
+### Native Rust Core
 - No Python, no Impacket
 - Native implementations of:
   - NTLM SSP
   - Kerberos
   - SMB protocol stack
 
-### 🤖 AI Mission Orchestrator
+### AI Mission Orchestrator
 - Built-in Elite Reaper engine
 - Control operations using natural language
 - Supports:
@@ -55,13 +55,13 @@ nxc-rs changes that:
   - Anthropic
   - Ollama
 
-### 🥷 Stealth & Evasion
+### Stealth & Evasion
 - Lockout-aware authentication strategies
 - Configurable jitter and randomized delays
 - Secure TLS handling
 - Reduced detection footprint
 
-### 🔎 Advanced Reconnaissance
+### Advanced Reconnaissance
 - Active Directory enumeration (LDAP, AD CS)
 - BloodHound data collection
 - WMI-based system intelligence
@@ -85,7 +85,7 @@ nxc-rs supports 22 protocols and 135+ modules, built for both reconnaissance and
 
 ## 📦 Installation
 
-### ⚡ Quick Install
+### Quick Install
 
 **Linux / macOS**
 ```bash
@@ -107,7 +107,7 @@ cd nxc-rs
 cargo build --release --package nxc
 ```
 
-## 📖 Usage
+## Usage
 
 ### Help & Discovery
 ```bash
@@ -159,7 +159,7 @@ nxc ai "Enumerate all GPO names using LDAP"
 nxc ai "Find hosts with SMB signing disabled"
 ```
 
-## 🏗 Architecture
+## Architecture
 
 nxc-rs is built as a modular Rust workspace:
 
@@ -176,7 +176,7 @@ nxc-rs is built as a modular Rust workspace:
 - Protocol-driven architecture
 - Clean separation of concerns
 
-## 🗺️ Roadmap
+## Roadmap
 - Plugin / external module system
 - Distributed execution (multi-node ops)
 - Advanced evasion techniques
@@ -193,7 +193,7 @@ Contributions are welcome.
 
 For major changes, open an issue first.
 
-## 📄 License
+## License
 
 Licensed under the BSD 2-Clause License.
 See [LICENSE](LICENSE) for details.
