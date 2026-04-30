@@ -146,7 +146,11 @@ impl NxcModule for WebFuzzer {
         let mut tasks = Vec::new();
 
         for path in target_paths {
-            let permit = sem.clone().acquire_owned().await.unwrap_or_else(|_| panic!("Failed to acquire semaphore"));
+            let permit = sem
+                .clone()
+                .acquire_owned()
+                .await
+                .unwrap_or_else(|_| panic!("Failed to acquire semaphore"));
             let url = format!("{base_url}{path}");
             let client = http_sess.client.clone();
             let creds = http_sess.credentials.clone();

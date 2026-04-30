@@ -405,7 +405,10 @@ impl ExecutionEngine {
                     }
                 }
 
-                let permit = semaphore.clone().acquire_owned().await.unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"));
+                let permit =
+                    semaphore.clone().acquire_owned().await.unwrap_or_else(|_| {
+                        panic!("Failed to compile regex or create progress style")
+                    });
                 let protocol_clone = protocol.clone();
                 let target_clone = target.clone();
                 let cred_clone = cred.clone();
@@ -671,26 +674,34 @@ mod tests {
 
     #[test]
     fn test_parse_single_ip() {
-        let targets = parse_targets("192.168.1.10").unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"));
+        let targets = parse_targets("192.168.1.10")
+            .unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"));
         assert_eq!(targets.len(), 1);
         assert_eq!(targets[0].ip_string(), "192.168.1.10");
     }
 
     #[test]
     fn test_parse_cidr_24() {
-        let targets = parse_targets("192.168.1.0/24").unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"));
+        let targets = parse_targets("192.168.1.0/24")
+            .unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"));
         assert_eq!(targets.len(), 254); // .1 through .254
     }
 
     #[test]
     fn test_parse_range() {
-        let targets = parse_targets("192.168.1.1-10").unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"));
+        let targets = parse_targets("192.168.1.1-10")
+            .unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"));
         assert_eq!(targets.len(), 10);
     }
 
     #[test]
     fn test_target_display() {
-        let t = Target::new("10.0.0.1".parse().unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"))).with_hostname("dc01.corp.local");
+        let t = Target::new(
+            "10.0.0.1"
+                .parse()
+                .unwrap_or_else(|_| panic!("Failed to compile regex or create progress style")),
+        )
+        .with_hostname("dc01.corp.local");
         assert_eq!(t.display(), "10.0.0.1 (dc01.corp.local)");
     }
 
@@ -790,12 +801,21 @@ mod tests {
         let engine = ExecutionEngine::new(opts);
         let smb_proto: Arc<dyn nxc_protocols::NxcProtocol> = Arc::new(MockProtocol);
 
-        let targets = vec![
-            Target::new("192.168.1.10".parse().unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"))),
-            Target::new("192.168.1.11".parse().unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"))),
-            Target::new("192.168.1.12".parse().unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"))),
-            Target::new("192.168.1.99".parse().unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"))), // Mocks connection failure
-        ];
+        let targets =
+            vec![
+                Target::new("192.168.1.10".parse().unwrap_or_else(|_| {
+                    panic!("Failed to compile regex or create progress style")
+                })),
+                Target::new("192.168.1.11".parse().unwrap_or_else(|_| {
+                    panic!("Failed to compile regex or create progress style")
+                })),
+                Target::new("192.168.1.12".parse().unwrap_or_else(|_| {
+                    panic!("Failed to compile regex or create progress style")
+                })),
+                Target::new("192.168.1.99".parse().unwrap_or_else(|_| {
+                    panic!("Failed to compile regex or create progress style")
+                })), // Mocks connection failure
+            ];
 
         let creds = vec![
             Credentials::password("admin", "wrong", None),
@@ -894,7 +914,11 @@ mod tests {
             }
         }
 
-        let targets = vec![Target::new("127.0.0.1".parse().unwrap_or_else(|_| panic!("Failed to compile regex or create progress style")))];
+        let targets = vec![Target::new(
+            "127.0.0.1"
+                .parse()
+                .unwrap_or_else(|_| panic!("Failed to compile regex or create progress style")),
+        )];
         let creds = vec![Credentials::password("admin", "pass", None)];
 
         engine.run(Arc::new(MockProto), targets, creds).await;

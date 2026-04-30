@@ -201,10 +201,10 @@ impl NxcProtocol for WinrmProtocol {
             .downcast_mut::<WinrmSession>()
             .ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
         let url = self.build_url(&winrm_sess.target, winrm_sess.port);
-        let client = winrm_sess
-            .client
-            .clone()
-            .unwrap_or_else(|| self.build_client(winrm_sess.proxy.as_deref()).unwrap_or_else(|_| panic!("Failed to build client")));
+        let client = winrm_sess.client.clone().unwrap_or_else(|| {
+            self.build_client(winrm_sess.proxy.as_deref())
+                .unwrap_or_else(|_| panic!("Failed to build client"))
+        });
 
         debug!("WinRM: Authenticating {}@{}", creds.username, url);
 
@@ -271,10 +271,10 @@ impl NxcProtocol for WinrmProtocol {
             .downcast_ref::<WinrmSession>()
             .ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
         let url = &winrm_sess.endpoint;
-        let client = winrm_sess
-            .client
-            .clone()
-            .unwrap_or_else(|| self.build_client(winrm_sess.proxy.as_deref()).unwrap_or_else(|_| panic!("Failed to build client")));
+        let client = winrm_sess.client.clone().unwrap_or_else(|| {
+            self.build_client(winrm_sess.proxy.as_deref())
+                .unwrap_or_else(|_| panic!("Failed to build client"))
+        });
 
         // For an offensive tool, we inject AMSI and ETW bypasses into the command if it's PowerShell.
         let final_cmd = if cmd.to_lowercase().starts_with("powershell") {
