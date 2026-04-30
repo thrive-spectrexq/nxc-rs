@@ -981,7 +981,7 @@ footer {
           <span class="terminal-title">nxc — mission terminal</span>
         </div>
         <div class="terminal-body">
-          <div><span class="t-prompt">$ </span><span class="t-cmd">nxc smb 192.168.1.0/24 -u Admin -H a3b7c...</span></div>
+          <div><span class="t-prompt">$ </span><span class="t-cmd">nxc smb 192.168.1.0/24 -u Admin -H &lt;hash&gt; -M lsassy</span></div>
           <div><span class="t-dim">──────────────────────────────────────</span></div>
           <div><span class="t-info">[*] </span><span class="t-dim">Enumerating 254 hosts on 192.168.1.0/24</span></div>
           <div><span class="t-ok">[+] </span><span class="t-dim">192.168.1.10 — Windows Server 2022</span></div>
@@ -991,7 +991,7 @@ footer {
           <div><span class="t-hit">[!] </span><span class="t-dim">192.168.1.45 — SMB signing: DISABLED</span></div>
           <div><span class="t-dim">──────────────────────────────────────</span></div>
           <div><span class="t-info">[*] </span><span class="t-dim">Scan complete: 254 hosts, 2 vulnerable</span></div>
-          <div><span class="t-prompt">$ </span><span class="t-cmd">nxc ai "dump lsa on vuln hosts"</span></div>
+          <div><span class="t-prompt">$ </span><span class="t-cmd">nxc ai "dump lsassy on vuln hosts"</span></div>
           <div><span class="t-info">[AI] </span><span class="t-dim">Launching Elite Reaper mission...</span></div>
           <div><span class="t-prompt">$ </span><span class="cursor"></span></div>
         </div>
@@ -1064,23 +1064,21 @@ footer {
             <td><span class="proto-name">SMB</span></td>
             <td><span class="status-dot">Active</span></td>
             <td>
-              <span class="cap-tag">NTLM SSP</span>
+              <span class="cap-tag">NTLM auth</span>
+              <span class="cap-tag">shares</span>
               <span class="cap-tag">smbexec</span>
               <span class="cap-tag">lsassy</span>
-              <span class="cap-tag">dcshadow</span>
-              <span class="cap-tag">SAM/LSA/NTDS dump</span>
-              <span class="cap-tag">Share enum</span>
+              <span class="cap-tag">NTDS dumping</span>
             </td>
           </tr>
           <tr>
             <td><span class="proto-name">LDAP</span></td>
             <td><span class="status-dot">Active</span></td>
             <td>
-              <span class="cap-tag">AD CS enum</span>
-              <span class="cap-tag">BloodHound export</span>
+              <span class="cap-tag">AD CS</span>
+              <span class="cap-tag">BloodHound</span>
+              <span class="cap-tag">LAPS/gMSA</span>
               <span class="cap-tag">Kerberoasting</span>
-              <span class="cap-tag">gMSA</span>
-              <span class="cap-tag">LAPS read</span>
             </td>
           </tr>
           <tr>
@@ -1088,82 +1086,55 @@ footer {
             <td><span class="status-dot">Active</span></td>
             <td>
               <span class="cap-tag">NTLM/Kerberos</span>
-              <span class="cap-tag">PSRP objects</span>
-              <span class="cap-tag">PS/CMD exec</span>
+              <span class="cap-tag">PSRP execution</span>
             </td>
           </tr>
           <tr>
             <td><span class="proto-name">MSSQL</span></td>
             <td><span class="status-dot">Active</span></td>
             <td>
-              <span class="cap-tag">SQL query</span>
+              <span class="cap-tag">Query execution</span>
               <span class="cap-tag">xp_cmdshell</span>
-              <span class="cap-tag">IMPERSONATE checks</span>
-            </td>
-          </tr>
-          <tr>
-            <td><span class="proto-name">SSH</span></td>
-            <td><span class="status-dot">Active</span></td>
-            <td>
-              <span class="cap-tag">Password &amp; key auth</span>
-              <span class="cap-tag">Sudo check</span>
-              <span class="cap-tag">Fingerprinting</span>
+              <span class="cap-tag">impersonation</span>
             </td>
           </tr>
           <tr>
             <td><span class="proto-name">WMI</span></td>
             <td><span class="status-dot">Active</span></td>
             <td>
-              <span class="cap-tag">Direct exec</span>
-              <span class="cap-tag">Process enum</span>
-              <span class="cap-tag">Service enum</span>
-              <span class="cap-tag">Patch enum</span>
+              <span class="cap-tag">Remote execution</span>
+              <span class="cap-tag">system enumeration</span>
             </td>
           </tr>
           <tr>
-            <td><span class="proto-name">RDP</span></td>
+            <td><span class="proto-name">SSH</span></td>
             <td><span class="status-dot">Active</span></td>
             <td>
-              <span class="cap-tag">NLA auth</span>
-              <span class="cap-tag">TSRequest gen</span>
-              <span class="cap-tag">Screenshot</span>
+              <span class="cap-tag">Auth auditing</span>
+              <span class="cap-tag">command execution</span>
             </td>
           </tr>
           <tr>
-            <td><span class="proto-name">IPMI</span></td>
+            <td><span class="proto-name">RDP / VNC / ADB</span></td>
             <td><span class="status-dot">Active</span></td>
             <td>
-              <span class="cap-tag">BMC probe</span>
-              <span class="cap-tag">RAKP hash dump</span>
+              <span class="cap-tag">Remote access</span>
+              <span class="cap-tag">screenshots</span>
             </td>
           </tr>
           <tr>
-            <td><span class="proto-name">Kubernetes</span></td>
+            <td><span class="proto-name">Web / DNS / FTP</span></td>
             <td><span class="status-dot">Active</span></td>
             <td>
-              <span class="cap-tag">API auth test</span>
-              <span class="cap-tag">Pod enum</span>
-              <span class="cap-tag">Secret enum</span>
+              <span class="cap-tag">Enumeration &amp; recon</span>
             </td>
           </tr>
           <tr>
-            <td><span class="proto-name">DNS</span></td>
+            <td><span class="proto-name">Cloud / Kube</span></td>
             <td><span class="status-dot">Active</span></td>
             <td>
-              <span class="cap-tag">AXFR</span>
-              <span class="cap-tag">Record enum</span>
-              <span class="cap-tag">Insecure update</span>
-            </td>
-          </tr>
-          <tr>
-            <td><span class="proto-name">ADB / VNC / FTP / NFS / HTTP / iLO / iDRAC</span></td>
-            <td><span class="status-dot">Active</span></td>
-            <td>
-              <span class="cap-tag">Auth testing</span>
-              <span class="cap-tag">Shell exec</span>
-              <span class="cap-tag">Screenshot</span>
-              <span class="cap-tag">Share enum</span>
-              <span class="cap-tag">Redfish API</span>
+              <span class="cap-tag">Kubernetes</span>
+              <span class="cap-tag">infrastructure probing</span>
             </td>
           </tr>
         </tbody>
@@ -1233,35 +1204,21 @@ footer {
         <span class="example-proto">WinRM</span>
         <div>
           <div class="example-code">nxc winrm &lt;target&gt; -u Admin -p Pass123 -x "Get-Process"</div>
-          <div class="example-desc">Run PowerShell commands securely via PSRP over WinRM</div>
+          <div class="example-desc">WinRM Command Execution</div>
         </div>
       </div>
       <div class="example-item">
         <span class="example-proto">SMB</span>
         <div>
-          <div class="example-code">nxc smb 192.168.1.0/24 -u Admin -H 31d6cfe0d16ae931b73c59d7e0c089c0 -M lsassy</div>
-          <div class="example-desc">Dump LSA secrets from an entire /24 subnet using pass-the-hash</div>
-        </div>
-      </div>
-      <div class="example-item">
-        <span class="example-proto">LDAP</span>
-        <div>
-          <div class="example-code">nxc ldap &lt;dc&gt; -u user -p pass --bloodhound --collection All</div>
-          <div class="example-desc">Export BloodHound data for full Active Directory attack path analysis</div>
+          <div class="example-code">nxc smb 192.168.1.0/24 -u Admin -H &lt;hash&gt; -M lsassy</div>
+          <div class="example-desc">SMB Credential Dumping</div>
         </div>
       </div>
       <div class="example-item">
         <span class="example-proto">NFS</span>
         <div>
           <div class="example-code">nxc nfs &lt;target&gt; --enum-shares</div>
-          <div class="example-desc">List exported NFS shares via the MOUNT service</div>
-        </div>
-      </div>
-      <div class="example-item">
-        <span class="example-proto">LIST</span>
-        <div>
-          <div class="example-code">nxc smb &lt;target&gt; -L</div>
-          <div class="example-desc">List all available offensive modules for a given protocol</div>
+          <div class="example-desc">NFS Enumeration</div>
         </div>
       </div>
     </div>
@@ -1295,9 +1252,8 @@ footer {
 
       <div class="ai-examples">
         <div class="ai-example">Scan 10.0.0.0/24 for port 445 and identify OS versions</div>
-        <div class="ai-example">Enumerate all GPO names from the domain using LDAP</div>
-        <div class="ai-example">Audit 172.16.5.0/24 for default passwords on MSSQL and SSH</div>
-        <div class="ai-example">Check if 192.168.1.50 has active web directories on 80 or 443</div>
+        <div class="ai-example">Enumerate all GPO names using LDAP</div>
+        <div class="ai-example">Find hosts with SMB signing disabled</div>
       </div>
     </div>
   </div>
