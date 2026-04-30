@@ -57,7 +57,7 @@ impl NxcModule for NetDiscovery {
         info!("Network: Starting discovery...");
 
         let _network_session = match session.protocol() {
-            "network" => session.downcast_mut::<nxc_protocols::network::NetworkSession>().unwrap(),
+            "network" => session.downcast_mut::<nxc_protocols::network::NetworkSession>().unwrap_or_else(|| panic!("session downcast failed")),
             _ => return Err(anyhow::anyhow!("Module only supports network")),
         };
 

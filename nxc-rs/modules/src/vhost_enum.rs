@@ -145,7 +145,7 @@ impl NxcModule for VhostEnum {
         let mut tasks = Vec::new();
 
         for sub in subdomains {
-            let permit = sem.clone().acquire_owned().await.unwrap();
+            let permit = sem.clone().acquire_owned().await.unwrap_or_else(|_| panic!("Failed to acquire semaphore"));
             let url = base_url.clone();
             let client = http_sess.client.clone();
             let vhost = format!("{sub}.{domain}");

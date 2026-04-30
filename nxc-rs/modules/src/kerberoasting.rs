@@ -54,7 +54,7 @@ impl NxcModule for Kerberoasting {
         let user_filter = opts.get("USER").map(std::string::String::as_str).unwrap_or("*");
 
         let ldap_session = match session.protocol() {
-            "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap(),
+            "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap_or_else(|| panic!("session downcast failed")),
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
