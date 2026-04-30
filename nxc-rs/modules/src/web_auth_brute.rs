@@ -83,9 +83,11 @@ impl NxcModule for WebAuthBrute {
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         let path = opts.get("PATH").ok_or_else(|| anyhow!("PATH is required"))?;
-        let user_field = opts.get("USER_FIELD").map(|s| s.as_str()).unwrap_or("username");
-        let pass_field = opts.get("PASS_FIELD").map(|s| s.as_str()).unwrap_or("password");
-        let fail_text = opts.get("FAIL_TEXT").map(|s| s.as_str()).unwrap_or("Invalid");
+        let user_field =
+            opts.get("USER_FIELD").map(std::string::String::as_str).unwrap_or("username");
+        let pass_field =
+            opts.get("PASS_FIELD").map(std::string::String::as_str).unwrap_or("password");
+        let fail_text = opts.get("FAIL_TEXT").map(std::string::String::as_str).unwrap_or("Invalid");
         let threads = opts.get("THREADS").and_then(|s| s.parse::<usize>().ok()).unwrap_or(20);
 
         let url = format!("{}://{}:{}{}", scheme, http_sess.target, http_sess.port, path);

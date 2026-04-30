@@ -36,11 +36,7 @@ pub struct RelayConfig {
 
 impl Default for RelayConfig {
     fn default() -> Self {
-        Self {
-            bind_addr: "0.0.0.0:80".to_string(),
-            relay_target: None,
-            capture_only: true,
-        }
+        Self { bind_addr: "0.0.0.0:80".to_string(), relay_target: None, capture_only: true }
     }
 }
 
@@ -55,10 +51,7 @@ pub struct RelayServer {
 #[allow(dead_code)]
 impl RelayServer {
     pub fn new(config: RelayConfig) -> Self {
-        Self {
-            config,
-            captured: std::sync::Arc::new(tokio::sync::Mutex::new(Vec::new())),
-        }
+        Self { config, captured: std::sync::Arc::new(tokio::sync::Mutex::new(Vec::new())) }
     }
 
     /// Create a capture-only relay on the given address.
@@ -160,7 +153,9 @@ async fn handle_http_ntlm(
                     match msg_type {
                         1 => {
                             // Type 1 (Negotiate) → respond with Type 2 (Challenge)
-                            debug!("Relay: NTLM Type 1 from {client_ip} — sending Type 2 challenge");
+                            debug!(
+                                "Relay: NTLM Type 1 from {client_ip} — sending Type 2 challenge"
+                            );
                             let challenge = build_ntlm_type2_challenge();
                             let b64_challenge = base64_encode(&challenge);
                             let response = format!(
@@ -253,7 +248,7 @@ fn build_ntlm_type2_challenge() -> Vec<u8> {
     msg.extend_from_slice(&0u16.to_le_bytes()); // len
     msg.extend_from_slice(&0u16.to_le_bytes()); // max len
     msg.extend_from_slice(&56u32.to_le_bytes()); // offset
-    // Negotiate Flags
+                                                 // Negotiate Flags
     let flags: u32 = 0x00008215 // UNICODE | OEM | REQUEST_TARGET | NTLM | ALWAYS_SIGN
         | 0x00080000  // EXTENDED_SESSIONSECURITY
         | 0x00800000  // TARGET_INFO
@@ -324,10 +319,7 @@ fn extract_type3_info(data: &[u8]) -> Result<(String, String, String)> {
 
 /// Decode UTF-16LE bytes to a Rust String.
 fn decode_utf16le(data: &[u8]) -> String {
-    let u16s: Vec<u16> = data
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes([c[0], c[1]]))
-        .collect();
+    let u16s: Vec<u16> = data.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
     String::from_utf16_lossy(&u16s)
 }
 

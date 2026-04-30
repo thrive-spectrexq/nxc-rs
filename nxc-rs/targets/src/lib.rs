@@ -392,9 +392,8 @@ impl ExecutionEngine {
                 }
                 // Per-host limit
                 if let Some(limit) = fail_limit {
-                    let count = host_fails
-                        .entry(target_str.clone())
-                        .or_insert_with(|| AtomicU32::new(0));
+                    let count =
+                        host_fails.entry(target_str.clone()).or_insert_with(|| AtomicU32::new(0));
                     if count.load(Ordering::Relaxed) >= limit {
                         tracing::debug!(
                             "Host fail limit ({limit}) reached for {target_str} — skipping"
@@ -439,7 +438,7 @@ impl ExecutionEngine {
                             .call(&target_ip, || {
                                 let p = protocol_clone.clone();
                                 let t = target_str.clone();
-                                let pr = proxy.map(|s| s.to_string());
+                                let pr = proxy.map(std::string::ToString::to_string);
                                 async move { p.connect(&t, port, pr.as_deref()).await }
                             })
                             .await
@@ -512,7 +511,7 @@ impl ExecutionEngine {
                                         Ok(Some(h_id))
                                     }).await;
 
-                                    host_id = db_res.ok().and_then(|r| r.ok()).flatten();
+                                    host_id = db_res.ok().and_then(std::result::Result::ok).flatten();
                                 }
 
                                 // Execute modules if requested

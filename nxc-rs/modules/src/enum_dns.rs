@@ -52,7 +52,7 @@ impl NxcModule for EnumDns {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let domain_filter = opts.get("DOMAIN").map(|s| s.as_str());
+        let domain_filter = opts.get("DOMAIN").map(std::string::String::as_str);
 
         let ldap_session = match session.protocol() {
             "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap(),

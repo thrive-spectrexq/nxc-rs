@@ -55,13 +55,13 @@ async fn main() -> Result<()> {
         }
         Some(("relay", relay_matches)) => {
             let bind_addr = relay_matches.get_one::<String>("bind-addr").unwrap();
-            
+
             let config = relay::RelayConfig {
                 bind_addr: bind_addr.clone(),
                 relay_target: relay_matches.get_one::<String>("target").cloned(),
                 capture_only: relay_matches.get_one::<String>("target").is_none(),
             };
-            
+
             let server = relay::RelayServer::new(config);
             server.start().await?;
             return Ok(());
@@ -107,7 +107,7 @@ async fn main() -> Result<()> {
     // ── Parse targets ──
     let target_specs: Vec<&str> = sub_matches
         .get_many::<String>("target")
-        .map(|vals| vals.map(|s| s.as_str()).collect())
+        .map(|vals| vals.map(std::string::String::as_str).collect())
         .unwrap_or_default();
 
     let mut all_targets = Vec::new();
@@ -248,7 +248,10 @@ async fn main() -> Result<()> {
     };
 
     // ── Setup Database ──
-    let workspace = matches.get_one::<String>("workspace").map(|s| s.as_str()).unwrap_or("default");
+    let workspace = matches
+        .get_one::<String>("workspace")
+        .map(std::string::String::as_str)
+        .unwrap_or("default");
 
     // Ensure .nxc directory exists in home or current dir
     let home = std::env::var("HOME")

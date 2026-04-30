@@ -53,7 +53,8 @@ impl NxcModule for HttpPathsModule {
             let protocol = nxc_protocols::http::HttpProtocol { use_ssl: false, verify_ssl: false }; // Defaults
 
             let default_paths = "/.git,/.env,/backup,/phpmyadmin,/admin,/config";
-            let paths_str = opts.get("PATHS").map(|s| s.as_str()).unwrap_or(default_paths);
+            let paths_str =
+                opts.get("PATHS").map(std::string::String::as_str).unwrap_or(default_paths);
             let paths_vec: Vec<&str> = paths_str.split(',').collect();
 
             match protocol.enumerate_paths(http_sess, &paths_vec).await {

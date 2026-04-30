@@ -54,7 +54,8 @@ impl NxcModule for SshAuthMethods {
             .downcast_ref::<SshSession>()
             .ok_or_else(|| anyhow!("Module requires an SSH session"))?;
 
-        let username = opts.get("USERNAME").map(|s| s.as_str()).unwrap_or("root").to_string();
+        let username =
+            opts.get("USERNAME").map(std::string::String::as_str).unwrap_or("root").to_string();
         let target = ssh_sess.target.clone();
         let port = ssh_sess.port;
 

@@ -60,7 +60,7 @@ impl NxcModule for LdapAdModule {
             .ok_or_else(|| anyhow!("Invalid session type"))?;
 
         let proto = LdapProtocol::new();
-        let enum_type = opts.get("type").map(|s| s.as_str()).unwrap_or("all");
+        let enum_type = opts.get("type").map(std::string::String::as_str).unwrap_or("all");
 
         let mut output = String::new();
         let mut results = json!({});

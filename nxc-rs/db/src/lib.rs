@@ -482,7 +482,8 @@ impl NxcDb {
     /// Delete a specific loot item
     pub fn delete_loot(&self, loot_id: i64) -> Result<bool> {
         let conn = self.pool.get()?;
-        let rows = conn.execute("DELETE FROM nxc_loot WHERE id = ?1", rusqlite::params![loot_id])?;
+        let rows =
+            conn.execute("DELETE FROM nxc_loot WHERE id = ?1", rusqlite::params![loot_id])?;
         Ok(rows > 0)
     }
 

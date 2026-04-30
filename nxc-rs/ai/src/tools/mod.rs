@@ -44,10 +44,10 @@ impl ToolRegistry {
     }
 
     pub fn get(&self, name: &str) -> Option<&dyn NxcTool> {
-        self.tools.get(name).map(|t| t.as_ref())
+        self.tools.get(name).map(std::convert::AsRef::as_ref)
     }
 
     pub fn all(&self) -> Vec<&dyn NxcTool> {
-        self.tools.values().map(|t| t.as_ref()).collect()
+        self.tools.values().map(std::convert::AsRef::as_ref).collect()
     }
 }
