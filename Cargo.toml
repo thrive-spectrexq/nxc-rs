@@ -88,10 +88,7 @@ bytes = "1"
 
 # ─── Workspace Lints ─────────────────
 [workspace.lints.rust]
-# TODO: Refactor 15 unsafe session downcasts to use as_any_mut().downcast_mut()
-# then promote back to "deny". See: snmp.rs, redis.rs, postgresql.rs, mysql.rs,
-# docker.rs, zerologon.rs, printerbug.rs, petitpotam.rs, ntds.rs, dpapi.rs, etc.
-unsafe_code = "warn"
+unsafe_code = "deny"
 
 [workspace.lints.clippy]
 # Correctness — critical for a security tool

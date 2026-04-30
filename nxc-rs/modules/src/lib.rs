@@ -107,7 +107,10 @@ pub mod rbcd;
 pub mod subnets; // get_network, get_unixpassword, ldap_checker, obsolete, pre2k
 
 // ─── Phase 3-6: MSSQL, Cred Harvesting, Persistence, Advanced ──
-pub mod advanced_modules;
+pub mod mssql_modules;
+pub mod cred_harvesting;
+pub mod persistence;
+pub mod advanced_recon;
 
 // ─── Wireless Reconnaissance ────────────────────────────────────
 pub mod wifi_recon;
@@ -459,45 +462,45 @@ impl ModuleRegistry {
         modules.insert("pre2k".into(), Box::new(ldap_enumeration::Pre2k::new()));
 
         // ─── Phase 3: MSSQL Modules (6 modules) ────────────────────
-        modules.insert("mssql_coerce".into(), Box::new(advanced_modules::MssqlCoerce::new()));
-        modules.insert("mssql_dumper".into(), Box::new(advanced_modules::MssqlDumper::new()));
-        modules.insert("mssql_cbt".into(), Box::new(advanced_modules::MssqlCbt::new()));
-        modules.insert("enable_cmdshell".into(), Box::new(advanced_modules::EnableCmdShell::new()));
-        modules.insert("enum_links".into(), Box::new(advanced_modules::EnumLinks::new()));
-        modules.insert("enum_logins".into(), Box::new(advanced_modules::EnumLogins::new()));
+        modules.insert("mssql_coerce".into(), Box::new(mssql_modules::MssqlCoerce::new()));
+        modules.insert("mssql_dumper".into(), Box::new(mssql_modules::MssqlDumper::new()));
+        modules.insert("mssql_cbt".into(), Box::new(mssql_modules::MssqlCbt::new()));
+        modules.insert("enable_cmdshell".into(), Box::new(mssql_modules::EnableCmdShell::new()));
+        modules.insert("enum_links".into(), Box::new(mssql_modules::EnumLinks::new()));
+        modules.insert("enum_logins".into(), Box::new(mssql_modules::EnumLogins::new()));
 
         // ─── Phase 4: Credential Harvesting (10 modules) ───────────
-        modules.insert("firefox".into(), Box::new(advanced_modules::FirefoxCreds::new()));
-        modules.insert("winscp".into(), Box::new(advanced_modules::WinscpCreds::new()));
+        modules.insert("firefox".into(), Box::new(cred_harvesting::FirefoxCreds::new()));
+        modules.insert("winscp".into(), Box::new(cred_harvesting::WinscpCreds::new()));
         modules
-            .insert("keepass_discover".into(), Box::new(advanced_modules::KeepassDiscover::new()));
-        modules.insert("keepass_trigger".into(), Box::new(advanced_modules::KeepassTrigger::new()));
-        modules.insert("mremoteng".into(), Box::new(advanced_modules::MremotengCreds::new()));
-        modules.insert("rdcman".into(), Box::new(advanced_modules::RdcmanCreds::new()));
-        modules.insert("putty".into(), Box::new(advanced_modules::PuttySessions::new()));
-        modules.insert("mobaxterm".into(), Box::new(advanced_modules::MobaxtermCreds::new()));
-        modules.insert("aws_credentials".into(), Box::new(advanced_modules::AwsCredentials::new()));
-        modules.insert("veeam".into(), Box::new(advanced_modules::VeeamCreds::new()));
+            .insert("keepass_discover".into(), Box::new(cred_harvesting::KeepassDiscover::new()));
+        modules.insert("keepass_trigger".into(), Box::new(cred_harvesting::KeepassTrigger::new()));
+        modules.insert("mremoteng".into(), Box::new(cred_harvesting::MremotengCreds::new()));
+        modules.insert("rdcman".into(), Box::new(cred_harvesting::RdcmanCreds::new()));
+        modules.insert("putty".into(), Box::new(cred_harvesting::PuttySessions::new()));
+        modules.insert("mobaxterm".into(), Box::new(cred_harvesting::MobaxtermCreds::new()));
+        modules.insert("aws_credentials".into(), Box::new(cred_harvesting::AwsCredentials::new()));
+        modules.insert("veeam".into(), Box::new(cred_harvesting::VeeamCreds::new()));
 
         // ─── Phase 5: Persistence & Lateral Movement (9 modules) ───
-        modules.insert("schtask_as".into(), Box::new(advanced_modules::SchtaskAs::new()));
-        modules.insert("slinky".into(), Box::new(advanced_modules::Slinky::new()));
-        modules.insert("scuffy".into(), Box::new(advanced_modules::Scuffy::new()));
-        modules.insert("drop_sc".into(), Box::new(advanced_modules::DropSc::new()));
-        modules.insert("drop_library_ms".into(), Box::new(advanced_modules::DropLibraryMs::new()));
-        modules.insert("met_inject".into(), Box::new(advanced_modules::MetInject::new()));
-        modules.insert("empire_exec".into(), Box::new(advanced_modules::EmpireExec::new()));
-        modules.insert("web_delivery".into(), Box::new(advanced_modules::WebDelivery::new()));
+        modules.insert("schtask_as".into(), Box::new(persistence::SchtaskAs::new()));
+        modules.insert("slinky".into(), Box::new(persistence::Slinky::new()));
+        modules.insert("scuffy".into(), Box::new(persistence::Scuffy::new()));
+        modules.insert("drop_sc".into(), Box::new(persistence::DropSc::new()));
+        modules.insert("drop_library_ms".into(), Box::new(persistence::DropLibraryMs::new()));
+        modules.insert("met_inject".into(), Box::new(persistence::MetInject::new()));
+        modules.insert("empire_exec".into(), Box::new(persistence::EmpireExec::new()));
+        modules.insert("web_delivery".into(), Box::new(persistence::WebDelivery::new()));
         modules
-            .insert("lockscreendoors".into(), Box::new(advanced_modules::LockScreenDoors::new()));
+            .insert("lockscreendoors".into(), Box::new(persistence::LockScreenDoors::new()));
 
         // ─── Phase 6: RS-Exclusive Advanced (6 modules) ────────────
-        modules.insert("amsi_bypass".into(), Box::new(advanced_modules::AmsiBypass::new()));
-        modules.insert("bof_loader".into(), Box::new(advanced_modules::BofLoader::new()));
-        modules.insert("pe_loader".into(), Box::new(advanced_modules::PeLoader::new()));
-        modules.insert("etw_patcher".into(), Box::new(advanced_modules::EtwPatcher::new()));
-        modules.insert("defender_enum".into(), Box::new(advanced_modules::DefenderEnum::new()));
-        modules.insert("dpapi_masterkey".into(), Box::new(advanced_modules::DpapiMasterkey::new()));
+        modules.insert("amsi_bypass".into(), Box::new(advanced_recon::AmsiBypass::new()));
+        modules.insert("bof_loader".into(), Box::new(advanced_recon::BofLoader::new()));
+        modules.insert("pe_loader".into(), Box::new(advanced_recon::PeLoader::new()));
+        modules.insert("etw_patcher".into(), Box::new(advanced_recon::EtwPatcher::new()));
+        modules.insert("defender_enum".into(), Box::new(advanced_recon::DefenderEnum::new()));
+        modules.insert("dpapi_masterkey".into(), Box::new(advanced_recon::DpapiMasterkey::new()));
 
         // ─── Wireless Reconnaissance ────────────────────────────────
         modules.insert("wifi_recon".into(), Box::new(wifi_recon::WifiRecon::new()));
