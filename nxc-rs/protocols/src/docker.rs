@@ -131,7 +131,10 @@ impl NxcProtocol for DockerProtocol {
         creds: &Credentials,
     ) -> Result<AuthResult> {
         let docker_sess = match session.protocol() {
-            "docker" => session.as_any_mut().downcast_mut::<DockerSession>().ok_or_else(|| anyhow!("Invalid session type"))?,
+            "docker" => session
+                .as_any_mut()
+                .downcast_mut::<DockerSession>()
+                .ok_or_else(|| anyhow!("Invalid session type"))?,
             _ => return Err(anyhow!("Invalid session type")),
         };
 
@@ -170,7 +173,10 @@ impl NxcProtocol for DockerProtocol {
 
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput> {
         let docker_sess = match session.protocol() {
-            "docker" => session.as_any().downcast_ref::<DockerSession>().ok_or_else(|| anyhow!("Invalid session type"))?,
+            "docker" => session
+                .as_any()
+                .downcast_ref::<DockerSession>()
+                .ok_or_else(|| anyhow!("Invalid session type"))?,
             _ => return Err(anyhow!("Invalid session type")),
         };
 

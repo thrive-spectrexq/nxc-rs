@@ -55,7 +55,7 @@ impl NxcModule for GppPassword {
             .downcast_ref::<SmbSession>()
             .ok_or_else(|| anyhow!("Module requires an SMB session"))?;
 
-        let share = opts.get("SHARE").map(|s| s.as_str()).unwrap_or("SYSVOL");
+        let share = opts.get("SHARE").map(std::string::String::as_str).unwrap_or("SYSVOL");
         info!("Searching {} for GPP passwords on {}", share, smb_sess.target);
 
         let mut output = String::from("GPP Password Search Results:\n");

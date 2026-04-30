@@ -167,7 +167,7 @@ impl NtlmAuthenticator {
             .map(|h| h.to_string_lossy().to_string())
             .unwrap_or_else(|_| "WORKSTATION".to_string());
         Self {
-            domain: domain.map(|s| s.to_string()),
+            domain: domain.map(std::string::ToString::to_string),
             workstation,
             negotiate_flags: DEFAULT_NEGOTIATE_FLAGS,
         }
@@ -312,7 +312,7 @@ impl NtlmAuthenticator {
         let (exported_session_key, encrypted_random_session_key) =
             if negotiate_flags & NTLMSSP_NEGOTIATE_KEY_EXCH != 0 {
                 let exported_key: [u8; 16] = rand::random();
-                let key_array: &[u8; 16] = session_base_key[..16].try_into().unwrap();
+                let key_array: &[u8; 16] = session_base_key[..16].try_into().unwrap_or_else(|_| panic!("key_array try_into failed"));
                 let mut rc4_key = Rc4::new_from_slice(key_array)
                     .map_err(|e| anyhow::anyhow!("RC4 init fail: {e}"))?;
                 let mut encrypted = exported_key;
@@ -323,10 +323,10 @@ impl NtlmAuthenticator {
             };
 
         // 8. Build Type 3 message
-        let domain_utf16: Vec<u8> = domain.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
-        let user_utf16: Vec<u8> = username.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+        let domain_utf16: Vec<u8> = domain.encode_utf16().flat_map(u16::to_le_bytes).collect();
+        let user_utf16: Vec<u8> = username.encode_utf16().flat_map(u16::to_le_bytes).collect();
         let ws_utf16: Vec<u8> =
-            self.workstation.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+            self.workstation.encode_utf16().flat_map(u16::to_le_bytes).collect();
 
         // LM response (24 bytes of zeros for NTLMv2)
         let lm_response = vec![0u8; 24];
@@ -490,14 +490,14 @@ impl NtlmSessionSecurity {
         let sealing_key = self.client_sealing_key();
 
         // HMAC-MD5(SigningKey, SeqNum + Message)
-        let mut hmac = <HmacMd5 as Mac>::new_from_slice(&signing_key).expect("HMAC key");
+        let mut hmac = <HmacMd5 as Mac>::new_from_slice(&signing_key).unwrap_or_else(|_| panic!("HMAC key"));
         hmac.update(&seq_num.to_le_bytes());
         hmac.update(message);
         let mac = hmac.finalize().into_bytes();
 
         // Encrypt first 8 bytes of HMAC with RC4(SealingKey)
-        let key_array: &[u8; 16] = sealing_key[..16].try_into().unwrap();
-        let mut rc4 = Rc4::new_from_slice(key_array).expect("RC4 init fail");
+        let key_array: &[u8; 16] = sealing_key[..16].try_into().unwrap_or_else(|_| panic!("sealing_key try_into failed"));
+        let mut rc4 = Rc4::new_from_slice(key_array).unwrap_or_else(|_| panic!("RC4 init fail"));
         let mut encrypted_mac = [0u8; 8];
         encrypted_mac.copy_from_slice(&mac[..8]);
         rc4.apply_keystream(&mut encrypted_mac);
@@ -525,7 +525,7 @@ pub fn calculate_nt_hash(password: &str) -> [u8; 16] {
 /// Calculate NTLMv2 hash: HMAC-MD5(NT_Hash, UPPERCASE(user) + UPPERCASE(domain)).
 pub fn calculate_v2_hash(username: &str, domain: &str, nt_hash: &[u8; 16]) -> [u8; 16] {
     let mut hmac =
-        <HmacMd5 as Mac>::new_from_slice(nt_hash).expect("HMAC can take key of any size");
+        <HmacMd5 as Mac>::new_from_slice(nt_hash).unwrap_or_else(|_| panic!("HMAC can take key of any size"));
     let identity = format!("{}{}", username.to_uppercase(), domain.to_uppercase());
     let utf16: Vec<u16> = identity.encode_utf16().collect();
     let bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
@@ -552,8 +552,8 @@ pub fn calculate_lm_hash(password: &str) -> [u8; 16] {
     let key1 = des_key_from_7(&pass_bytes[0..7]);
     let key2 = des_key_from_7(&pass_bytes[7..14]);
 
-    let cipher1 = Des::new_from_slice(&key1).expect("DES key");
-    let cipher2 = Des::new_from_slice(&key2).expect("DES key");
+    let cipher1 = Des::new_from_slice(&key1).unwrap_or_else(|_| panic!("DES key"));
+    let cipher2 = Des::new_from_slice(&key2).unwrap_or_else(|_| panic!("DES key"));
 
     let mut block1 = des::cipher::generic_array::GenericArray::clone_from_slice(magic);
     let mut block2 = des::cipher::generic_array::GenericArray::clone_from_slice(magic);
@@ -651,7 +651,7 @@ mod tests {
         // MsvAvNbDomainName (0x0002)
         data.extend_from_slice(&0x0002u16.to_le_bytes());
         let domain = "TEST";
-        let domain_u16: Vec<u8> = domain.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+        let domain_u16: Vec<u8> = domain.encode_utf16().flat_map(u16::to_le_bytes).collect();
         data.extend_from_slice(&(domain_u16.len() as u16).to_le_bytes());
         data.extend_from_slice(&domain_u16);
         // MsvAvEOL

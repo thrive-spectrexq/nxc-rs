@@ -59,7 +59,7 @@ impl Credentials {
     /// Create simple password credentials.
     pub fn password(username: &str, password: &str, domain: Option<&str>) -> Self {
         Self {
-            domain: domain.map(|s| s.to_string()),
+            domain: domain.map(std::string::ToString::to_string),
             username: username.to_string(),
             password: Some(password.to_string()),
             nt_hash: None,
@@ -75,7 +75,7 @@ impl Credentials {
     /// Create pass-the-hash credentials.
     pub fn nt_hash(username: &str, hash: &str, domain: Option<&str>) -> Self {
         Self {
-            domain: domain.map(|s| s.to_string()),
+            domain: domain.map(std::string::ToString::to_string),
             username: username.to_string(),
             password: None,
             nt_hash: Some(hash.to_string()),
@@ -91,7 +91,7 @@ impl Credentials {
     /// Create AES key credentials (overpass-the-hash).
     pub fn aes_key(username: &str, aes_256: &str, domain: Option<&str>) -> Self {
         Self {
-            domain: domain.map(|s| s.to_string()),
+            domain: domain.map(std::string::ToString::to_string),
             username: username.to_string(),
             password: None,
             nt_hash: None,
@@ -107,7 +107,7 @@ impl Credentials {
     /// Create credentials from a ccache file (ticket reuse).
     pub fn ccache(username: &str, path: &str, domain: Option<&str>) -> Self {
         Self {
-            domain: domain.map(|s| s.to_string()),
+            domain: domain.map(std::string::ToString::to_string),
             username: username.to_string(),
             password: None,
             nt_hash: None,
@@ -123,7 +123,7 @@ impl Credentials {
     /// Create certificate-based credentials.
     pub fn certificate(username: &str, pfx_path: &str, domain: Option<&str>) -> Self {
         Self {
-            domain: domain.map(|s| s.to_string()),
+            domain: domain.map(std::string::ToString::to_string),
             username: username.to_string(),
             password: None,
             nt_hash: None,
@@ -198,7 +198,7 @@ impl AuthResult {
             success: false,
             admin: false,
             message: message.to_string(),
-            error_code: code.map(|s| s.to_string()),
+            error_code: code.map(std::string::ToString::to_string),
         }
     }
 }

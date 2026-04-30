@@ -44,7 +44,10 @@ impl NxcModule for MssqlEnum {
         _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let mssql_session = match session.protocol() {
-            "mssql" => session.as_any().downcast_ref::<MssqlSession>().ok_or_else(|| anyhow::anyhow!("Invalid session type"))?,
+            "mssql" => session
+                .as_any()
+                .downcast_ref::<MssqlSession>()
+                .ok_or_else(|| anyhow::anyhow!("Invalid session type"))?,
             _ => return Err(anyhow::anyhow!("Module only supports MSSQL")),
         };
 
@@ -64,7 +67,8 @@ impl NxcModule for MssqlEnum {
                     if let Some(obj) = login.as_object() {
                         let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
                         let disabled =
-                            obj.get("is_disabled").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
+                            obj.get("is_disabled").and_then(serde_json::Value::as_i64).unwrap_or(0)
+                                == 1;
                         output_lines.push(format!("    - {name} (Disabled: {disabled})"));
                         login_list.push(login.clone());
                     }

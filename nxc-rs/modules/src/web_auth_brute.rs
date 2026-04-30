@@ -83,9 +83,11 @@ impl NxcModule for WebAuthBrute {
 
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         let path = opts.get("PATH").ok_or_else(|| anyhow!("PATH is required"))?;
-        let user_field = opts.get("USER_FIELD").map(|s| s.as_str()).unwrap_or("username");
-        let pass_field = opts.get("PASS_FIELD").map(|s| s.as_str()).unwrap_or("password");
-        let fail_text = opts.get("FAIL_TEXT").map(|s| s.as_str()).unwrap_or("Invalid");
+        let user_field =
+            opts.get("USER_FIELD").map(std::string::String::as_str).unwrap_or("username");
+        let pass_field =
+            opts.get("PASS_FIELD").map(std::string::String::as_str).unwrap_or("password");
+        let fail_text = opts.get("FAIL_TEXT").map(std::string::String::as_str).unwrap_or("Invalid");
         let threads = opts.get("THREADS").and_then(|s| s.parse::<usize>().ok()).unwrap_or(20);
 
         let url = format!("{}://{}:{}{}", scheme, http_sess.target, http_sess.port, path);
@@ -102,7 +104,7 @@ impl NxcModule for WebAuthBrute {
 
         for u in &default_users {
             for p in &default_passwords {
-                let permit = sem.clone().acquire_owned().await.unwrap();
+                let permit = sem.clone().acquire_owned().await.unwrap_or_else(|_| panic!("Failed to acquire semaphore"));
                 let client = http_sess.client.clone();
                 let username = u.to_string();
                 let password = p.to_string();

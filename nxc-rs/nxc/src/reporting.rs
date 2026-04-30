@@ -71,16 +71,17 @@ pub fn export_xml(path: &str, report: &Report) -> Result<()> {
     writeln!(file, "  <hosts>")?;
 
     // Group by target
-    let mut hosts_map: std::collections::HashMap<&str, Vec<&ExecutionResult>> = std::collections::HashMap::new();
+    let mut hosts_map: std::collections::HashMap<&str, Vec<&ExecutionResult>> =
+        std::collections::HashMap::new();
     for res in &report.results {
         hosts_map.entry(&res.target).or_default().push(res);
     }
 
     for (target, results) in hosts_map {
         writeln!(file, "    <host>")?;
-        writeln!(file, "      <address>{}</address>", target)?;
+        writeln!(file, "      <address>{target}</address>")?;
         writeln!(file, "      <services>")?;
-        
+
         let protocol = report.protocol.to_uppercase();
         let port = match protocol.as_str() {
             "SMB" => 445,
@@ -95,9 +96,9 @@ pub fn export_xml(path: &str, report: &Report) -> Result<()> {
         };
 
         writeln!(file, "        <service>")?;
-        writeln!(file, "          <port>{}</port>", port)?;
+        writeln!(file, "          <port>{port}</port>")?;
         writeln!(file, "          <proto>tcp</proto>")?;
-        writeln!(file, "          <name>{}</name>", protocol)?;
+        writeln!(file, "          <name>{protocol}</name>")?;
         writeln!(file, "          <state>open</state>")?;
         writeln!(file, "        </service>")?;
         writeln!(file, "      </services>")?;
@@ -106,9 +107,14 @@ pub fn export_xml(path: &str, report: &Report) -> Result<()> {
         for res in results {
             if res.success {
                 writeln!(file, "        <vuln>")?;
-                writeln!(file, "          <name>{} Auth bypass/credentials</name>", protocol)?;
-                writeln!(file, "          <info>Username: {} | Admin: {} | Message: {}</info>", 
-                    res.username, res.admin, res.message.replace("<", "&lt;").replace(">", "&gt;"))?;
+                writeln!(file, "          <name>{protocol} Auth bypass/credentials</name>")?;
+                writeln!(
+                    file,
+                    "          <info>Username: {} | Admin: {} | Message: {}</info>",
+                    res.username,
+                    res.admin,
+                    res.message.replace("<", "&lt;").replace(">", "&gt;")
+                )?;
                 writeln!(file, "        </vuln>")?;
             }
         }
@@ -118,7 +124,7 @@ pub fn export_xml(path: &str, report: &Report) -> Result<()> {
 
     writeln!(file, "  </hosts>")?;
     writeln!(file, "</MetasploitV4>")?;
-    
+
     file.flush()?;
     Ok(())
 }

@@ -482,7 +482,8 @@ impl NxcDb {
     /// Delete a specific loot item
     pub fn delete_loot(&self, loot_id: i64) -> Result<bool> {
         let conn = self.pool.get()?;
-        let rows = conn.execute("DELETE FROM nxc_loot WHERE id = ?1", rusqlite::params![loot_id])?;
+        let rows =
+            conn.execute("DELETE FROM nxc_loot WHERE id = ?1", rusqlite::params![loot_id])?;
         Ok(rows > 0)
     }
 
@@ -522,7 +523,7 @@ impl NxcDb {
         }
 
         let param_refs: Vec<&dyn rusqlite::types::ToSql> =
-            params.iter().map(|p| p.as_ref()).collect();
+            params.iter().map(std::convert::AsRef::as_ref).collect();
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
             Ok(Credential {
