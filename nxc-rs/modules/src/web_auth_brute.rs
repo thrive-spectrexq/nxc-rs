@@ -104,7 +104,11 @@ impl NxcModule for WebAuthBrute {
 
         for u in &default_users {
             for p in &default_passwords {
-                let permit = sem.clone().acquire_owned().await.unwrap_or_else(|_| panic!("Failed to acquire semaphore"));
+                let permit = sem
+                    .clone()
+                    .acquire_owned()
+                    .await
+                    .unwrap_or_else(|_| panic!("Failed to acquire semaphore"));
                 let client = http_sess.client.clone();
                 let username = u.to_string();
                 let password = p.to_string();
