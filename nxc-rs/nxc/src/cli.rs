@@ -155,483 +155,34 @@ pub fn build_cli() -> Command {
     ];
 
     // ── Create protocol subcommands ──
-    let smb_cmd = Command::new("smb")
-        .about("SMB protocol (port 445)")
-        .args(&auth_args)
-        .args(&kerberos_args)
-        .args(&module_args)
-        .args(&export_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("445")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
-            Arg::new("shares")
-                .long("shares")
-                .help("Enumerate shares and access")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("sessions")
-                .long("sessions")
-                .help("Enumerate active sessions")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(Arg::new("disks").long("disks").help("Enumerate disks").action(ArgAction::SetTrue))
-        .arg(
-            Arg::new("loggedon-users")
-                .long("loggedon-users")
-                .help("Enumerate logged-on users")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(Arg::new("users").long("users").help("Enumerate users").action(ArgAction::SetTrue))
-        .arg(Arg::new("groups").long("groups").help("Enumerate groups").action(ArgAction::SetTrue))
-        .arg(
-            Arg::new("pass-pol")
-                .long("pass-pol")
-                .help("Dump password policy")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("exec-method")
-                .long("exec-method")
-                .help("Execution method (smbexec, atexec, wmiexec, mmcexec)")
-                .value_parser(["smbexec", "atexec", "wmiexec", "mmcexec"])
-                .default_value("wmiexec"),
-        )
-        .arg(
-            Arg::new("exec-command")
-                .short('x')
-                .long("exec-command")
-                .help("Execute command on target"),
-        )
-        .arg(
-            Arg::new("exec-command-ps")
-                .short('X')
-                .long("exec-command-ps")
-                .help("Execute PowerShell command on target"),
-        );
 
-    let ssh_cmd = Command::new("ssh")
-        .about("SSH protocol (port 22)")
-        .args(&auth_args)
-        .args(&module_args)
-        .args(&export_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("22")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(Arg::new("key-file").long("key-file").help("SSH private key file for authentication"))
-        .arg(
-            Arg::new("exec-command")
-                .short('x')
-                .long("exec-command")
-                .help("Execute command on target"),
-        )
-        .arg(
-            Arg::new("sudo-check")
-                .long("sudo-check")
-                .help("Check for sudo privileges")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("ssh-timeout")
-                .long("ssh-timeout")
-                .help("SSH connection timeout in seconds")
-                .default_value("10")
-                .value_parser(clap::value_parser!(u64)),
-        );
+    let smb_cmd = build_smb_cmd(&auth_args, &kerberos_args, &module_args, &export_args);
+    let ssh_cmd = build_ssh_cmd(&auth_args, &module_args, &export_args);
+    let ldap_cmd = build_ldap_cmd(&auth_args, &kerberos_args, &module_args, &export_args);
+    let winrm_cmd = build_winrm_cmd(&auth_args, &kerberos_args, &module_args, &export_args);
+    let mssql_cmd = build_mssql_cmd(&auth_args, &kerberos_args, &module_args, &export_args);
+    let rdp_cmd = build_rdp_cmd(&auth_args, &module_args, &export_args);
 
-    let ldap_cmd = Command::new("ldap")
-        .about("LDAP protocol (port 389/636)")
-        .args(&auth_args)
-        .args(&kerberos_args)
-        .args(&module_args)
-        .args(&export_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("389")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
-            Arg::new("ldaps").long("ldaps").help("Use LDAPS (port 636)").action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("kerberoasting")
-                .long("kerberoasting")
-                .help("Perform Kerberoasting and save output to file")
-                .num_args(0..=1)
-                .default_missing_value("kerberoast.txt"),
-        )
-        .arg(
-            Arg::new("asreproasting")
-                .long("asreproasting")
-                .help("Perform ASREProasting and save output to file")
-                .num_args(0..=1)
-                .default_missing_value("asreproast.txt"),
-        )
-        .arg(
-            Arg::new("users")
-                .long("users")
-                .help("Enumerate domain users")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("groups")
-                .long("groups")
-                .help("Enumerate domain groups")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("gmsa")
-                .long("gmsa")
-                .help("Enumerate gMSA passwords")
-                .action(ArgAction::SetTrue),
-        );
+    let ftp_cmd = build_ftp_cmd(&auth_args, &module_args, &export_args);
+    let vnc_cmd = build_vnc_cmd(&auth_args, &module_args, &export_args);
+    let wmi_cmd = build_wmi_cmd(&auth_args, &kerberos_args, &module_args, &export_args);
+    let nfs_cmd = build_nfs_cmd(&auth_args, &module_args, &export_args);
+    let adb_cmd = build_adb_cmd(&auth_args, &module_args, &export_args);
+    let network_cmd = build_network_cmd(&module_args, &export_args);
 
-    let winrm_cmd = Command::new("winrm")
-        .about("WinRM protocol (port 5985/5986)")
-        .args(&auth_args)
-        .args(&kerberos_args)
-        .args(&module_args)
-        .args(&export_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("5985")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(Arg::new("ssl").long("ssl").help("Use HTTPS (port 5986)").action(ArgAction::SetTrue))
-        .arg(
-            Arg::new("exec-command")
-                .short('x')
-                .long("exec-command")
-                .help("Execute command on target"),
-        )
-        .arg(
-            Arg::new("exec-command-ps")
-                .short('X')
-                .long("exec-command-ps")
-                .help("Execute PowerShell command on target"),
-        );
 
-    let mssql_cmd = Command::new("mssql")
-        .about("MSSQL protocol (port 1433)")
-        .args(&auth_args)
-        .args(&kerberos_args)
-        .args(&module_args)
-        .args(&export_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("1433")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(Arg::new("query").short('q').long("query").help("Execute SQL query"))
-        .arg(
-            Arg::new("exec-command")
-                .short('x')
-                .long("exec-command")
-                .help("Execute command via xp_cmdshell"),
-        );
+    let http_cmd = build_http_cmd(&auth_args, &module_args, &export_args);
+    let redis_cmd = build_redis_cmd(&auth_args, &module_args, &export_args);
+    let postgres_cmd = build_postgres_cmd(&auth_args, &module_args, &export_args);
+    let mysql_cmd = build_mysql_cmd(&auth_args, &module_args, &export_args);
+    let snmp_cmd = build_snmp_cmd(&auth_args, &module_args, &export_args);
+    let docker_cmd = build_docker_cmd(&auth_args, &module_args, &export_args);
+    #[cfg(feature = "opcua-support")]
+    let opcua_cmd = build_opcua_cmd(&auth_args, &module_args, &export_args);
+    let dns_cmd = build_dns_cmd(&auth_args, &module_args, &export_args);
+    let ipmi_cmd = build_ipmi_cmd(&auth_args, &module_args, &export_args);
 
-    let rdp_cmd = Command::new("rdp")
-        .about("RDP protocol (port 3389)")
-        .args(&auth_args)
-        .args(&module_args)
-        .args(&export_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("3389")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
-            Arg::new("screenshot")
-                .long("screenshot")
-                .help("Take a screenshot of the RDP login screen")
-                .action(ArgAction::SetTrue),
-        );
-
-    let ftp_cmd = Command::new("ftp")
-        .about("FTP protocol (port 21)")
-        .args(&auth_args)
-        .args(&export_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("21")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
-            Arg::new("list")
-                .long("list")
-                .help("List files in the root directory")
-                .action(ArgAction::SetTrue),
-        );
-
-    let vnc_cmd = Command::new("vnc")
-        .about("VNC protocol (port 5900)")
-        .args(&auth_args)
-        .args(&export_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("5900")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
-            Arg::new("screenshot")
-                .long("screenshot")
-                .help("Take a screenshot of the VNC session")
-                .action(ArgAction::SetTrue),
-        );
-
-    let wmi_cmd = Command::new("wmi")
-        .about("WMI protocol (port 135)")
-        .args(&auth_args)
-        .args(&kerberos_args)
-        .args(&module_args)
-        .args(&export_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("135")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(Arg::new("query").short('q').long("query").help("Execute WMI query").num_args(1))
-        .arg(
-            Arg::new("exec-command")
-                .short('x')
-                .long("exec-command")
-                .help("Execute command via Win32_Process.Create"),
-        );
-
-    let nfs_cmd = Command::new("nfs")
-        .about("NFS protocol (port 111/2049)")
-        .args(&export_args)
-        .arg(
-            Arg::new("target")
-                .help("Target IP(s), range(s), CIDR(s), hostname(s), or file(s)")
-                .required(true)
-                .num_args(1..)
-                .index(1),
-        )
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("111")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
-            Arg::new("enum").long("enum").help("Enumerate NFS exports").action(ArgAction::SetTrue),
-        );
-
-    let adb_cmd = Command::new("adb")
-        .about("Android Debug Bridge (port 5555)")
-        .args(&export_args)
-        .arg(
-            Arg::new("target")
-                .help("Target IP(s), range(s), CIDR(s), hostname(s), or file(s)")
-                .required(true)
-                .num_args(1..)
-                .index(1),
-        )
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("5555")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
-            Arg::new("screenshot")
-                .long("screenshot")
-                .help("Take a screenshot of the Android device")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(Arg::new("shell").long("shell").help("Execute shell command").num_args(1));
-
-    let network_cmd = Command::new("network")
-        .alias("net")
-        .about("Network enumeration (ARP, WiFi, mDNS, LLMNR)")
-        .arg(Arg::new("target").help("Range to sweep (e.g. 192.168.1.0/24)").num_args(1).index(1))
-        .arg(
-            Arg::new("scan")
-                .long("scan")
-                .help("Scan for nearby wireless networks")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(Arg::new("connect").long("connect").help("Connect to a specific SSID").num_args(1))
-        .arg(
-            Arg::new("devices")
-                .long("devices")
-                .help("Sweep local LAN for connected devices (ARP)")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("profiles")
-                .long("profiles")
-                .help("List saved wireless profiles")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("dump")
-                .long("dump")
-                .help("Dump cleartext passwords for all saved wireless profiles")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("mdns")
-                .long("mdns")
-                .help("Perform mDNS service discovery")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("llmnr")
-                .long("llmnr")
-                .help("Perform LLMNR host discovery")
-                .action(ArgAction::SetTrue),
-        );
-
-    let http_cmd = Command::new("http")
-        .about("HTTP(S) protocol (port 80/443)")
-        .args(&auth_args)
-        .args(&module_args)
-        .args(&export_args)
-        .arg(
-            Arg::new("port").long("port").default_value("0").value_parser(clap::value_parser!(u16)),
-        )
-        .arg(Arg::new("ssl").long("ssl").help("Use SSL/TLS").action(ArgAction::SetTrue));
-
-    let redis_cmd = Command::new("redis")
-        .about("Redis protocol (port 6379)")
-        .args(&auth_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("6379")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
-            Arg::new("info")
-                .long("info")
-                .help("Enumerate Redis server information")
-                .action(ArgAction::SetTrue),
-        );
-
-    let postgres_cmd = Command::new("postgres")
-        .alias("postgresql")
-        .about("PostgreSQL protocol (port 5432)")
-        .args(&auth_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("5432")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(Arg::new("dbs").long("dbs").help("List databases").action(ArgAction::SetTrue))
-        .arg(
-            Arg::new("exec-command")
-                .short('x')
-                .long("exec-command")
-                .help("Execute command via COPY FROM PROGRAM (requires superuser)"),
-        );
-
-    let mysql_cmd = Command::new("mysql")
-        .about("MySQL protocol (port 3306)")
-        .args(&auth_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("3306")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(Arg::new("dbs").long("dbs").help("List databases").action(ArgAction::SetTrue))
-        .arg(Arg::new("query").short('q').long("query").help("Execute SQL query"));
-
-    let snmp_cmd = Command::new("snmp")
-        .about("SNMP protocol (port 161/udp)")
-        .args(&auth_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("161")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
-            Arg::new("enum")
-                .long("enum")
-                .help("Enumerate system information")
-                .action(ArgAction::SetTrue),
-        );
-
-    let docker_cmd = Command::new("docker")
-        .about("Docker API & Registry protocol (port 2375/5000)")
-        .args(&auth_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("2375")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
-            Arg::new("enum")
-                .long("enum")
-                .help("Enumerate containers or repositories")
-                .action(ArgAction::SetTrue),
-        );
-
-    let opcua_cmd = Command::new("opcua")
-        .about("OPC-UA (Industrial Control Systems) protocol (port 4840)")
-        .args(&auth_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("4840")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
-            Arg::new("enum")
-                .long("enum")
-                .help("Enumerate OPC-UA server status and metadata")
-                .action(ArgAction::SetTrue),
-        );
-
-    let dns_cmd = Command::new("dns")
-        .about("DNS protocol (port 53)")
-        .args(&auth_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("53")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
-            Arg::new("enum").long("enum").help("Enumerate DNS records").action(ArgAction::SetTrue),
-        );
-
-    let ipmi_cmd = Command::new("ipmi")
-        .about("IPMI protocol (port 623/udp)")
-        .args(&auth_args)
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .default_value("623")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
-            Arg::new("enum")
-                .long("enum")
-                .help("Enumerate IPMI information")
-                .action(ArgAction::SetTrue),
-        );
-
-    Command::new("nxc")
+    let cmd = Command::new("nxc")
         .about(banner)
         .version(VERSION)
         .arg(
@@ -639,7 +190,7 @@ pub fn build_cli() -> Command {
                 .short('t')
                 .long("threads")
                 .help("Number of concurrent threads")
-                .default_value("256")
+                .default_value("100")
                 .value_parser(clap::value_parser!(usize))
                 .global(true),
         )
@@ -771,8 +322,12 @@ pub fn build_cli() -> Command {
         .subcommand(wmi_cmd)
         .subcommand(mysql_cmd)
         .subcommand(snmp_cmd)
-        .subcommand(docker_cmd)
-        .subcommand(opcua_cmd)
+        .subcommand(docker_cmd);
+
+    #[cfg(feature = "opcua-support")]
+    let cmd = cmd.subcommand(opcua_cmd);
+
+    let cmd = cmd
         .subcommand(dns_cmd)
         .subcommand(ipmi_cmd)
         .subcommand(nfs_cmd)
@@ -801,7 +356,9 @@ pub fn build_cli() -> Command {
                         .long("model")
                         .help("Specific model to use (default: gemini-1.5-flash)"),
                 ),
-        )
+        );
+
+    cmd
 }
 
 pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
@@ -927,4 +484,586 @@ pub fn get_protocol_handler(
         "kube" | "kubernetes" | "k8s" => Some(Arc::new(nxc_protocols::kube::KubeProtocol::new())),
         _ => None,
     }
+}
+
+
+fn build_ftp_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("ftp")
+        .about("FTP protocol (port 21)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("21")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(Arg::new("ls").long("ls").help("List files in directory").num_args(0..=1))
+        .arg(
+            Arg::new("get")
+                .long("get")
+                .help("Download a file (e.g. --get /path/to/file)"),
+        )
+        .arg(
+            Arg::new("put")
+                .long("put")
+                .help("Upload a file (e.g. --put local.txt remote.txt)")
+                .num_args(2),
+        )
+}
+
+fn build_vnc_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("vnc")
+        .about("VNC protocol (port 5900)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("5900")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("screenshot")
+                .long("screenshot")
+                .help("Take screenshot upon successful auth")
+                .action(ArgAction::SetTrue),
+        )
+}
+
+fn build_wmi_cmd(auth_args: &[Arg], kerberos_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("wmi")
+        .about("WMI protocol (port 135)")
+        .args(auth_args)
+        .args(kerberos_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("135")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(Arg::new("query").short('q').long("query").help("Execute WQL query"))
+        .arg(
+            Arg::new("exec-command")
+                .short('x')
+                .long("exec-command")
+                .help("Execute command via Win32_Process"),
+        )
+}
+
+fn build_nfs_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("nfs")
+        .about("NFS protocol (port 2049)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("2049")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("shares")
+                .long("shares")
+                .help("Enumerate NFS exports")
+                .action(ArgAction::SetTrue),
+        )
+}
+
+fn build_adb_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("adb")
+        .about("Android Debug Bridge protocol (port 5555)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("5555")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("exec-command")
+                .short('x')
+                .long("exec-command")
+                .help("Execute command via adb shell"),
+        )
+}
+
+fn build_network_cmd(module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("network")
+        .about("Network enumeration and analysis (No authentication required)")
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("scan")
+                .long("scan")
+                .help("Perform a network scan (ARP/ping sweep)")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("connect")
+                .long("connect")
+                .help("Attempt to connect to a specific WiFi network (e.g. --connect 'Corporate WiFi')"),
+        )
+        .arg(
+            Arg::new("devices")
+                .long("devices")
+                .help("List wireless interfaces")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("profiles")
+                .long("profiles")
+                .help("List saved WiFi profiles")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("dump")
+                .long("dump")
+                .help("Dump saved WiFi credentials")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("mdns")
+                .long("mdns")
+                .help("Perform mDNS (Bonjour) service discovery")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("llmnr")
+                .long("llmnr")
+                .help("Perform LLMNR service discovery")
+                .action(ArgAction::SetTrue),
+        )
+}
+
+
+fn build_http_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("http")
+        .about("HTTP / HTTPS protocol (port 80/443)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("80")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(Arg::new("ssl").long("ssl").help("Use HTTPS").action(ArgAction::SetTrue))
+        .arg(
+            Arg::new("verify-ssl")
+                .long("verify-ssl")
+                .help("Verify SSL certificate")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("path")
+                .long("path")
+                .help("Path to request (default: /)")
+                .default_value("/"),
+        )
+}
+
+fn build_redis_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("redis")
+        .about("Redis protocol (port 6379)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("6379")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("info")
+                .long("info")
+                .help("Retrieve Redis server info")
+                .action(ArgAction::SetTrue),
+        )
+}
+
+fn build_postgres_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("postgres")
+        .about("PostgreSQL protocol (port 5432)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("5432")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(Arg::new("dbs").long("dbs").help("List databases").action(ArgAction::SetTrue))
+        .arg(Arg::new("query").short('q').long("query").help("Execute SQL query"))
+        .arg(
+            Arg::new("exec-command")
+                .short('x')
+                .long("exec-command")
+                .help("Execute system command via COPY/libc"),
+        )
+}
+
+fn build_mysql_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("mysql")
+        .about("MySQL protocol (port 3306)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("3306")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(Arg::new("dbs").long("dbs").help("List databases").action(ArgAction::SetTrue))
+        .arg(Arg::new("query").short('q').long("query").help("Execute SQL query"))
+}
+
+fn build_snmp_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("snmp")
+        .about("SNMP protocol (port 161/udp)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("161")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("enum")
+                .long("enum")
+                .help("Enumerate system information")
+                .action(ArgAction::SetTrue),
+        )
+}
+
+fn build_docker_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("docker")
+        .about("Docker API & Registry protocol (port 2375/5000)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("2375")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("enum")
+                .long("enum")
+                .help("Enumerate containers or repositories")
+                .action(ArgAction::SetTrue),
+        )
+}
+
+#[cfg(feature = "opcua-support")]
+fn build_opcua_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("opcua")
+        .about("OPC-UA (Industrial Control Systems) protocol (port 4840)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("4840")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("enum")
+                .long("enum")
+                .help("Enumerate OPC-UA server status and metadata")
+                .action(ArgAction::SetTrue),
+        )
+}
+
+fn build_dns_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("dns")
+        .about("DNS protocol (port 53)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("53")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("enum").long("enum").help("Enumerate DNS records").action(ArgAction::SetTrue),
+        )
+}
+
+fn build_ipmi_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("ipmi")
+        .about("IPMI protocol (port 623/udp)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("623")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("enum")
+                .long("enum")
+                .help("Enumerate IPMI information")
+                .action(ArgAction::SetTrue),
+        )
+}
+
+
+fn build_smb_cmd(auth_args: &[Arg], kerberos_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("smb")
+        .about("SMB protocol (port 445)")
+        .args(auth_args)
+        .args(kerberos_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("445")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("shares")
+                .long("shares")
+                .help("Enumerate shares and access")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("sessions")
+                .long("sessions")
+                .help("Enumerate active sessions")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(Arg::new("disks").long("disks").help("Enumerate disks").action(ArgAction::SetTrue))
+        .arg(
+            Arg::new("loggedon-users")
+                .long("loggedon-users")
+                .help("Enumerate logged-on users")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(Arg::new("users").long("users").help("Enumerate users").action(ArgAction::SetTrue))
+        .arg(Arg::new("groups").long("groups").help("Enumerate groups").action(ArgAction::SetTrue))
+        .arg(
+            Arg::new("local-groups")
+                .long("local-groups")
+                .help("Enumerate local groups")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("pass-pol")
+                .long("pass-pol")
+                .help("Dump password policy")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(Arg::new("rid-brute").long("rid-brute").help("RID bruteforce").num_args(0..=1))
+        .arg(
+            Arg::new("sam")
+                .long("sam")
+                .help("Dump SAM hashes")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("lsa")
+                .long("lsa")
+                .help("Dump LSA secrets")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("ntds")
+                .long("ntds")
+                .help("Dump NTDS.dit hashes (VSS)")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("exec-method")
+                .long("exec-method")
+                .help("Execution method (smbexec, atexec, wmiexec, mmcexec)")
+                .value_parser(["smbexec", "atexec", "wmiexec", "mmcexec"])
+                .default_value("wmiexec"),
+        )
+        .arg(
+            Arg::new("exec-command")
+                .short('x')
+                .long("exec-command")
+                .help("Execute command on target"),
+        )
+        .arg(
+            Arg::new("exec-command-ps")
+                .short('X')
+                .long("exec-command-ps")
+                .help("Execute PowerShell command on target"),
+        )
+}
+
+fn build_ssh_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("ssh")
+        .about("SSH protocol (port 22)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("22")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(Arg::new("key-file").long("key-file").help("SSH private key file for authentication"))
+        .arg(
+            Arg::new("exec-command")
+                .short('x')
+                .long("exec-command")
+                .help("Execute command on target"),
+        )
+        .arg(
+            Arg::new("sudo-check")
+                .long("sudo-check")
+                .help("Check for sudo privileges")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("ssh-timeout")
+                .long("ssh-timeout")
+                .help("SSH connection timeout in seconds")
+                .default_value("10")
+                .value_parser(clap::value_parser!(u64)),
+        )
+}
+
+fn build_ldap_cmd(auth_args: &[Arg], kerberos_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("ldap")
+        .about("LDAP protocol (port 389/636)")
+        .args(auth_args)
+        .args(kerberos_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("389")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("ldaps").long("ldaps").help("Use LDAPS (port 636)").action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("kerberoasting")
+                .long("kerberoasting")
+                .help("Perform Kerberoasting and save output to file")
+                .num_args(0..=1)
+                .default_missing_value("kerberoast.txt"),
+        )
+        .arg(
+            Arg::new("asreproasting")
+                .long("asreproasting")
+                .help("Perform ASREProasting and save output to file")
+                .num_args(0..=1)
+                .default_missing_value("asreproast.txt"),
+        )
+        .arg(
+            Arg::new("users")
+                .long("users")
+                .help("Enumerate domain users")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("groups")
+                .long("groups")
+                .help("Enumerate domain groups")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("gmsa")
+                .long("gmsa")
+                .help("Enumerate gMSA passwords")
+                .action(ArgAction::SetTrue),
+        )
+}
+
+fn build_winrm_cmd(auth_args: &[Arg], kerberos_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("winrm")
+        .about("WinRM protocol (port 5985/5986)")
+        .args(auth_args)
+        .args(kerberos_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("5985")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(Arg::new("ssl").long("ssl").help("Use HTTPS (port 5986)").action(ArgAction::SetTrue))
+        .arg(
+            Arg::new("exec-command")
+                .short('x')
+                .long("exec-command")
+                .help("Execute command on target"),
+        )
+        .arg(
+            Arg::new("exec-command-ps")
+                .short('X')
+                .long("exec-command-ps")
+                .help("Execute PowerShell command on target"),
+        )
+}
+
+fn build_mssql_cmd(auth_args: &[Arg], kerberos_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("mssql")
+        .about("MSSQL protocol (port 1433)")
+        .args(auth_args)
+        .args(kerberos_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("1433")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(Arg::new("query").short('q').long("query").help("Execute SQL query"))
+        .arg(
+            Arg::new("exec-command")
+                .short('x')
+                .long("exec-command")
+                .help("Execute command via xp_cmdshell"),
+        )
+}
+
+fn build_rdp_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("rdp")
+        .about("RDP protocol (port 3389)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("3389")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("screenshot")
+                .long("screenshot")
+                .help("Take a screenshot of the RDP login screen")
+                .action(ArgAction::SetTrue),
+        )
 }

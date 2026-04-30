@@ -19,7 +19,7 @@ pub struct OpcUaSession {
     pub port: u16,
     pub admin: bool,
     pub client: Arc<Mutex<Client>>,
-    pub session: Option<Arc<Mutex<Session>>>,
+    pub session: Option<Arc<opcua::sync::RwLock<Session>>>,
 }
 
 impl NxcSession for OpcUaSession {
@@ -111,17 +111,9 @@ impl NxcProtocol for OpcUaProtocol {
 
         // Identity Token setup
         let identity_token = if let Some(ref pass) = creds.password {
-            IdentityToken::UserName(UserNameIdentityToken {
-                user_name: creds.username.clone(),
-                password: pass.clone(),
-                ..Default::default()
-            })
+            IdentityToken::UserName(creds.username.clone(), pass.clone())
         } else if !creds.username.is_empty() {
-            IdentityToken::UserName(UserNameIdentityToken {
-                user_name: creds.username.clone(),
-                password: String::new(),
-                ..Default::default()
-            })
+            IdentityToken::UserName(creds.username.clone(), String::new())
         } else {
             IdentityToken::Anonymous
         };
@@ -130,8 +122,7 @@ impl NxcProtocol for OpcUaProtocol {
         // Note: Option 1 (Auto-select highest security) is implicitly handled by async-opcua
         // if we provide the right policy, but for now we go with None (No Security) for initial probe.
         match client
-            .connect_to_endpoint(&url, SecurityPolicy::None.to_string(), identity_token)
-            .await
+            .connect_to_endpoint(url.as_str(), identity_token)
         {
             Ok(session) => {
                 info!("OPC-UA: Session established on {}:{}", opcua_sess.target, opcua_sess.port);
@@ -153,16 +144,16 @@ impl NxcProtocol for OpcUaProtocol {
             .ok_or_else(|| anyhow!("Invalid session type"))?;
 
         if let Some(ref session_arc) = opcua_sess.session {
-            let session = session_arc.lock().await;
+            let session = session_arc.read();
 
             // For OPC-UA, "execute" is mapped to reading server metadata
-            let node_id = NodeId::new(0, opcua::types::ObjectId::Server_ServerStatus);
+            let node_id = NodeId::new(0, 2256);
             let result = session.read(&[opcua::client::prelude::ReadValueId {
                 node_id,
                 attribute_id: AttributeId::Value as u32,
                 index_range: opcua::types::UAString::null(),
                 data_encoding: opcua::types::QualifiedName::null(),
-            }]);
+            }], opcua::types::TimestampsToReturn::Both, 0.0);
 
             match result {
                 Ok(data_value) => {

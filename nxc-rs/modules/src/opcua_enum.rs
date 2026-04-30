@@ -1,3 +1,4 @@
+use nxc_protocols::NxcProtocol;
 use crate::{ModuleOptions, ModuleResult, NxcModule};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -37,7 +38,7 @@ impl NxcModule for OpcUaEnum {
         session: &mut dyn NxcSession,
         _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let opcua_sess = session
+        let _opcua_sess = session
             .as_any()
             .downcast_ref::<OpcUaSession>()
             .ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
