@@ -16,7 +16,6 @@ We take security seriously at NetExec-RS. If you discover a security vulnerabili
 **Do not report security vulnerabilities in public GitHub issues.**
 
 Please send security reports via:
-- Email: frimpsbathrive@gmail.com
 - GitHub Security Advisories: [Private Report](https://github.com/thrive-spectrexq/nxc-rs/security/advisories/new)
 
 Please include the following information in your report:
