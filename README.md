@@ -176,13 +176,6 @@ nxc-rs is built as a modular Rust workspace:
 - Protocol-driven architecture
 - Clean separation of concerns
 
-## Roadmap
-- Plugin / external module system
-- Distributed execution (multi-node ops)
-- Advanced evasion techniques
-- Web UI / dashboard
-- Blue-team simulation mode
-
 ## 🤝 Contributing
 
 Contributions are welcome.
