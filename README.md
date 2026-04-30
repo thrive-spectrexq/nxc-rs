@@ -7,7 +7,7 @@
 
 ---
 
-**NetExec-RS (nxc-rs)** is a modern, high-performance network execution tool built in Rust. Inspired by the legendary [NetExec](https://github.com/Pennyw0rth/NetExec.git), it brings blazing-fast concurrency, memory safety, and native protocol implementations to the modern red-teaming toolkit.
+**NetExec-RS (nxc-rs)** is a modern, high-performance network execution tool built in Rust. Inspired by Pennyw0rth [NetExec](https://github.com/Pennyw0rth/NetExec.git), it brings blazing-fast concurrency, memory safety, and native protocol implementations to the modern red-teaming toolkit.
 
 ## 🚀 Key Features
 
