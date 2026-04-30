@@ -129,7 +129,10 @@ impl NxcModule for Asreproasting {
         let hashes_only: Vec<String> = results
             .iter()
             .filter_map(|r| {
-                r["hash"].as_str().filter(|h| h.starts_with("$krb")).map(|h| h.to_string())
+                r["hash"]
+                    .as_str()
+                    .filter(|h| h.starts_with("$krb"))
+                    .map(std::string::ToString::to_string)
             })
             .collect();
 

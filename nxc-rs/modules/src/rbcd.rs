@@ -61,7 +61,8 @@ impl NxcModule for Rbcd {
             .ok_or_else(|| anyhow!("Module requires an LDAP session"))?;
         let action = opts.get("ACTION").map(std::string::String::as_str).unwrap_or("read");
         let delegate_to = opts.get("DELEGATE_TO").map(std::string::String::as_str).unwrap_or("N/A");
-        let delegate_from = opts.get("DELEGATE_FROM").map(std::string::String::as_str).unwrap_or("N/A");
+        let delegate_from =
+            opts.get("DELEGATE_FROM").map(std::string::String::as_str).unwrap_or("N/A");
         let mut output = format!("RBCD Configuration ({action}):\n");
         output.push_str(&format!("  [*] Delegate TO: {delegate_to}\n"));
         output.push_str(&format!("  [*] Delegate FROM: {delegate_from}\n"));

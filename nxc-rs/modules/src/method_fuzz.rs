@@ -52,7 +52,7 @@ impl NxcModule for MethodFuzz {
             .downcast_mut::<HttpSession>()
             .ok_or_else(|| anyhow!("Module requires an HTTP session"))?;
 
-        let path = opts.get("PATH").map(|s| s.as_str()).unwrap_or("/");
+        let path = opts.get("PATH").map(std::string::String::as_str).unwrap_or("/");
         let scheme = if http_sess.use_ssl { "https" } else { "http" };
         let url = format!("{}://{}:{}{}", scheme, http_sess.target, http_sess.port, path);
 

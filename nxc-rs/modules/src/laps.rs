@@ -52,7 +52,7 @@ impl NxcModule for Laps {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let computer_filter = opts.get("COMPUTER").map(|s| s.as_str()).unwrap_or("*");
+        let computer_filter = opts.get("COMPUTER").map(std::string::String::as_str).unwrap_or("*");
 
         let ldap_session = match session.protocol() {
             "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap(),

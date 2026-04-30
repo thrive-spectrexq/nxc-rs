@@ -60,7 +60,7 @@ impl NxcModule for MssqlClr {
             .ok_or_else(|| anyhow!("Invalid session type"))?;
 
         let proto = MssqlProtocol::new();
-        let action = opts.get("action").map(|s| s.as_str()).unwrap_or("list");
+        let action = opts.get("action").map(std::string::String::as_str).unwrap_or("list");
 
         let mut output = String::new();
         let mut results = json!({});

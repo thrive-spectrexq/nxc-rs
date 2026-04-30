@@ -51,7 +51,7 @@ impl NxcModule for Kerberoasting {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let user_filter = opts.get("USER").map(|s| s.as_str()).unwrap_or("*");
+        let user_filter = opts.get("USER").map(std::string::String::as_str).unwrap_or("*");
 
         let ldap_session = match session.protocol() {
             "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap(),
@@ -157,7 +157,10 @@ impl NxcModule for Kerberoasting {
         let hashes_only: Vec<String> = results
             .iter()
             .filter_map(|r| {
-                r["hash"].as_str().filter(|h| h.starts_with("$krb")).map(|h| h.to_string())
+                r["hash"]
+                    .as_str()
+                    .filter(|h| h.starts_with("$krb"))
+                    .map(std::string::ToString::to_string)
             })
             .collect();
 

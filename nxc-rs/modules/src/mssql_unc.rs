@@ -61,7 +61,7 @@ impl NxcModule for MssqlUnc {
             .ok_or_else(|| anyhow!("Module requires an MSSQL session"))?;
 
         let attacker_ip = opts.get("UNC_IP").ok_or_else(|| anyhow!("UNC_IP is required"))?;
-        let share = opts.get("SHARE").map(|s| s.as_str()).unwrap_or("share");
+        let share = opts.get("SHARE").map(std::string::String::as_str).unwrap_or("share");
 
         info!("Starting MSSQL NTLM Coercion against {} to {}", mssql_sess.target, attacker_ip);
 

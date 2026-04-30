@@ -634,9 +634,7 @@ impl SmbProtocol {
         pkt.extend_from_slice(&96u16.to_le_bytes()); // NameOffset
         pkt.extend_from_slice(&2u16.to_le_bytes()); // NameLength
         pkt.extend_from_slice(&u32::MAX.to_le_bytes()); // OutputBufferLength
-        pkt.extend_from_slice(
-            &"*".encode_utf16().flat_map(u16::to_le_bytes).collect::<Vec<u8>>(),
-        );
+        pkt.extend_from_slice(&"*".encode_utf16().flat_map(u16::to_le_bytes).collect::<Vec<u8>>());
         pkt
     }
 

@@ -183,7 +183,10 @@ impl NxcProtocol for KubeProtocol {
         let ns = kube_sess.namespace.as_deref().unwrap_or("default");
 
         // Try to find a pod to execute on
-        let pods_url = format!("https://{}:{}/api/v1/namespaces/{}/pods", kube_sess.target, kube_sess.port, ns);
+        let pods_url = format!(
+            "https://{}:{}/api/v1/namespaces/{}/pods",
+            kube_sess.target, kube_sess.port, ns
+        );
         let mut req = client.get(&pods_url);
         if let Some(ref token) = kube_sess.token {
             req = req.bearer_auth(token);
@@ -191,16 +194,19 @@ impl NxcProtocol for KubeProtocol {
         let resp = req.send().await?;
         let pods_json: serde_json::Value = resp.json().await?;
 
-        let pod_name = pods_json["items"].as_array().and_then(|items| {
-            items.iter().find_map(|item| {
-                let status = item["status"]["phase"].as_str().unwrap_or("");
-                if status == "Running" {
-                    item["metadata"]["name"].as_str().map(std::string::ToString::to_string)
-                } else {
-                    None
-                }
+        let pod_name = pods_json["items"]
+            .as_array()
+            .and_then(|items| {
+                items.iter().find_map(|item| {
+                    let status = item["status"]["phase"].as_str().unwrap_or("");
+                    if status == "Running" {
+                        item["metadata"]["name"].as_str().map(std::string::ToString::to_string)
+                    } else {
+                        None
+                    }
+                })
             })
-        }).ok_or_else(|| anyhow!("No running pods found in namespace {ns}"))?;
+            .ok_or_else(|| anyhow!("No running pods found in namespace {ns}"))?;
 
         info!("Kube: Selected pod {} for execution", pod_name);
 
@@ -209,25 +215,28 @@ impl NxcProtocol for KubeProtocol {
             kube_sess.target, kube_sess.port, ns, pod_name, urlencoding::encode(cmd)
         );
 
-        let mut req = tokio_tungstenite::tungstenite::client::IntoClientRequest::into_client_request(exec_url.clone())?;
+        let mut req =
+            tokio_tungstenite::tungstenite::client::IntoClientRequest::into_client_request(
+                exec_url.clone(),
+            )?;
         if let Some(ref token) = kube_sess.token {
             req.headers_mut().insert(
                 reqwest::header::AUTHORIZATION,
-                reqwest::header::HeaderValue::from_str(&format!("Bearer {token}"))?
+                reqwest::header::HeaderValue::from_str(&format!("Bearer {token}"))?,
             );
         }
-        req.headers_mut().insert(reqwest::header::SEC_WEBSOCKET_PROTOCOL, reqwest::header::HeaderValue::from_static("v4.channel.k8s.io"));
-
-        let connector = tokio_tungstenite::Connector::NativeTls(
-            native_tls::TlsConnector::builder().danger_accept_invalid_certs(true).build()?
+        req.headers_mut().insert(
+            reqwest::header::SEC_WEBSOCKET_PROTOCOL,
+            reqwest::header::HeaderValue::from_static("v4.channel.k8s.io"),
         );
 
-        let (mut ws_stream, _) = tokio_tungstenite::connect_async_tls_with_config(
-            req,
-            None,
-            false,
-            Some(connector),
-        ).await?;
+        let connector = tokio_tungstenite::Connector::NativeTls(
+            native_tls::TlsConnector::builder().danger_accept_invalid_certs(true).build()?,
+        );
+
+        let (mut ws_stream, _) =
+            tokio_tungstenite::connect_async_tls_with_config(req, None, false, Some(connector))
+                .await?;
 
         let mut stdout_buf = String::new();
         let mut stderr_buf = String::new();
@@ -236,7 +245,9 @@ impl NxcProtocol for KubeProtocol {
             let msg = msg?;
             match msg {
                 tokio_tungstenite::tungstenite::Message::Binary(data) => {
-                    if data.is_empty() { continue; }
+                    if data.is_empty() {
+                        continue;
+                    }
                     let channel = data[0];
                     let content = String::from_utf8_lossy(&data[1..]);
                     if channel == 1 {
@@ -253,11 +264,7 @@ impl NxcProtocol for KubeProtocol {
             }
         }
 
-        Ok(CommandOutput {
-            stdout: stdout_buf,
-            stderr: stderr_buf,
-            exit_code: Some(0),
-        })
+        Ok(CommandOutput { stdout: stdout_buf, stderr: stderr_buf, exit_code: Some(0) })
     }
 }
 
