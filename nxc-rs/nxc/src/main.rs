@@ -56,7 +56,7 @@ async fn main() -> Result<()> {
         Some(("relay", relay_matches)) => {
             let bind_addr = relay_matches
                 .get_one::<String>("bind-addr")
-                .unwrap_or_else(|| panic!("bind-addr is required"));
+                .expect("clap ensures bind-addr is present via default_value");
 
             let config = relay::RelayConfig {
                 bind_addr: bind_addr.clone(),
