@@ -52,7 +52,7 @@ impl NxcModule for Whoami {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let target_user = opts.get("USER").map(|s| s.as_str()).unwrap_or(""); // If empty, we'll try to find the current user context
+        let target_user = opts.get("USER").map(std::string::String::as_str).unwrap_or(""); // If empty, we'll try to find the current user context
 
         let ldap_session = match session.protocol() {
             "ldap" => session.downcast_mut::<nxc_protocols::ldap::LdapSession>().unwrap(),

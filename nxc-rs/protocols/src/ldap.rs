@@ -270,7 +270,7 @@ impl NxcProtocol for LdapProtocol {
         let addr = format!("{target}:{port}");
         let target_owned = target.to_string();
         let _timeout = self.timeout;
-        let proxy_owned = proxy.map(|s| s.to_string());
+        let proxy_owned = proxy.map(std::string::ToString::to_string);
 
         let target_clone = target_owned.clone();
 
@@ -463,6 +463,7 @@ mod tests {
             0x01, // Revision 1
             0x05, // 5 sub-authorities
             0x00, 0x00, 0x00, 0x00, 0x00, 0x05, // Authority 5
+            0x15, 0x00, 0x00, 0x00, // 21 (LE)
             0xA7, 0x93, 0xF1, 0xD7, // 3623811015 (LE)
             0xFC, 0x89, 0x6E, 0xC8, // 3361044348 (LE)
             0x44, 0xCA, 0xCE, 0x01, // 30300820 (LE)

@@ -170,7 +170,7 @@ impl NxcProtocol for WinrmProtocol {
                 admin: false,
                 is_ssl: port == 5986,
                 endpoint: url,
-                proxy: proxy.map(|s| s.to_string()),
+                proxy: proxy.map(std::string::ToString::to_string),
                 auth_header: None,
                 client: Some(client),
             }))
@@ -182,7 +182,7 @@ impl NxcProtocol for WinrmProtocol {
                 admin: false,
                 is_ssl: port == 5986,
                 endpoint: url,
-                proxy: proxy.map(|s| s.to_string()),
+                proxy: proxy.map(std::string::ToString::to_string),
                 auth_header: None,
                 client: Some(client),
             }))

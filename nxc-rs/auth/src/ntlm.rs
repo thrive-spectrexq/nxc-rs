@@ -167,7 +167,7 @@ impl NtlmAuthenticator {
             .map(|h| h.to_string_lossy().to_string())
             .unwrap_or_else(|_| "WORKSTATION".to_string());
         Self {
-            domain: domain.map(|s| s.to_string()),
+            domain: domain.map(std::string::ToString::to_string),
             workstation,
             negotiate_flags: DEFAULT_NEGOTIATE_FLAGS,
         }
@@ -323,10 +323,10 @@ impl NtlmAuthenticator {
             };
 
         // 8. Build Type 3 message
-        let domain_utf16: Vec<u8> = domain.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
-        let user_utf16: Vec<u8> = username.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+        let domain_utf16: Vec<u8> = domain.encode_utf16().flat_map(u16::to_le_bytes).collect();
+        let user_utf16: Vec<u8> = username.encode_utf16().flat_map(u16::to_le_bytes).collect();
         let ws_utf16: Vec<u8> =
-            self.workstation.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+            self.workstation.encode_utf16().flat_map(u16::to_le_bytes).collect();
 
         // LM response (24 bytes of zeros for NTLMv2)
         let lm_response = vec![0u8; 24];
@@ -651,7 +651,7 @@ mod tests {
         // MsvAvNbDomainName (0x0002)
         data.extend_from_slice(&0x0002u16.to_le_bytes());
         let domain = "TEST";
-        let domain_u16: Vec<u8> = domain.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+        let domain_u16: Vec<u8> = domain.encode_utf16().flat_map(u16::to_le_bytes).collect();
         data.extend_from_slice(&(domain_u16.len() as u16).to_le_bytes());
         data.extend_from_slice(&domain_u16);
         // MsvAvEOL

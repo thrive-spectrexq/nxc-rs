@@ -55,9 +55,9 @@ impl NxcModule for RegQuery {
             .ok_or_else(|| anyhow!("Module requires an SMB session"))?;
         let path = opts
             .get("PATH")
-            .map(|s| s.as_str())
+            .map(std::string::String::as_str)
             .unwrap_or("HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
-        let key = opts.get("KEY").map(|s| s.as_str());
+        let key = opts.get("KEY").map(std::string::String::as_str);
         let mut output = format!("Remote Registry Query on {}:\n", smb_sess.target);
         output.push_str(&format!("  [*] Path: {path}\n"));
         if let Some(k) = key {

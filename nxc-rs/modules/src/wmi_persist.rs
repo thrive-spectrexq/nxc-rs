@@ -66,8 +66,8 @@ impl NxcModule for WmiPersistModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let action = opts.get("ACTION").map(|s| s.as_str()).unwrap_or("install");
-        let name = opts.get("NAME").map(|s| s.as_str()).unwrap_or("WindowsUpdater");
+        let action = opts.get("ACTION").map(std::string::String::as_str).unwrap_or("install");
+        let name = opts.get("NAME").map(std::string::String::as_str).unwrap_or("WindowsUpdater");
 
         let script = if action == "install" {
             let payload = opts
@@ -93,7 +93,7 @@ Write-Output 'WMI Persistence Cleaned Up Successfully'"#
         // Base64 encode the script to avoid quoting issues
         let b64_script = base64::Engine::encode(
             &base64::engine::general_purpose::STANDARD,
-            script.encode_utf16().flat_map(|u| u.to_le_bytes()).collect::<Vec<u8>>(),
+            script.encode_utf16().flat_map(u16::to_le_bytes).collect::<Vec<u8>>(),
         );
         let cmd = format!("powershell -e {b64_script}");
 
