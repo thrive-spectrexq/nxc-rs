@@ -113,7 +113,7 @@ impl NxcProtocol for WmiProtocol {
             target: target.to_string(),
             port,
             admin: false,
-            proxy: proxy.map(|s| s.to_string()),
+            proxy: proxy.map(std::string::ToString::to_string),
         }))
     }
 

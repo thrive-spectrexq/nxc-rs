@@ -101,7 +101,7 @@ impl NxcProtocol for MssqlProtocol {
                     port,
                     admin: false,
                     credentials: None,
-                    proxy: proxy.map(|s| s.to_string()),
+                    proxy: proxy.map(std::string::ToString::to_string),
                 }))
             }
             Ok(Err(e)) => Err(anyhow!("Connection refused or unreachable: {e}")),
@@ -222,7 +222,7 @@ impl NxcProtocol for MssqlProtocol {
         let pass = creds.password.as_deref().unwrap_or_default();
 
         if let Some(ref domain) = creds.domain {
-            config.authentication(AuthMethod::sql_server(format!("{}\\{}", domain, user), pass));
+            config.authentication(AuthMethod::sql_server(format!("{domain}\\{user}"), pass));
         } else {
             config.authentication(AuthMethod::sql_server(user, pass));
         }
@@ -300,7 +300,7 @@ impl MssqlProtocol {
         let pass = creds.password.as_deref().unwrap_or_default();
 
         if let Some(ref domain) = creds.domain {
-            config.authentication(AuthMethod::sql_server(format!("{}\\{}", domain, user), pass));
+            config.authentication(AuthMethod::sql_server(format!("{domain}\\{user}"), pass));
         } else {
             config.authentication(AuthMethod::sql_server(user, pass));
         }

@@ -45,7 +45,7 @@ impl NxcModule for Wdigest {
             .as_any()
             .downcast_ref::<SmbSession>()
             .ok_or_else(|| anyhow!("Module requires an SMB session"))?;
-        let action = opts.get("ACTION").map(|s| s.as_str()).unwrap_or("check");
+        let action = opts.get("ACTION").map(std::string::String::as_str).unwrap_or("check");
         let mut output = format!("WDigest {} on {}:\n", action, smb_sess.target);
         output.push_str("  [*] Registry: HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest\\UseLogonCredential\n");
         match action {

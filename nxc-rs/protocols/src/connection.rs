@@ -115,7 +115,7 @@ impl ConnectionManager {
         breaker
             .call(|| {
                 let target = target.to_string();
-                let proxy = proxy.map(|s| s.to_string());
+                let proxy = proxy.map(std::string::ToString::to_string);
                 let retry_policy = self.retry_policy.clone();
                 let tm = self.timeout_manager.clone();
 

@@ -512,7 +512,7 @@ impl ModuleRegistry {
 
     /// Get a module by name.
     pub fn get(&self, name: &str) -> Option<&dyn NxcModule> {
-        self.modules.get(name).map(|m| m.as_ref())
+        self.modules.get(name).map(std::convert::AsRef::as_ref)
     }
 
     /// List all modules, optionally filtered by protocol.
@@ -520,7 +520,7 @@ impl ModuleRegistry {
         self.modules
             .values()
             .filter(|m| protocol.map(|p| m.supported_protocols().contains(&p)).unwrap_or(true))
-            .map(|m| m.as_ref())
+            .map(std::convert::AsRef::as_ref)
             .collect()
     }
 }

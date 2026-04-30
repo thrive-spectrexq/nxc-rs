@@ -50,7 +50,7 @@ impl NxcModule for GroupMem {
             .ok_or_else(|| anyhow!("Module requires an LDAP session"))?;
         let proto = LdapProtocol::new();
         let base_dn = proto.get_base_dn(ldap_sess).await?;
-        let group = opts.get("GROUP").map(|s| s.as_str()).unwrap_or("Domain Admins");
+        let group = opts.get("GROUP").map(std::string::String::as_str).unwrap_or("Domain Admins");
         let filter = format!("(&(objectClass=group)(cn={group}))");
         let entries = proto
             .search(ldap_sess, &base_dn, ldap3::Scope::Subtree, &filter, vec!["member", "cn"])
