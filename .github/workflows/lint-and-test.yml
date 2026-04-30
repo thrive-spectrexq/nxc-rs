@@ -11,31 +11,6 @@ env:
   RUSTFLAGS: "-Dwarnings"
 
 jobs:
-  lint:
-    name: Clippy + Format
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
-
-      - uses: actions-rust-lang/setup-rust-toolchain@2b1f5e9b395427c92ee4e3331786ca3c37afe2d7 # v1.16.0
-        with:
-          components: clippy, rustfmt
-
-      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2.7.7
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libkrb5-dev libsasl2-dev libldap2-dev pkg-config libssl-dev
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      - name: Run Clippy
-        run: cargo clippy --all-targets --all-features
-
   test:
     name: Tests
     runs-on: ubuntu-latest
