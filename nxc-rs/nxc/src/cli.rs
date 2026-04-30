@@ -809,17 +809,17 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
 
     let usernames: Vec<&str> = matches
         .get_many::<String>("username")
-        .map(|vals| vals.map(|s| s.as_str()).collect())
+        .map(|vals| vals.map(std::string::String::as_str).collect())
         .unwrap_or_default();
 
     let passwords: Vec<&str> = matches
         .get_many::<String>("password")
-        .map(|vals| vals.map(|s| s.as_str()).collect())
+        .map(|vals| vals.map(std::string::String::as_str).collect())
         .unwrap_or_default();
 
     let hashes: Vec<&str> = matches
         .get_many::<String>("hash")
-        .map(|vals| vals.map(|s| s.as_str()).collect())
+        .map(|vals| vals.map(std::string::String::as_str).collect())
         .unwrap_or_default();
 
     let no_bruteforce = matches.get_flag("no-bruteforce");

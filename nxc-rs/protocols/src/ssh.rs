@@ -209,7 +209,7 @@ impl NxcProtocol for SshProtocol {
         let addr = format!("{target}:{port}");
         let target_owned = target.to_string();
         let timeout = self.timeout;
-        let proxy_owned = proxy.map(|s| s.to_string());
+        let proxy_owned = proxy.map(std::string::ToString::to_string);
 
         // SSH connection is blocking, so move to a blocking thread
         let session_result = tokio::task::spawn_blocking(move || -> Result<SshSession> {

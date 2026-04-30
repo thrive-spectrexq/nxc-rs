@@ -87,7 +87,7 @@ pub fn aes_encrypt(plaintext: &str, key: &[u8; 16]) -> Vec<u8> {
     // PKCS7 padding to 16-byte block boundary
     let pad_len = 16 - (data.len() % 16);
     let mut padded = data.to_vec();
-    padded.extend(std::iter::repeat(pad_len as u8).take(pad_len));
+    padded.extend(std::iter::repeat_n(pad_len as u8, pad_len));
 
     let mut ciphertext = Vec::with_capacity(padded.len());
     for chunk in padded.chunks_exact(16) {

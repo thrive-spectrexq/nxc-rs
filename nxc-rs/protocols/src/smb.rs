@@ -55,7 +55,7 @@ pub struct Smb2Header {
 impl Smb2Header {
     pub fn new(command: u16) -> Self {
         Self {
-            protocol_id: SMB2_MAGIC.try_into().unwrap(),
+            protocol_id: SMB2_MAGIC.try_into().unwrap_or_else(|_| panic!("Invalid MAGIC")),
             structure_size: 64,
             credit_charge: 0,
             status: 0,
@@ -227,13 +227,13 @@ impl SmbProtocol {
                             let minor = ntlm_blob[49];
                             let build = u16::from_le_bytes([ntlm_blob[50], ntlm_blob[51]]);
                             if major > 0 {
-                                info.os_version = format!("{}.{}.{}", major, minor, build);
+                                info.os_version = format!("{major}.{minor}.{build}");
                                 if major == 10 {
                                     info.os = "Windows 10/11 / Server 2016+".to_string();
                                 } else if major == 6 {
                                     info.os = "Windows 7/8 / Server 2008/2012".to_string();
                                 } else {
-                                    info.os = format!("Windows {}", major);
+                                    info.os = format!("Windows {major}");
                                 }
                             }
                         }
@@ -634,9 +634,7 @@ impl SmbProtocol {
         pkt.extend_from_slice(&96u16.to_le_bytes()); // NameOffset
         pkt.extend_from_slice(&2u16.to_le_bytes()); // NameLength
         pkt.extend_from_slice(&u32::MAX.to_le_bytes()); // OutputBufferLength
-        pkt.extend_from_slice(
-            &"*".encode_utf16().flat_map(|u| u.to_le_bytes()).collect::<Vec<u8>>(),
-        );
+        pkt.extend_from_slice(&"*".encode_utf16().flat_map(u16::to_le_bytes).collect::<Vec<u8>>());
         pkt
     }
 

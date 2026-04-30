@@ -108,7 +108,10 @@ impl NxcProtocol for PostgresProtocol {
         creds: &Credentials,
     ) -> Result<AuthResult> {
         let pg_sess = match session.protocol() {
-            "postgresql" => session.as_any_mut().downcast_mut::<PostgresSession>().ok_or_else(|| anyhow!("Invalid session type"))?,
+            "postgresql" => session
+                .as_any_mut()
+                .downcast_mut::<PostgresSession>()
+                .ok_or_else(|| anyhow!("Invalid session type"))?,
             _ => return Err(anyhow!("Invalid session type")),
         };
 
@@ -163,7 +166,10 @@ impl NxcProtocol for PostgresProtocol {
 
     async fn execute(&self, session: &dyn NxcSession, cmd: &str) -> Result<CommandOutput> {
         let pg_sess = match session.protocol() {
-            "postgresql" => session.as_any().downcast_ref::<PostgresSession>().ok_or_else(|| anyhow!("Invalid session type"))?,
+            "postgresql" => session
+                .as_any()
+                .downcast_ref::<PostgresSession>()
+                .ok_or_else(|| anyhow!("Invalid session type"))?,
             _ => return Err(anyhow!("Invalid session type")),
         };
 

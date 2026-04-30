@@ -156,7 +156,13 @@ impl NxcProtocol for OpcUaProtocol {
             let session = session_arc.lock().await;
 
             // For OPC-UA, "execute" is mapped to reading server metadata
-            let result = session.read_attribute(&NodeId::server_status(), AttributeId::Value).await;
+            let node_id = NodeId::new(0, opcua::types::ObjectId::Server_ServerStatus);
+            let result = session.read(&[opcua::client::prelude::ReadValueId {
+                node_id,
+                attribute_id: AttributeId::Value as u32,
+                index_range: opcua::types::UAString::null(),
+                data_encoding: opcua::types::QualifiedName::null(),
+            }]);
 
             match result {
                 Ok(data_value) => {

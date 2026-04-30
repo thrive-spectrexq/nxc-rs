@@ -53,7 +53,8 @@ impl NxcModule for LsassyModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let dump_dir = opts.get("PATH").map(|s| s.as_str()).unwrap_or("C:\\Windows\\Temp");
+        let dump_dir =
+            opts.get("PATH").map(std::string::String::as_str).unwrap_or("C:\\Windows\\Temp");
         let dump_filename = format!("{}\\lsass_{}.dmp", dump_dir, Uuid::new_v4().simple());
 
         // PowerShell payload to find LSASS PID and dump it using comsvcs.dll Minidump
@@ -78,7 +79,7 @@ if (Test-Path "{dump_filename}") {{
 
         let b64_script = base64::Engine::encode(
             &base64::engine::general_purpose::STANDARD,
-            script.encode_utf16().flat_map(|u| u.to_le_bytes()).collect::<Vec<u8>>(),
+            script.encode_utf16().flat_map(u16::to_le_bytes).collect::<Vec<u8>>(),
         );
         let cmd = format!("powershell -e {b64_script}");
 
@@ -118,7 +119,7 @@ if (Test-Path "{dump_filename}") {{
         Ok(ModuleResult {
             credentials: vec![],
             success,
-            output: clean_output.clone(),
+            output: clean_output,
             data: serde_json::json!({
                 "dump_path": dump_filename,
                 "success": success,

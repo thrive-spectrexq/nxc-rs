@@ -170,7 +170,7 @@ impl NxcProtocol for WinrmProtocol {
                 admin: false,
                 is_ssl: port == 5986,
                 endpoint: url,
-                proxy: proxy.map(|s| s.to_string()),
+                proxy: proxy.map(std::string::ToString::to_string),
                 auth_header: None,
                 client: Some(client),
             }))
@@ -182,7 +182,7 @@ impl NxcProtocol for WinrmProtocol {
                 admin: false,
                 is_ssl: port == 5986,
                 endpoint: url,
-                proxy: proxy.map(|s| s.to_string()),
+                proxy: proxy.map(std::string::ToString::to_string),
                 auth_header: None,
                 client: Some(client),
             }))
@@ -204,7 +204,7 @@ impl NxcProtocol for WinrmProtocol {
         let client = winrm_sess
             .client
             .clone()
-            .unwrap_or_else(|| self.build_client(winrm_sess.proxy.as_deref()).unwrap());
+            .unwrap_or_else(|| self.build_client(winrm_sess.proxy.as_deref()).unwrap_or_else(|_| panic!("Failed to build client")));
 
         debug!("WinRM: Authenticating {}@{}", creds.username, url);
 
@@ -274,7 +274,7 @@ impl NxcProtocol for WinrmProtocol {
         let client = winrm_sess
             .client
             .clone()
-            .unwrap_or_else(|| self.build_client(winrm_sess.proxy.as_deref()).unwrap());
+            .unwrap_or_else(|| self.build_client(winrm_sess.proxy.as_deref()).unwrap_or_else(|_| panic!("Failed to build client")));
 
         // For an offensive tool, we inject AMSI and ETW bypasses into the command if it's PowerShell.
         let final_cmd = if cmd.to_lowercase().starts_with("powershell") {

@@ -100,7 +100,7 @@ impl NxcModule for MssqlDumper {
             .as_any()
             .downcast_ref::<nxc_protocols::mssql::MssqlSession>()
             .ok_or_else(|| anyhow!("MSSQL session required"))?;
-        let db = opts.get("DB").map(|s| s.as_str()).unwrap_or("master");
+        let db = opts.get("DB").map(std::string::String::as_str).unwrap_or("master");
         let proto = nxc_protocols::mssql::MssqlProtocol::new();
         let sql = format!("SELECT TABLE_NAME FROM {db}.INFORMATION_SCHEMA.TABLES");
         let tables = proto.query_json(mssql_sess, &sql).await.unwrap_or_default();
@@ -199,7 +199,7 @@ impl NxcModule for EnableCmdShell {
             .as_any()
             .downcast_ref::<nxc_protocols::mssql::MssqlSession>()
             .ok_or_else(|| anyhow!("MSSQL session required"))?;
-        let action = opts.get("ACTION").map(|s| s.as_str()).unwrap_or("enable");
+        let action = opts.get("ACTION").map(std::string::String::as_str).unwrap_or("enable");
         let proto = nxc_protocols::mssql::MssqlProtocol::new();
         let val = if action == "enable" { "1" } else { "0" };
         let sqls = [
@@ -482,7 +482,7 @@ impl NxcModule for KeepassTrigger {
             .as_any()
             .downcast_ref::<nxc_protocols::smb::SmbSession>()
             .ok_or_else(|| anyhow!("SMB required"))?;
-        let action = opts.get("ACTION").map(|s| s.as_str()).unwrap_or("check");
+        let action = opts.get("ACTION").map(std::string::String::as_str).unwrap_or("check");
         let output = format!(
             "KeePass Trigger ({}) on {}:\n  [*] Targets KeePass.config.xml\n",
             action, smb.target
@@ -790,8 +790,8 @@ impl NxcModule for SchtaskAs {
             .as_any()
             .downcast_ref::<nxc_protocols::smb::SmbSession>()
             .ok_or_else(|| anyhow!("SMB required"))?;
-        let cmd = opts.get("CMD").map(|s| s.as_str()).unwrap_or("whoami");
-        let user = opts.get("USER").map(|s| s.as_str()).unwrap_or("SYSTEM");
+        let cmd = opts.get("CMD").map(std::string::String::as_str).unwrap_or("whoami");
+        let user = opts.get("USER").map(std::string::String::as_str).unwrap_or("SYSTEM");
         let output = format!(
             "Scheduled Task on {}:\n  [*] Command: {}\n  [*] Run As: {}\n",
             smb.target, cmd, user
@@ -853,7 +853,7 @@ impl NxcModule for Slinky {
             .downcast_ref::<nxc_protocols::smb::SmbSession>()
             .ok_or_else(|| anyhow!("SMB required"))?;
         let server = opts.get("SERVER").ok_or_else(|| anyhow!("SERVER required"))?;
-        let name = opts.get("NAME").map(|s| s.as_str()).unwrap_or("desktop.lnk");
+        let name = opts.get("NAME").map(std::string::String::as_str).unwrap_or("desktop.lnk");
         let output = format!(
             "Slinky on {}:\n  [*] Dropping {} with icon path -> \\\\{}\\share\n",
             smb.target, name, server
@@ -1212,7 +1212,7 @@ impl NxcModule for LockScreenDoors {
             .as_any()
             .downcast_ref::<nxc_protocols::smb::SmbSession>()
             .ok_or_else(|| anyhow!("SMB required"))?;
-        let action = opts.get("ACTION").map(|s| s.as_str()).unwrap_or("check");
+        let action = opts.get("ACTION").map(std::string::String::as_str).unwrap_or("check");
         let output = format!("LockScreen Doors ({}) on {}:\n  [*] Checks: sethc.exe, utilman.exe, osk.exe, narrator.exe, magnify.exe\n", action, smb.target);
         Ok(ModuleResult {
             success: true,

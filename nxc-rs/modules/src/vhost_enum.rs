@@ -74,7 +74,7 @@ impl NxcModule for VhostEnum {
 
         let domain =
             opts.get("DOMAIN").ok_or_else(|| anyhow!("DOMAIN is required for vhost enum"))?;
-        let wordlist = opts.get("WORDLIST").map(|s| s.as_str()).unwrap_or("common");
+        let wordlist = opts.get("WORDLIST").map(std::string::String::as_str).unwrap_or("common");
         let threads = opts.get("THREADS").and_then(|s| s.parse::<usize>().ok()).unwrap_or(50);
 
         let basic_words = vec![
@@ -105,7 +105,7 @@ impl NxcModule for VhostEnum {
         ];
 
         let subdomains: Vec<String> = if wordlist == "common" {
-            basic_words.into_iter().map(|s| s.to_string()).collect()
+            basic_words.into_iter().map(std::string::ToString::to_string).collect()
         } else {
             match std::fs::read_to_string(wordlist) {
                 Ok(content) => content
@@ -145,7 +145,7 @@ impl NxcModule for VhostEnum {
         let mut tasks = Vec::new();
 
         for sub in subdomains {
-            let permit = sem.clone().acquire_owned().await.unwrap();
+            let permit = sem.clone().acquire_owned().await.unwrap_or_else(|_| panic!("Failed to acquire semaphore"));
             let url = base_url.clone();
             let client = http_sess.client.clone();
             let vhost = format!("{sub}.{domain}");

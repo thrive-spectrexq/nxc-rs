@@ -54,14 +54,14 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(("relay", relay_matches)) => {
-            let bind_addr = relay_matches.get_one::<String>("bind-addr").unwrap();
-            
+            let bind_addr = relay_matches.get_one::<String>("bind-addr").unwrap_or_else(|| panic!("bind-addr is required"));
+
             let config = relay::RelayConfig {
                 bind_addr: bind_addr.clone(),
                 relay_target: relay_matches.get_one::<String>("target").cloned(),
                 capture_only: relay_matches.get_one::<String>("target").is_none(),
             };
-            
+
             let server = relay::RelayServer::new(config);
             server.start().await?;
             return Ok(());
@@ -107,7 +107,7 @@ async fn main() -> Result<()> {
     // ── Parse targets ──
     let target_specs: Vec<&str> = sub_matches
         .get_many::<String>("target")
-        .map(|vals| vals.map(|s| s.as_str()).collect())
+        .map(|vals| vals.map(std::string::String::as_str).collect())
         .unwrap_or_default();
 
     let mut all_targets = Vec::new();
@@ -248,7 +248,10 @@ async fn main() -> Result<()> {
     };
 
     // ── Setup Database ──
-    let workspace = matches.get_one::<String>("workspace").map(|s| s.as_str()).unwrap_or("default");
+    let workspace = matches
+        .get_one::<String>("workspace")
+        .map(std::string::String::as_str)
+        .unwrap_or("default");
 
     // Ensure .nxc directory exists in home or current dir
     let home = std::env::var("HOME")
@@ -398,7 +401,7 @@ async fn main() -> Result<()> {
             let filename =
                 format!("report_{}_{}.json", protocol_name, Utc::now().format("%Y%m%d_%H%M%S"));
             let report_path = ws_reports_dir.join(filename);
-            if let Err(e) = reporting::export_json(report_path.to_str().unwrap(), &report) {
+            if let Err(e) = reporting::export_json(report_path.to_str().unwrap_or_else(|| panic!("report_path is invalid utf-8")), &report) {
                 NxcGlobalOutput::warn(&format!("Failed to save workspace report: {e}"));
             }
         }
@@ -491,8 +494,8 @@ mod tests {
             "pass",
         ]);
         let (_, sub_m) = matches.subcommand().unwrap();
-        let targets: Vec<&String> = sub_m.get_many::<String>("target").unwrap().collect();
-        assert_eq!(targets.len(), 2);
+        let targets = sub_m.get_many::<String>("target").unwrap();
+        assert_eq!(targets.count(), 2);
     }
 
     #[test]
