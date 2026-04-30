@@ -23,7 +23,7 @@ Please include the following information in your report:
 - Steps to reproduce the issue.
 - Potential impact and mitigation strategies.
 
-We will respond within 48 hours and work with you to resolve the issue as quickly as possible.
+We will respond within 48 hours, and work with you to resolve the issue as quickly as possible.
 
 ## Ethical Research
 
