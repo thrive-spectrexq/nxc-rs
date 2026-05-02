@@ -364,20 +364,44 @@ pub fn build_cli() -> Command {
 pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
     let mut creds = Vec::new();
 
-    let usernames: Vec<&str> = matches
-        .get_many::<String>("username")
-        .map(|vals| vals.map(std::string::String::as_str).collect())
-        .unwrap_or_default();
+    let mut usernames: Vec<String> = Vec::new();
+    if let Some(vals) = matches.get_many::<String>("username") {
+        for val in vals {
+            if std::path::Path::new(val).exists() && (!val.contains('/') || val.ends_with(".txt")) {
+                if let Ok(content) = std::fs::read_to_string(val) {
+                    usernames.extend(content.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+                }
+            } else {
+                usernames.push(val.to_string());
+            }
+        }
+    }
 
-    let passwords: Vec<&str> = matches
-        .get_many::<String>("password")
-        .map(|vals| vals.map(std::string::String::as_str).collect())
-        .unwrap_or_default();
+    let mut passwords: Vec<String> = Vec::new();
+    if let Some(vals) = matches.get_many::<String>("password") {
+        for val in vals {
+            if std::path::Path::new(val).exists() && (!val.contains('/') || val.ends_with(".txt")) {
+                if let Ok(content) = std::fs::read_to_string(val) {
+                    passwords.extend(content.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+                }
+            } else {
+                passwords.push(val.to_string());
+            }
+        }
+    }
 
-    let hashes: Vec<&str> = matches
-        .get_many::<String>("hash")
-        .map(|vals| vals.map(std::string::String::as_str).collect())
-        .unwrap_or_default();
+    let mut hashes: Vec<String> = Vec::new();
+    if let Some(vals) = matches.get_many::<String>("hash") {
+        for val in vals {
+            if std::path::Path::new(val).exists() && (!val.contains('/') || val.ends_with(".txt")) {
+                if let Ok(content) = std::fs::read_to_string(val) {
+                    hashes.extend(content.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+                }
+            } else {
+                hashes.push(val.to_string());
+            }
+        }
+    }
 
     let no_bruteforce = matches.get_flag("no-bruteforce");
     let use_kerberos = matches.get_flag("kerberos");
@@ -394,11 +418,11 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
         // Pair usernames with passwords 1:1
         let max_len = usernames.len().max(passwords.len()).max(hashes.len());
         for i in 0..max_len {
-            let user = usernames.get(i).copied().unwrap_or("");
+            let user = usernames.get(i).map(String::as_str).unwrap_or("");
             let mut c = if let Some(hash) = hashes.get(i) {
                 Credentials::nt_hash(user, hash, None)
             } else {
-                let pass = passwords.get(i).copied().unwrap_or("");
+                let pass = passwords.get(i).map(String::as_str).unwrap_or("");
                 Credentials::password(user, pass, None)
             };
             c.use_kerberos = use_kerberos;
