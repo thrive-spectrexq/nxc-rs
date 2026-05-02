@@ -107,10 +107,10 @@ pub mod rbcd;
 pub mod subnets; // get_network, get_unixpassword, ldap_checker, obsolete, pre2k
 
 // ─── Phase 3-6: MSSQL, Cred Harvesting, Persistence, Advanced ──
-pub mod mssql_modules;
-pub mod cred_harvesting;
-pub mod persistence;
 pub mod advanced_recon;
+pub mod cred_harvesting;
+pub mod mssql_modules;
+pub mod persistence;
 
 // ─── Wireless Reconnaissance ────────────────────────────────────
 pub mod wifi_recon;
@@ -491,8 +491,7 @@ impl ModuleRegistry {
         modules.insert("met_inject".into(), Box::new(persistence::MetInject::new()));
         modules.insert("empire_exec".into(), Box::new(persistence::EmpireExec::new()));
         modules.insert("web_delivery".into(), Box::new(persistence::WebDelivery::new()));
-        modules
-            .insert("lockscreendoors".into(), Box::new(persistence::LockScreenDoors::new()));
+        modules.insert("lockscreendoors".into(), Box::new(persistence::LockScreenDoors::new()));
 
         // ─── Phase 6: RS-Exclusive Advanced (6 modules) ────────────
         modules.insert("amsi_bypass".into(), Box::new(advanced_recon::AmsiBypass::new()));
