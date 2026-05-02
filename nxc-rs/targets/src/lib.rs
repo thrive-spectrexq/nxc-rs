@@ -117,7 +117,7 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>> {
     let spec = spec.trim();
 
     // Check if it's a file path
-    if std::path::Path::new(spec).exists() && !spec.contains('/') || spec.ends_with(".txt") {
+    if std::path::Path::new(spec).exists() && (!spec.contains('/') || spec.ends_with(".txt")) {
         return parse_target_file(spec);
     }
 
