@@ -179,6 +179,8 @@ pub fn build_cli() -> Command {
     let docker_cmd = build_docker_cmd(&auth_args, &module_args, &export_args);
     #[cfg(feature = "opcua-support")]
     let opcua_cmd = build_opcua_cmd(&auth_args, &module_args, &export_args);
+
+    let telnet_cmd = build_telnet_cmd(&auth_args, &module_args, &export_args);
     let dns_cmd = build_dns_cmd(&auth_args, &module_args, &export_args);
     let ipmi_cmd = build_ipmi_cmd(&auth_args, &module_args, &export_args);
 
@@ -327,6 +329,8 @@ pub fn build_cli() -> Command {
     #[cfg(feature = "opcua-support")]
     let cmd = cmd.subcommand(opcua_cmd);
 
+    let cmd = cmd.subcommand(telnet_cmd);
+
     let cmd = cmd
         .subcommand(dns_cmd)
         .subcommand(ipmi_cmd)
@@ -455,6 +459,7 @@ pub fn get_protocol_handler(
         "adb" => Some(Arc::new(nxc_protocols::adb::AdbProtocol::new())),
         #[cfg(feature = "opcua-support")]
         "opcua" => Some(Arc::new(nxc_protocols::opcua::OpcUaProtocol::new())),
+        "telnet" => Some(Arc::new(nxc_protocols::telnet::TelnetProtocol::new())),
         "network" | "net" | "wifi" => {
             let scan = sub_matches.get_flag("scan");
             let connect = sub_matches.get_one::<String>("connect").cloned();
@@ -1065,5 +1070,21 @@ fn build_rdp_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) ->
                 .long("screenshot")
                 .help("Take a screenshot of the RDP login screen")
                 .action(ArgAction::SetTrue),
+        )
+}
+
+fn build_telnet_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("telnet")
+        .about("Telnet authentication and execution (port 23)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .help("Telnet port")
+                .default_value("23")
+                .action(clap::ArgAction::Set)
+                .value_parser(clap::value_parser!(u16)),
         )
 }

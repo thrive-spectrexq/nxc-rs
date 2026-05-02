@@ -27,6 +27,7 @@ pub mod nfs;
 pub mod obfuscation;
 #[cfg(feature = "opcua-support")]
 pub mod opcua;
+pub mod telnet;
 pub mod postgresql;
 pub mod rdp;
 pub mod redis;
@@ -160,6 +161,7 @@ pub enum Protocol {
     Ilo,
     Kube,
     OpcUa,
+    Telnet,
 }
 
 impl Protocol {
@@ -188,6 +190,7 @@ impl Protocol {
             Protocol::Ilo => "ilo",
             Protocol::Kube => "kube",
             Protocol::OpcUa => "opcua",
+            Protocol::Telnet => "telnet",
         }
     }
 
@@ -216,6 +219,7 @@ impl Protocol {
             Protocol::Ilo => 443,
             Protocol::Kube => 6443,
             Protocol::OpcUa => 4840,
+            Protocol::Telnet => 23,
         }
     }
 
@@ -246,6 +250,7 @@ impl Protocol {
             "ilo" | "idrac" | "bmc" => Some(Protocol::Ilo),
             "kube" | "kubernetes" | "k8s" => Some(Protocol::Kube),
             "opcua" | "opc" => Some(Protocol::OpcUa),
+            "telnet" => Some(Protocol::Telnet),
             _ => None,
         }
     }
@@ -276,6 +281,7 @@ impl Protocol {
             Protocol::Ilo,
             Protocol::Kube,
             Protocol::OpcUa,
+            Protocol::Telnet,
         ]
     }
 }
