@@ -1060,6 +1060,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "des"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "916a94e407b54f9034d71dd748234cd1e516ced6284009906ae246f177eafe5a"
+dependencies = [
+ "cipher 0.5.1",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2833,7 +2842,7 @@ dependencies = [
  "cbc",
  "chrono",
  "cipher 0.4.4",
- "des",
+ "des 0.9.0",
  "digest 0.10.7",
  "hex",
  "hmac 0.12.1",
@@ -2913,7 +2922,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "cipher 0.4.4",
- "des",
+ "des 0.9.0",
  "futures-util",
  "hex",
  "image",
@@ -3108,7 +3117,7 @@ checksum = "d4873306de53fe82e7e484df31e1e947d61514b6ea2ed6cd7b45d63006fd9224"
 dependencies = [
  "cbc",
  "cipher 0.4.4",
- "des",
+ "des 0.8.1",
  "getrandom 0.2.17",
  "hmac 0.12.1",
  "lazy_static",
