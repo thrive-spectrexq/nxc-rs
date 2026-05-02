@@ -121,9 +121,7 @@ impl NxcProtocol for OpcUaProtocol {
         // Attempt to connect and create session
         // Note: Option 1 (Auto-select highest security) is implicitly handled by async-opcua
         // if we provide the right policy, but for now we go with None (No Security) for initial probe.
-        match client
-            .connect_to_endpoint(url.as_str(), identity_token)
-        {
+        match client.connect_to_endpoint(url.as_str(), identity_token) {
             Ok(session) => {
                 info!("OPC-UA: Session established on {}:{}", opcua_sess.target, opcua_sess.port);
                 opcua_sess.session = Some(session);
@@ -148,12 +146,16 @@ impl NxcProtocol for OpcUaProtocol {
 
             // For OPC-UA, "execute" is mapped to reading server metadata
             let node_id = NodeId::new(0, 2256);
-            let result = session.read(&[opcua::client::prelude::ReadValueId {
-                node_id,
-                attribute_id: AttributeId::Value as u32,
-                index_range: opcua::types::UAString::null(),
-                data_encoding: opcua::types::QualifiedName::null(),
-            }], opcua::types::TimestampsToReturn::Both, 0.0);
+            let result = session.read(
+                &[opcua::client::prelude::ReadValueId {
+                    node_id,
+                    attribute_id: AttributeId::Value as u32,
+                    index_range: opcua::types::UAString::null(),
+                    data_encoding: opcua::types::QualifiedName::null(),
+                }],
+                opcua::types::TimestampsToReturn::Both,
+                0.0,
+            );
 
             match result {
                 Ok(data_value) => {

@@ -67,8 +67,12 @@ pub async fn handle_ai_mode(
     };
 
     // Initialize shared resources for AI tools
-    let db_path = std::path::Path::new("nxc.db");
-    let db = Arc::new(NxcDb::new(db_path, "default")?);
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
+    let dot_nxc = std::path::PathBuf::from(home).join(".nxc");
+    let db_path = dot_nxc.join("nxc.db");
+    let db = Arc::new(NxcDb::new(&db_path, "default")?);
     let registry_mod = Arc::new(ModuleRegistry::new());
 
     let mut registry = ToolRegistry::new();

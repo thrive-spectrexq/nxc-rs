@@ -1,8 +1,8 @@
-use nxc_protocols::NxcProtocol;
 use crate::{ModuleOptions, ModuleResult, NxcModule};
 use anyhow::Result;
 use async_trait::async_trait;
 use nxc_protocols::opcua::{OpcUaProtocol, OpcUaSession};
+use nxc_protocols::NxcProtocol;
 use nxc_protocols::NxcSession;
 
 pub struct OpcUaEnum;

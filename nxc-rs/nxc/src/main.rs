@@ -54,9 +54,8 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(("relay", relay_matches)) => {
-            let bind_addr = relay_matches
-                .get_one::<String>("bind-addr")
-                .expect("clap ensures bind-addr is present via default_value");
+            let default_addr = "0.0.0.0:80".to_string();
+            let bind_addr = relay_matches.get_one::<String>("bind-addr").unwrap_or(&default_addr);
 
             let config = relay::RelayConfig {
                 bind_addr: bind_addr.clone(),
@@ -135,7 +134,7 @@ async fn main() -> Result<()> {
     }
 
     // ── Build execution options ──
-    let mut threads = matches.get_one::<usize>("threads").copied().unwrap_or(256);
+    let mut threads = matches.get_one::<usize>("threads").copied().unwrap_or(100);
     let timeout = matches.get_one::<u64>("timeout").copied().unwrap_or(30);
     let mut jitter = matches.get_one::<u64>("jitter").copied();
     let mut shuffle = matches.get_flag("shuffle");
@@ -214,9 +213,7 @@ async fn main() -> Result<()> {
         }
         "opcua" => {
             if sub_matches.get_flag("enum") && !modules.contains(&"opcua_enum".to_string()) {
-                // For OPC-UA, we map 'enum' to a stub if we want module isolation,
-                // but NxcEngine will call protocol.execute() by default?
-                // Actually, let's just mark it.
+                modules.push("opcua_enum".to_string());
             }
         }
         _ => {}
@@ -404,7 +401,7 @@ async fn main() -> Result<()> {
                 format!("report_{}_{}.json", protocol_name, Utc::now().format("%Y%m%d_%H%M%S"));
             let report_path = ws_reports_dir.join(filename);
             if let Err(e) = reporting::export_json(
-                report_path.to_str().unwrap_or_else(|| panic!("report_path is invalid utf-8")),
+                report_path.to_str().unwrap_or(""),
                 &report,
             ) {
                 NxcGlobalOutput::warn(&format!("Failed to save workspace report: {e}"));
