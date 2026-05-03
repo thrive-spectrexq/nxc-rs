@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS nxc_shares (
     write_access INTEGER DEFAULT 0
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_nxc_creds_unique ON nxc_credentials(workspace, username, domain);
+CREATE INDEX IF NOT EXISTS idx_nxc_creds_user ON nxc_credentials(workspace, username, domain);
 
 CREATE TABLE IF NOT EXISTS nxc_loot (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -156,8 +156,9 @@ pub struct WorkspaceStats {
 /// New migrations are appended; existing ones must NEVER be modified.
 const MIGRATIONS: &[(i64, &str)] = &[
     (1, NXC_SCHEMA),
+    (2, "DROP INDEX IF EXISTS idx_nxc_creds_unique; CREATE INDEX IF NOT EXISTS idx_nxc_creds_user ON nxc_credentials(workspace, username, domain);"),
     // Future migrations:
-    // (2, "ALTER TABLE nxc_hosts ADD COLUMN agent TEXT;"),
+    // (3, "ALTER TABLE nxc_hosts ADD COLUMN agent TEXT;"),
 ];
 
 /// Run pending migrations against the database.
@@ -282,14 +283,7 @@ impl NxcDb {
         conn.execute(
             "INSERT INTO nxc_credentials (workspace, domain, username, password, nt_hash, lm_hash, aes_128, aes_256, source, host_id, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-             ON CONFLICT(workspace, username, domain) DO UPDATE SET
-                password = COALESCE(excluded.password, password),
-                nt_hash = COALESCE(excluded.nt_hash, nt_hash),
-                lm_hash = COALESCE(excluded.lm_hash, lm_hash),
-                aes_128 = COALESCE(excluded.aes_128, aes_128),
-                aes_256 = COALESCE(excluded.aes_256, aes_256),
-                source = excluded.source,
-                created_at = excluded.created_at",
+             ",
             rusqlite::params![
                 cred.workspace, cred.domain, cred.username, cred.password,
                 cred.nt_hash, cred.lm_hash, cred.aes_128, cred.aes_256,

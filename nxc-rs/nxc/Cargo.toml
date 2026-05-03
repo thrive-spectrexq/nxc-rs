@@ -51,6 +51,7 @@ html-escape = "0.2"
 hex.workspace = true
 serde = { workspace = true, features = ["derive"] }
 csv.workspace = true
+tracing-appender = "0.2.5"
 
 [features]
 opcua-support = []

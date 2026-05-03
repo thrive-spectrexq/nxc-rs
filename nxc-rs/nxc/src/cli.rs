@@ -312,12 +312,6 @@ pub fn build_cli() -> Command {
                         .help("Address to bind the HTTP listener (e.g. 0.0.0.0:80)")
                         .default_value("0.0.0.0:80"),
                 )
-                .arg(
-                    Arg::new("target")
-                        .long("target")
-                        .short('t')
-                        .help("Target to relay authentication to (omit for capture-only mode)"),
-                )
         )
         .subcommand(wmi_cmd)
         .subcommand(mysql_cmd)
@@ -367,7 +361,7 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
     let mut usernames: Vec<String> = Vec::new();
     if let Some(vals) = matches.get_many::<String>("username") {
         for val in vals {
-            if std::path::Path::new(val).exists() && (!val.contains('/') || val.ends_with(".txt")) {
+            if std::path::Path::new(val).exists() {
                 if let Ok(content) = std::fs::read_to_string(val) {
                     usernames.extend(content.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
                 }
@@ -380,7 +374,7 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
     let mut passwords: Vec<String> = Vec::new();
     if let Some(vals) = matches.get_many::<String>("password") {
         for val in vals {
-            if std::path::Path::new(val).exists() && (!val.contains('/') || val.ends_with(".txt")) {
+            if std::path::Path::new(val).exists() {
                 if let Ok(content) = std::fs::read_to_string(val) {
                     passwords.extend(content.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
                 }
@@ -393,7 +387,7 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
     let mut hashes: Vec<String> = Vec::new();
     if let Some(vals) = matches.get_many::<String>("hash") {
         for val in vals {
-            if std::path::Path::new(val).exists() && (!val.contains('/') || val.ends_with(".txt")) {
+            if std::path::Path::new(val).exists() {
                 if let Ok(content) = std::fs::read_to_string(val) {
                     hashes.extend(content.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
                 }
