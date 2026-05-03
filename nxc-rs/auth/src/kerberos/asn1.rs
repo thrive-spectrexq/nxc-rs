@@ -11,7 +11,7 @@ pub type KerberosTime = GeneralizedTime;
 pub fn krb_string(s: &str) -> GeneralString {
     GeneralString::try_from(s).unwrap_or_else(|_| {
         GeneralString::try_from("")
-            .unwrap_or_else(|_| panic!("Failed to create empty GeneralString"))
+            .unwrap_or_default()
     })
 }
 
