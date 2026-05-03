@@ -521,8 +521,13 @@ impl ExecutionEngine {
                                 let mut module_data = std::collections::HashMap::new();
                                 if auth_res.success && !opts_clone.modules.is_empty() {
                                     let registry = nxc_modules::ModuleRegistry::new();
+                                    let active_protocol = protocol_clone.name();
                                     for module_name in &opts_clone.modules {
                                         if let Some(module) = registry.get(module_name) {
+                                            if !module.supported_protocols().contains(&active_protocol) {
+                                                tracing::error!("Module '{}' requires one of {:?}, but current protocol is '{}'. Skipping.", module_name, module.supported_protocols(), active_protocol);
+                                                continue;
+                                            }
                                             match module.run(session.as_mut(), &opts_clone.module_opts).await {
                                                 Ok(mod_res) => {
                                                     if mod_res.success {
