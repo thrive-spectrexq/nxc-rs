@@ -41,7 +41,29 @@ async fn main() -> Result<()> {
         tracing::Level::WARN
     };
 
-    tracing_subscriber::fmt().with_max_level(log_level).with_target(false).init();
+    let mut _log_guard = None;
+    if let Some(log_path) = matches.get_one::<String>("log") {
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)?;
+        let (non_blocking, guard) = tracing_appender::non_blocking(file);
+        _log_guard = Some(guard);
+
+        use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+        let file_layer = tracing_subscriber::fmt::layer()
+            .with_writer(non_blocking)
+            .with_ansi(false);
+        let stdout_layer = tracing_subscriber::fmt::layer().with_target(false);
+
+        tracing_subscriber::registry()
+            .with(tracing_subscriber::filter::LevelFilter::from(log_level))
+            .with(stdout_layer)
+            .with(file_layer)
+            .init();
+    } else {
+        tracing_subscriber::fmt().with_max_level(log_level).with_target(false).init();
+    }
 
     // ── Get the protocol subcommand ──
     let (protocol_name, sub_matches) = match matches.subcommand() {
@@ -59,8 +81,8 @@ async fn main() -> Result<()> {
 
             let config = relay::RelayConfig {
                 bind_addr: bind_addr.clone(),
-                relay_target: relay_matches.get_one::<String>("target").cloned(),
-                capture_only: relay_matches.get_one::<String>("target").is_none(),
+
+                capture_only: true,
             };
 
             let server = relay::RelayServer::new(config);

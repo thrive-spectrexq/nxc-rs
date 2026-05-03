@@ -57,7 +57,7 @@ impl NxcModule for EnumDns {
         let ldap_session = match session.protocol() {
             "ldap" => session
                 .downcast_mut::<nxc_protocols::ldap::LdapSession>()
-                .unwrap_or_else(|| panic!("session downcast failed")),
+                .ok_or_else(|| anyhow::anyhow!("Module requires a specific session type"))?,
             _ => return Err(anyhow::anyhow!("Module only supports LDAP")),
         };
 
