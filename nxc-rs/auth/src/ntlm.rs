@@ -314,7 +314,7 @@ impl NtlmAuthenticator {
                 let exported_key: [u8; 16] = rand::random();
                 let key_array: &[u8; 16] = session_base_key[..16]
                     .try_into()
-                    .unwrap_or_else(|_| panic!("key_array try_into failed"));
+                    .map_err(|_| anyhow::anyhow!("CryptoError: key derivation slice wrong length"))?;
                 let mut rc4_key = Rc4::new_from_slice(key_array)
                     .map_err(|e| anyhow::anyhow!("RC4 init fail: {e}"))?;
                 let mut encrypted = exported_key;
