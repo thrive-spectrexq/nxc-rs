@@ -24,46 +24,43 @@ pub struct CapturedHash {
 
 /// NTLM Relay server configuration.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct RelayConfig {
     /// Address to bind the HTTP listener (e.g., "0.0.0.0:80").
     pub bind_addr: String,
     /// Target to relay authentication to (e.g., "192.168.1.10:445").
-    pub relay_target: Option<String>,
-    /// Whether to only capture hashes (no relay).
+        /// Whether to only capture hashes (no relay).
     pub capture_only: bool,
 }
 
 impl Default for RelayConfig {
     fn default() -> Self {
-        Self { bind_addr: "0.0.0.0:80".to_string(), relay_target: None, capture_only: true }
+        Self { bind_addr: "0.0.0.0:80".to_string(), capture_only: true }
     }
 }
 
 /// NTLM Relay server — HTTP listener that triggers NTLM authentication
 /// and captures/relays the resulting credentials.
-#[allow(dead_code)]
 pub struct RelayServer {
     config: RelayConfig,
     captured: std::sync::Arc<tokio::sync::Mutex<Vec<CapturedHash>>>,
 }
 
-#[allow(dead_code)]
 impl RelayServer {
     pub fn new(config: RelayConfig) -> Self {
         Self { config, captured: std::sync::Arc::new(tokio::sync::Mutex::new(Vec::new())) }
     }
 
     /// Create a capture-only relay on the given address.
+    #[allow(dead_code)]
     pub fn capture_only(bind_addr: &str) -> Self {
         Self::new(RelayConfig {
             bind_addr: bind_addr.to_string(),
-            relay_target: None,
-            capture_only: true,
+                        capture_only: true,
         })
     }
 
     /// Get all captured hashes so far.
+    #[allow(dead_code)]
     pub async fn captured_hashes(&self) -> Vec<CapturedHash> {
         self.captured.lock().await.clone()
     }
