@@ -76,7 +76,7 @@ impl NxcProtocol for OpcUaProtocol {
         port: u16,
         _proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
-        let url = format!("opc.tcp://{}:{}/", target, port);
+        let url = format!("opc.tcp://{target}:{port}/");
         debug!("OPC-UA: Connecting to {}", url);
 
         // Configure OPC-UA Client
@@ -159,10 +159,10 @@ impl NxcProtocol for OpcUaProtocol {
 
             match result {
                 Ok(data_value) => {
-                    let output = format!("Server Status: {:?}", data_value);
+                    let output = format!("Server Status: {data_value:?}");
                     Ok(CommandOutput { stdout: output, stderr: String::new(), exit_code: Some(0) })
                 }
-                Err(e) => Err(anyhow!("Failed to read server status: {}", e)),
+                Err(e) => Err(anyhow!("Failed to read server status: {e}")),
             }
         } else {
             Err(anyhow!("No active OPC-UA session"))
