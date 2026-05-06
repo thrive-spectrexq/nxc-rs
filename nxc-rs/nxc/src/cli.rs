@@ -321,7 +321,7 @@ pub fn build_cli() -> Command {
     #[cfg(feature = "opcua-support")]
     let cmd = cmd.subcommand(opcua_cmd);
 
-    let cmd = cmd
+    cmd
         .subcommand(dns_cmd)
         .subcommand(ipmi_cmd)
         .subcommand(nfs_cmd)
@@ -350,9 +350,7 @@ pub fn build_cli() -> Command {
                         .long("model")
                         .help("Specific model to use (default: gemini-1.5-flash)"),
                 ),
-        );
-
-    cmd
+        )
 }
 
 pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {

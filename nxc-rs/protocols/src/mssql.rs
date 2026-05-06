@@ -145,7 +145,7 @@ impl NxcProtocol for MssqlProtocol {
             debug!("MSSQL: Using Windows auth for {}\\{}", domain, username);
             #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
             config.authentication(AuthMethod::sql_server(
-                format!("{}\\{}", domain, username),
+                format!("{domain}\\{username}"),
                 &password,
             ));
             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
@@ -394,7 +394,7 @@ impl MssqlProtocol {
                     mssql_sess.credentials = Some(creds.clone());
                     Ok(AuthResult::success(false))
                 }
-                Ok(Err(e)) => Ok(AuthResult::failure(&format!("Auth failed: {}", e), None)),
+                Ok(Err(e)) => Ok(AuthResult::failure(&format!("Auth failed: {e}"), None)),
                 Err(_) => Ok(AuthResult::failure("Connection timeout", None)),
             }
         }
