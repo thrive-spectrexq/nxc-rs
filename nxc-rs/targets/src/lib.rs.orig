@@ -496,7 +496,7 @@ impl ExecutionEngine {
                                         })?;
 
                                         if a_p.success {
-                                            if let Ok(cred_id) = db_p.add_credential(&Credential {
+                                            let _ = db_p.add_credential(&Credential {
                                                 id: None,
                                                 workspace: db_p.current_workspace().to_string(),
                                                 domain: None,
@@ -506,14 +506,10 @@ impl ExecutionEngine {
                                                 lm_hash: None,
                                                 aes_128: None,
                                                 aes_256: None,
-                                                source: Some(proto_name.clone()),
+                                                source: Some(proto_name),
                                                 host_id: Some(h_id),
                                                 created_at: now,
-                                            }) {
-                                                let _ = db_p.add_auth_result(h_id, Some(cred_id), &proto_name, "Success", a_p.admin);
-                                            }
-                                        } else {
-                                            let _ = db_p.add_auth_result(h_id, None, &proto_name, "Failure", false);
+                                            })?;
                                         }
                                         Ok(Some(h_id))
                                     }).await;
