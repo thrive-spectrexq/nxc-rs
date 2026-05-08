@@ -435,6 +435,13 @@ async fn main() -> Result<()> {
         }
     }
 
+    // Automated raw result logging if requested
+    if let Some(log_res_path) = sub_matches.get_one::<String>("log-results") {
+        if let Err(e) = reporting::export_ndjson(log_res_path, &results) {
+            NxcGlobalOutput::warn(&format!("Failed to write results log: {e}"));
+        }
+    }
+
     // 2. User-requested Exports
     if let Some(format) = sub_matches.get_one::<String>("export") {
         let mut path = sub_matches

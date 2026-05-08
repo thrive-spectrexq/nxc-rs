@@ -261,7 +261,13 @@ pub fn build_cli() -> Command {
         .arg(
             Arg::new("log")
                 .long("log")
-                .help("Export results to a custom file")
+                .help("Enable tracing debug log output to a file")
+                .global(true),
+        )
+        .arg(
+            Arg::new("log-results")
+                .long("log-results")
+                .help("Write structured execution results to a log file")
                 .global(true),
         )
         .arg(
