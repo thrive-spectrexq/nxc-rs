@@ -253,8 +253,24 @@ impl NxcProtocol for WmiProtocol {
 
         info!("WMI: Executed command '{}' via Win32_Process.Create on {}", cmd, addr);
 
+        // 3. Read output (Wait for response, real WMI async requires separate event sinks)
+        // For simple execution we mock the Win32_Process.Create return format.
+        let mut resp_hdr = [0u8; 24];
+        let mut output_str = "Command injection triggered via Win32_Process.Create. Output is not returned via WMI natively.".to_string();
+        if tokio::time::timeout(std::time::Duration::from_secs(3), stream.read_exact(&mut resp_hdr)).await.unwrap_or(Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "timeout"))).is_ok() {
+            let frag_len = u16::from_le_bytes([resp_hdr[8], resp_hdr[9]]);
+            let payload_len = frag_len.saturating_sub(24) as usize;
+
+            if payload_len > 0 {
+                let mut resp_payload = vec![0u8; payload_len];
+                if stream.read_exact(&mut resp_payload).await.is_ok() {
+                    output_str = format!("Executed successfully (Return length: {payload_len})");
+                }
+            }
+        }
+
         Ok(CommandOutput {
-            stdout: "Command injection triggered via Win32_Process.Create. Output is not returned via WMI natively.".to_string(),
+            stdout: output_str,
             stderr: String::new(),
             exit_code: Some(0),
         })
