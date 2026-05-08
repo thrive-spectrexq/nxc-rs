@@ -312,6 +312,12 @@ pub fn build_cli() -> Command {
                         .help("Address to bind the HTTP listener (e.g. 0.0.0.0:80)")
                         .default_value("0.0.0.0:80"),
                 )
+                .arg(
+                    Arg::new("target")
+                        .short('t')
+                        .long("target")
+                        .help("Target to relay authentication to (e.g. 192.168.1.10:445). If missing, runs in capture-only mode."),
+                )
         )
         .subcommand(wmi_cmd)
         .subcommand(mysql_cmd)

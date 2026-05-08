@@ -78,11 +78,12 @@ async fn main() -> Result<()> {
         Some(("relay", relay_matches)) => {
             let default_addr = "0.0.0.0:80".to_string();
             let bind_addr = relay_matches.get_one::<String>("bind-addr").unwrap_or(&default_addr);
+            let target = relay_matches.get_one::<String>("target");
 
             let config = relay::RelayConfig {
                 bind_addr: bind_addr.clone(),
-
-                capture_only: true,
+                capture_only: target.is_none(),
+                relay_target: target.cloned(),
             };
 
             let server = relay::RelayServer::new(config);
