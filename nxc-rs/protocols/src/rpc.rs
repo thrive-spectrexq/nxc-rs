@@ -264,6 +264,60 @@ pub const UUID_EFSR: [u8; 16] = [
 pub mod drsuapi {
     pub const DRS_BIND: u16 = 0;
     pub const DRS_GET_NC_CHANGES: u16 = 3;
+
+    pub fn build_drs_bind() -> Vec<u8> {
+        let mut buf = Vec::new();
+        // Minimal DRSBind struct (UUID)
+        buf.extend_from_slice(&[0x00; 16]); // pUuidClient
+        buf.extend_from_slice(&0x00u32.to_le_bytes()); // pClientInfo (NULL)
+        buf
+    }
+
+    pub fn build_drs_get_nc_changes(h_drs: &[u8; 20]) -> Vec<u8> {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(h_drs); // hDrs
+        buf.extend_from_slice(&0x00u32.to_le_bytes()); // dwInVersion
+        buf.extend_from_slice(&0x00u32.to_le_bytes()); // pmsgIn
+        buf
+    }
+}
+
+pub mod lsarpc {
+    pub const LSAR_OPEN_POLICY2: u16 = 44;
+    pub const LSAR_ENUMERATE_SECRETS: u16 = 14;
+    pub const LSAR_OPEN_SECRET: u16 = 28;
+    pub const LSAR_CLOSE: u16 = 0;
+
+    pub fn build_lsar_open_policy2(target: &str) -> Vec<u8> {
+        let mut buf = Vec::new();
+        // SystemName (Pointer)
+        buf.extend_from_slice(&0x00020000u32.to_le_bytes());
+        let target_utf16: Vec<u16> = target.encode_utf16().chain(std::iter::once(0)).collect();
+        buf.extend_from_slice(&(target_utf16.len() as u32).to_le_bytes()); // Max count
+        buf.extend_from_slice(&0u32.to_le_bytes()); // Offset
+        buf.extend_from_slice(&(target_utf16.len() as u32).to_le_bytes()); // Actual count
+        for u in target_utf16 {
+            buf.extend_from_slice(&u.to_le_bytes());
+        }
+        while buf.len() % 4 != 0 {
+            buf.push(0);
+        }
+
+        // ObjectAttributes (NULL pointer)
+        buf.extend_from_slice(&[0x00; 24]);
+
+        // DesiredAccess (POLICY_ALL_ACCESS = 0x000F0FFF)
+        buf.extend_from_slice(&0x000F0FFFu32.to_le_bytes());
+        buf
+    }
+
+    pub fn build_lsar_enumerate_secrets(h_policy: &[u8; 20]) -> Vec<u8> {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(h_policy);
+        buf.extend_from_slice(&0u32.to_le_bytes()); // ResumeHandle
+        buf.extend_from_slice(&8192u32.to_le_bytes()); // PreferredMaximumLength
+        buf
+    }
 }
 
 pub mod efsr {

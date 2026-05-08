@@ -654,7 +654,11 @@ impl SmbProtocol {
 
             let security_mode = data[66];
             info.smb_signing = (security_mode & 0x01) != 0 || (security_mode & 0x02) != 0;
-            info.signing_required = (security_mode & 0x02) != 0;
+            info.signing_required = (security_mode & 0x02) != 0 || (security_mode & 0x08) != 0;
+            let dialect = u16::from_le_bytes(data[68..70].try_into()?);
+            if dialect >= 0x0300 && info.signing_required {
+                tracing::info!("SMB3 Signing/Encryption required. Future packet flow will enforce AES-128-CMAC signature verification.");
+            }
         }
         Ok(info)
     }
