@@ -884,7 +884,7 @@ impl SmbProtocol {
         Ok(s.trim_end_matches('\0').to_string())
     }
 
-    async fn send_smb2_packet(
+    pub async fn send_smb2_packet(
         stream: &mut TcpStream,
         data: &[u8],
         timeout: Duration,
@@ -905,7 +905,7 @@ impl SmbProtocol {
         Ok(())
     }
 
-    async fn recv_smb2_packet(stream: &mut TcpStream, timeout: Duration) -> Result<Vec<u8>> {
+    pub async fn recv_smb2_packet(stream: &mut TcpStream, timeout: Duration) -> Result<Vec<u8>> {
         tokio::time::timeout(timeout, async {
             let mut header = [0u8; 4];
             stream.read_exact(&mut header).await?;
@@ -956,7 +956,7 @@ impl SmbProtocol {
         Ok(AuthResult::success(is_admin))
     }
 
-    fn build_session_setup_base(&self) -> Vec<u8> {
+    pub fn build_session_setup_base(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(128);
         buf.extend_from_slice(&Smb2Header::new(0x0001).to_bytes());
         buf.extend_from_slice(&[

