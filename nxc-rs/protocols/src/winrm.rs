@@ -311,7 +311,7 @@ impl NxcProtocol for WinrmProtocol {
 
         // 3. Receive Output (Poll)
         let mut stdout = String::new();
-        let stderr = String::new();
+        let mut stderr = String::new();
         loop {
             let receive_soap = self.build_receive_soap(&shell_id, &command_id);
             let mut req =
@@ -322,10 +322,30 @@ impl NxcProtocol for WinrmProtocol {
             let resp = req.body(receive_soap).send().await?;
             let body = resp.text().await?;
 
-            if let Some(out) = self.extract_xml_tag(&body, "rsp:Stream") {
-                let decoded =
-                    base64::Engine::decode(&base64::engine::general_purpose::STANDARD, out)?;
-                stdout.push_str(&String::from_utf8_lossy(&decoded));
+            let mut current_idx = 0;
+            while let Some(start_pos) = body[current_idx..].find("<rsp:Stream") {
+                let abs_start = current_idx + start_pos;
+                if let Some(content_start) = body[abs_start..].find('>') {
+                    let tag_content_start = abs_start + content_start + 1;
+                    if let Some(end_pos) = body[tag_content_start..].find("</rsp:Stream>") {
+                        let content = body[tag_content_start..tag_content_start + end_pos].trim();
+                        if !content.is_empty() {
+                            if let Ok(decoded) = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, content) {
+                                let is_stderr = body[abs_start..tag_content_start].contains("Name=\"stderr\"");
+                                if is_stderr {
+                                    stderr.push_str(&String::from_utf8_lossy(&decoded));
+                                } else {
+                                    stdout.push_str(&String::from_utf8_lossy(&decoded));
+                                }
+                            }
+                        }
+                        current_idx = tag_content_start + end_pos + 13; // 13 is len of </rsp:Stream>
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
             }
 
             if body.contains("CommandState=\"Done\"") {
