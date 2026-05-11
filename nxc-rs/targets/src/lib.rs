@@ -117,7 +117,7 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>> {
     let spec = spec.trim();
 
     // Check if it's a file path
-    if std::path::Path::new(spec).exists() && (!spec.contains('/') || spec.ends_with(".txt")) {
+    if std::path::Path::new(spec).is_file() && parse_cidr(spec).is_err() {
         return parse_target_file(spec);
     }
 
@@ -185,7 +185,8 @@ fn parse_cidr(spec: &str) -> Result<Vec<Target>> {
 
 /// Parse dash range (e.g. 192.168.1.1-254).
 fn parse_range(spec: &str) -> Result<Vec<Target>> {
-    let dash_pos = spec.rfind('-').unwrap_or_else(|| panic!("No dash in spec"));
+    let dash_pos = spec.rfind('-')
+        .ok_or_else(|| anyhow::anyhow!("Invalid range format: missing dash"))?;
     let base = &spec[..dash_pos];
     let end_octet: u8 = spec[dash_pos + 1..].parse()?;
 
@@ -334,12 +335,11 @@ impl ExecutionEngine {
         let total_tasks = targets.len() * creds.len();
         let pb = if total_tasks > 1 {
             let pb = indicatif::ProgressBar::new(total_tasks as u64);
-            pb.set_style(
-                indicatif::ProgressStyle::default_bar()
-                    .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
-                    .unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"))
-                    .progress_chars("#>-"),
-            );
+            if let Ok(style) = indicatif::ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+            {
+                pb.set_style(style.progress_chars("#>-"));
+            }
             pb.set_message("spidering...");
             Some(pb)
         } else {
@@ -406,9 +406,10 @@ impl ExecutionEngine {
                 }
 
                 let permit =
-                    semaphore.clone().acquire_owned().await.unwrap_or_else(|_| {
-                        panic!("Failed to compile regex or create progress style")
+                    semaphore.clone().acquire_owned().await.map_err(|_| {
+                        anyhow::anyhow!("Execution engine semaphore closed unexpectedly")
                     });
+                let permit = match permit { Ok(p) => p, Err(e) => { tracing::error!("{e}"); continue; } };
                 let protocol_clone = protocol.clone();
                 let target_clone = target.clone();
                 let cred_clone = cred.clone();
@@ -683,32 +684,27 @@ mod tests {
 
     #[test]
     fn test_parse_single_ip() {
-        let targets = parse_targets("192.168.1.10")
-            .unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"));
+        let targets = parse_targets("192.168.1.10").unwrap();
         assert_eq!(targets.len(), 1);
         assert_eq!(targets[0].ip_string(), "192.168.1.10");
     }
 
     #[test]
     fn test_parse_cidr_24() {
-        let targets = parse_targets("192.168.1.0/24")
-            .unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"));
+        let targets = parse_targets("192.168.1.0/24").unwrap();
         assert_eq!(targets.len(), 254); // .1 through .254
     }
 
     #[test]
     fn test_parse_range() {
-        let targets = parse_targets("192.168.1.1-10")
-            .unwrap_or_else(|_| panic!("Failed to compile regex or create progress style"));
+        let targets = parse_targets("192.168.1.1-10").unwrap();
         assert_eq!(targets.len(), 10);
     }
 
     #[test]
     fn test_target_display() {
         let t = Target::new(
-            "10.0.0.1"
-                .parse()
-                .unwrap_or_else(|_| panic!("Failed to compile regex or create progress style")),
+            "10.0.0.1".parse().unwrap(),
         )
         .with_hostname("dc01.corp.local");
         assert_eq!(t.display(), "10.0.0.1 (dc01.corp.local)");
@@ -812,18 +808,10 @@ mod tests {
 
         let targets =
             vec![
-                Target::new("192.168.1.10".parse().unwrap_or_else(|_| {
-                    panic!("Failed to compile regex or create progress style")
-                })),
-                Target::new("192.168.1.11".parse().unwrap_or_else(|_| {
-                    panic!("Failed to compile regex or create progress style")
-                })),
-                Target::new("192.168.1.12".parse().unwrap_or_else(|_| {
-                    panic!("Failed to compile regex or create progress style")
-                })),
-                Target::new("192.168.1.99".parse().unwrap_or_else(|_| {
-                    panic!("Failed to compile regex or create progress style")
-                })), // Mocks connection failure
+                Target::new("192.168.1.10".parse().unwrap()),
+                Target::new("192.168.1.11".parse().unwrap()),
+                Target::new("192.168.1.12".parse().unwrap()),
+                Target::new("192.168.1.99".parse().unwrap()), // Mocks connection failure
             ];
 
         let creds = vec![
@@ -924,9 +912,7 @@ mod tests {
         }
 
         let targets = vec![Target::new(
-            "127.0.0.1"
-                .parse()
-                .unwrap_or_else(|_| panic!("Failed to compile regex or create progress style")),
+            "127.0.0.1".parse().unwrap(),
         )];
         let creds = vec![Credentials::password("admin", "pass", None)];
 
