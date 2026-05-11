@@ -1055,7 +1055,7 @@ impl NxcProtocol for SmbProtocol {
         proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
         let mut stream = crate::connection::connect(target, port, proxy).await?;
-        let host_info = SmbProtocol::negotiate(&mut stream, self.timeout).await.unwrap_or_default();
+        let host_info = SmbProtocol::negotiate(&mut stream, self.timeout).await?;
         Ok(Box::new(SmbSession {
             target: target.to_string(),
             port,
