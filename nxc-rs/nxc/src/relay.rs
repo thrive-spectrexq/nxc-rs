@@ -348,8 +348,8 @@ fn build_ntlm_type2_challenge() -> Vec<u8> {
         | 0x20000000  // NEGOTIATE_128
         | 0x40000000; // KEY_EXCH
     msg.extend_from_slice(&flags.to_le_bytes());
-    // Server Challenge (8 bytes — random in production, fixed for capture)
-    msg.extend_from_slice(&[0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88]);
+    // Server Challenge (8 bytes)
+    msg.extend_from_slice(&rand::random::<[u8; 8]>());
     // Reserved (8 bytes)
     msg.extend_from_slice(&[0u8; 8]);
     // Target Info (empty security buffer): len=0, maxlen=0, offset=56
