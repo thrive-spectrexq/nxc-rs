@@ -23,3 +23,6 @@ nxc-protocols = { path = "../protocols" }
 nxc-targets = { path = "../targets" }
 nxc-db = { path = "../db" }
 nxc-modules = { path = "../modules" }
+
+[features]
+opcua-support = ["nxc-protocols/opcua-support"]

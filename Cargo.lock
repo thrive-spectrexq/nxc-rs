@@ -2802,6 +2802,7 @@ dependencies = [
  "nxc-modules",
  "nxc-protocols",
  "nxc-targets",
+ "rand 0.10.1",
  "reqwest",
  "serde",
  "serde_json",
