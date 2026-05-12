@@ -129,7 +129,7 @@ pub fn build_cli() -> Command {
 
     // ── Module arguments ──
     let module_args = vec![
-        Arg::new("module").short('M').long("module").help("Module to use").num_args(1),
+        Arg::new("module").short('M').long("module").help("Module to use").num_args(1..),
         Arg::new("module-options").short('o').help("Module options (KEY=VALUE)").num_args(1..),
         Arg::new("list-modules")
             .short('L')
@@ -181,6 +181,7 @@ pub fn build_cli() -> Command {
     let opcua_cmd = build_opcua_cmd(&auth_args, &module_args, &export_args);
     let dns_cmd = build_dns_cmd(&auth_args, &module_args, &export_args);
     let ipmi_cmd = build_ipmi_cmd(&auth_args, &module_args, &export_args);
+    let kube_cmd = build_kube_cmd(&auth_args, &module_args, &export_args);
 
     let cmd = Command::new("nxc")
         .about(banner)
@@ -336,6 +337,7 @@ pub fn build_cli() -> Command {
     cmd
         .subcommand(dns_cmd)
         .subcommand(ipmi_cmd)
+        .subcommand(kube_cmd)
         .subcommand(nfs_cmd)
         .subcommand(adb_cmd)
         .subcommand(network_cmd)
@@ -557,6 +559,26 @@ fn build_vnc_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) ->
             Arg::new("screenshot")
                 .long("screenshot")
                 .help("Take screenshot upon successful auth")
+                .action(ArgAction::SetTrue),
+        )
+}
+
+fn build_kube_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+    Command::new("kube")
+        .about("Kubernetes API protocol (port 6443/8443/10250)")
+        .args(auth_args)
+        .args(module_args)
+        .args(export_args)
+        .arg(
+            Arg::new("port")
+                .long("port")
+                .default_value("6443")
+                .value_parser(clap::value_parser!(u16)),
+        )
+        .arg(
+            Arg::new("enum")
+                .long("enum")
+                .help("Enumerate Kubernetes information")
                 .action(ArgAction::SetTrue),
         )
 }

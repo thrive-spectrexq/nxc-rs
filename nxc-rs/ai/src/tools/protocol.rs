@@ -25,7 +25,7 @@ impl NxcTool for ProtocolTool {
             "properties": {
                 "protocol": {
                     "type": "string",
-                    "enum": ["smb", "ssh", "winrm", "ldap", "mssql", "rdp", "http", "redis", "postgres", "mysql", "snmp", "docker", "dns", "ipmi", "ilo", "kube"],
+                    "enum": ["smb", "ssh", "winrm", "wmi", "ftp", "vnc", "nfs", "adb", "network", "opcua", "ldap", "mssql", "rdp", "http", "redis", "postgres", "mysql", "snmp", "docker", "dns", "ipmi", "ilo", "kube"],
                     "description": "The protocol to run"
                 },
                 "targets": {
@@ -106,9 +106,16 @@ impl NxcTool for ProtocolTool {
             Protocol::Ipmi => Arc::new(nxc_protocols::ipmi::IpmiProtocol::new()),
             Protocol::Ilo => Arc::new(nxc_protocols::ilo::IloProtocol::new()),
             Protocol::Kube => Arc::new(nxc_protocols::kube::KubeProtocol::new()),
-            _ => anyhow::bail!(
-                "Protocol handler for {protocol_name} not yet integrated into AI tool"
-            ),
+            Protocol::Wmi => Arc::new(nxc_protocols::wmi::WmiProtocol::new()),
+            Protocol::Ftp => Arc::new(nxc_protocols::ftp::FtpProtocol::new()),
+            Protocol::Vnc => Arc::new(nxc_protocols::vnc::VncProtocol::new()),
+            Protocol::Nfs => Arc::new(nxc_protocols::nfs::NfsProtocol::new()),
+            Protocol::Adb => Arc::new(nxc_protocols::adb::AdbProtocol::new()),
+            Protocol::Network => Arc::new(nxc_protocols::network::NetworkProtocol::new(false, None, false, false, false, false, false)),
+            #[cfg(feature = "opcua-support")]
+            Protocol::OpcUa => Arc::new(nxc_protocols::opcua::OpcUaProtocol::new()),
+            #[cfg(not(feature = "opcua-support"))]
+            Protocol::OpcUa => anyhow::bail!("OPC-UA support is not enabled. Recompile with the 'opcua-support' feature."),
         };
 
         let results = engine.run(protocol_handler, targets, creds).await;
