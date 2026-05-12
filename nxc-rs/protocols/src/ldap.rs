@@ -4,7 +4,7 @@
 //! Supports simple bind authentication.
 
 use crate::{CommandOutput, NxcProtocol, NxcSession};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use nxc_auth::{kerberos::KerberosClient, AuthResult, Credentials};
 use std::time::Duration;
@@ -402,10 +402,21 @@ impl LdapProtocol {
 
         // 3. Build AP-REQ / Wrap in GSSAPI
         let ap_req = krb_client.build_ap_req(&tgs)?;
-        let mut gssapi_token = Vec::new();
-        gssapi_token.extend_from_slice(&[0x60, 0x82, 0x01, 0x00]); // Fake ASN.1 GSSAPI wrapper length for demo, real implementation uses libgssapi or full ASN.1
-        gssapi_token.extend_from_slice(b"\x06\x09\x2a\x86\x48\x86\xf7\x12\x01\x02\x02"); // OID for KRB5
-        gssapi_token.extend_from_slice(&ap_req);
+
+        #[derive(rasn::AsnType, rasn::Encode, Debug)]
+        #[rasn(tag(application, 0))]
+        struct InitialContextToken {
+            oid: rasn::types::ObjectIdentifier,
+            inner: rasn::types::Any,
+        }
+
+        let krb5_oid = rasn::types::ObjectIdentifier::new(vec![1, 2, 840, 113554, 1, 2, 2])
+            .context("Failed to construct KRB5 OID")?;
+        let token = InitialContextToken {
+            oid: krb5_oid,
+            inner: rasn::types::Any::new(ap_req),
+        };
+        let gssapi_token = rasn::der::encode(&token).context("Failed to encode GSSAPI token")?;
 
         let url = self.build_url(&ldap_session.target, ldap_session.port);
         let (conn, mut ldap) =
