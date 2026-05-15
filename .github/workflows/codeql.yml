@@ -54,7 +54,7 @@ jobs:
         components: clippy, rustfmt
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@b81d0d250f2533fa65eb9ccf3e9e80ce3b4724f5 # v4
+      uses: github/codeql-action/init@d4b485515e8531d7071a39d526213eb5b2e74a11 # v4
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
@@ -62,6 +62,6 @@ jobs:
 
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@b81d0d250f2533fa65eb9ccf3e9e80ce3b4724f5 # v4
+      uses: github/codeql-action/analyze@d4b485515e8531d7071a39d526213eb5b2e74a11 # v4
       with:
         category: "/language:${{matrix.language}}"
