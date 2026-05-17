@@ -51,6 +51,7 @@ tokio-socks = "0.5"
 socks = "0.3"
 once_cell = "1.18"
 dashmap = "6"
+base64 = "0.22"
 
 # NetExec-RS dependencies (unified on digest 0.10.x for p12 compatibility)
 md4 = "0.11"

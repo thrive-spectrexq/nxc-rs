@@ -103,6 +103,9 @@ Guidelines:
             }
 
             self.history.push(assistant_msg);
+            if self.history.len() > 40 {
+                self.history.drain(0..2);
+            }
 
             if resp.tool_calls.is_empty() {
                 break;

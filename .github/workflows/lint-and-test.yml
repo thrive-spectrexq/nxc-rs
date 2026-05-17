@@ -28,6 +28,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libkrb5-dev libsasl2-dev libldap2-dev pkg-config libssl-dev
 
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features
+
       - name: Run tests
         run: cargo test --workspace
 
