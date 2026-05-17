@@ -41,21 +41,6 @@ impl NxcModule for Nopac {
         _session: &mut dyn NxcSession,
         _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        // NoPac is primarily a Kerberos vulnerability (KDC flaw)
-        // We check it by attempting a specific TGT request pattern.
-
-        tracing::info!("NoPac: Checking KDC vulnerability...");
-
-        // This usually involves sending a AS-REQ for a machine account name without the trailing '$'
-        // and then requesting a service ticket for the same account with the '$'.
-
-        Ok(ModuleResult {
-            success: true,
-            output:
-                "[+] VULNERABLE: Domain Controller is susceptible to NoPac privilege escalation"
-                    .to_string(),
-            data: serde_json::json!({"vulnerable": true, "cve": "2021-42287"}),
-            credentials: vec![],
-        })
+        Err(anyhow::anyhow!("Module not yet implemented"))
     }
 }
