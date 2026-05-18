@@ -27,6 +27,7 @@ name = "nxc"
 path = "src/main.rs"
 
 [dependencies]
+base64 = { workspace = true }
 nxc-auth = { path = "../auth" }
 nxc-protocols = { path = "../protocols" }
 nxc-modules = { path = "../modules" }

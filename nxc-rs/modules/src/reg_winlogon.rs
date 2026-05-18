@@ -1,9 +1,8 @@
 //! # reg_winlogon — Winlogon credential extraction
 use crate::{ModuleOptions, ModuleResult, NxcModule};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use async_trait::async_trait;
-use nxc_protocols::{smb::SmbSession, NxcSession};
-use serde_json::json;
+use nxc_protocols::NxcSession;
 
 pub struct RegWinlogon;
 impl RegWinlogon {
@@ -30,22 +29,9 @@ impl NxcModule for RegWinlogon {
     }
     async fn run(
         &self,
-        session: &mut dyn NxcSession,
+        _session: &mut dyn NxcSession,
         _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let smb_sess = session
-            .as_any()
-            .downcast_ref::<SmbSession>()
-            .ok_or_else(|| anyhow!("Module requires an SMB session"))?;
-        let mut output = format!("Winlogon Credential Check on {}:\n", smb_sess.target);
-        output.push_str("  [*] HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\n");
-        output.push_str("  [*] Checking DefaultUserName, DefaultPassword, DefaultDomainName\n");
-        output.push_str("  [*] Checking AutoAdminLogon\n");
-        Ok(ModuleResult {
-            success: true,
-            output,
-            data: json!({"winlogon_check": true}),
-            credentials: vec![],
-        })
+        Err(anyhow::anyhow!("Module not yet implemented"))
     }
 }

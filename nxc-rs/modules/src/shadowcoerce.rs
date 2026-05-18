@@ -1,9 +1,8 @@
 //! # shadowcoerce — ShadowCoerce MS-FSRVP authentication coercion
 use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use async_trait::async_trait;
-use nxc_protocols::{smb::SmbSession, NxcSession};
-use serde_json::json;
+use nxc_protocols::NxcSession;
 
 pub struct ShadowCoerce;
 impl ShadowCoerce {
@@ -38,23 +37,9 @@ impl NxcModule for ShadowCoerce {
     }
     async fn run(
         &self,
-        session: &mut dyn NxcSession,
-        opts: &ModuleOptions,
+        _session: &mut dyn NxcSession,
+        _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let smb_sess = session
-            .as_any()
-            .downcast_ref::<SmbSession>()
-            .ok_or_else(|| anyhow!("Module requires an SMB session"))?;
-        let listener = opts.get("LISTENER").ok_or_else(|| anyhow!("LISTENER required"))?;
-        let mut output = format!("ShadowCoerce (MS-FSRVP) on {}:\n", smb_sess.target);
-        output.push_str(&format!("  [*] Listener: {listener}\n"));
-        output.push_str("  [*] Connecting to \\\\pipe\\\\FssagentRpc\n");
-        output.push_str("  [*] Calling IsPathSupported with UNC path to trigger coercion\n");
-        Ok(ModuleResult {
-            success: true,
-            output,
-            data: json!({"shadowcoerce": true, "listener": listener}),
-            credentials: vec![],
-        })
+        Err(anyhow::anyhow!("Module not yet implemented"))
     }
 }

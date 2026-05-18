@@ -43,17 +43,13 @@ async fn main() -> Result<()> {
 
     let mut _log_guard = None;
     if let Some(log_path) = matches.get_one::<String>("log") {
-        let file = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_path)?;
+        let file = std::fs::OpenOptions::new().create(true).append(true).open(log_path)?;
         let (non_blocking, guard) = tracing_appender::non_blocking(file);
         _log_guard = Some(guard);
 
         use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-        let file_layer = tracing_subscriber::fmt::layer()
-            .with_writer(non_blocking)
-            .with_ansi(false);
+        let file_layer =
+            tracing_subscriber::fmt::layer().with_writer(non_blocking).with_ansi(false);
         let stdout_layer = tracing_subscriber::fmt::layer().with_target(false);
 
         tracing_subscriber::registry()
@@ -423,10 +419,7 @@ async fn main() -> Result<()> {
             let filename =
                 format!("report_{}_{}.json", protocol_name, Utc::now().format("%Y%m%d_%H%M%S"));
             let report_path = ws_reports_dir.join(filename);
-            if let Err(e) = reporting::export_json(
-                report_path.to_str().unwrap_or(""),
-                &report,
-            ) {
+            if let Err(e) = reporting::export_json(report_path.to_str().unwrap_or(""), &report) {
                 NxcGlobalOutput::warn(&format!("Failed to save workspace report: {e}"));
             }
         }
@@ -472,6 +465,7 @@ async fn main() -> Result<()> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

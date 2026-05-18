@@ -186,6 +186,7 @@ fn read_credential(r: &mut impl Read) -> Result<KerberosTicket> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use std::io::Cursor;
