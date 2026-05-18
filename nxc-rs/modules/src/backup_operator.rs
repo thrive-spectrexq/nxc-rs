@@ -1,9 +1,8 @@
 //! # backup_operator — Backup operator privilege abuse
 use crate::{ModuleOptions, ModuleResult, NxcModule};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use async_trait::async_trait;
-use nxc_protocols::{smb::SmbSession, NxcSession};
-use serde_json::json;
+use nxc_protocols::NxcSession;
 
 pub struct BackupOperator;
 impl BackupOperator {
@@ -30,22 +29,9 @@ impl NxcModule for BackupOperator {
     }
     async fn run(
         &self,
-        session: &mut dyn NxcSession,
+        _session: &mut dyn NxcSession,
         _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let smb_sess = session
-            .as_any()
-            .downcast_ref::<SmbSession>()
-            .ok_or_else(|| anyhow!("Module requires an SMB session"))?;
-        let mut output = format!("Backup Operator Abuse on {}:\n", smb_sess.target);
-        output.push_str("  [*] Using SeBackupPrivilege to read protected registry hives\n");
-        output.push_str("  [*] Targets: SAM, SECURITY, SYSTEM, NTDS.dit\n");
-        output.push_str("  [*] Method: BackupRead API or reg save via remote registry\n");
-        Ok(ModuleResult {
-            success: true,
-            output,
-            data: json!({"backup_op": true}),
-            credentials: vec![],
-        })
+        Err(anyhow::anyhow!("Module not yet implemented"))
     }
 }

@@ -170,7 +170,6 @@ pub fn build_cli() -> Command {
     let adb_cmd = build_adb_cmd(&auth_args, &module_args, &export_args);
     let network_cmd = build_network_cmd(&module_args, &export_args);
 
-
     let http_cmd = build_http_cmd(&auth_args, &module_args, &export_args);
     let redis_cmd = build_redis_cmd(&auth_args, &module_args, &export_args);
     let postgres_cmd = build_postgres_cmd(&auth_args, &module_args, &export_args);
@@ -375,7 +374,9 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
         for val in vals {
             if std::path::Path::new(val).exists() {
                 if let Ok(content) = std::fs::read_to_string(val) {
-                    usernames.extend(content.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+                    usernames.extend(
+                        content.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()),
+                    );
                 }
             } else {
                 usernames.push(val.to_string());
@@ -388,7 +389,9 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
         for val in vals {
             if std::path::Path::new(val).exists() {
                 if let Ok(content) = std::fs::read_to_string(val) {
-                    passwords.extend(content.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+                    passwords.extend(
+                        content.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()),
+                    );
                 }
             } else {
                 passwords.push(val.to_string());
@@ -401,7 +404,9 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
         for val in vals {
             if std::path::Path::new(val).exists() {
                 if let Ok(content) = std::fs::read_to_string(val) {
-                    hashes.extend(content.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+                    hashes.extend(
+                        content.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()),
+                    );
                 }
             } else {
                 hashes.push(val.to_string());
@@ -516,7 +521,6 @@ pub fn get_protocol_handler(
     }
 }
 
-
 fn build_ftp_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
     Command::new("ftp")
         .about("FTP protocol (port 21)")
@@ -530,11 +534,7 @@ fn build_ftp_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) ->
                 .value_parser(clap::value_parser!(u16)),
         )
         .arg(Arg::new("ls").long("ls").help("List files in directory").num_args(0..=1))
-        .arg(
-            Arg::new("get")
-                .long("get")
-                .help("Download a file (e.g. --get /path/to/file)"),
-        )
+        .arg(Arg::new("get").long("get").help("Download a file (e.g. --get /path/to/file)"))
         .arg(
             Arg::new("put")
                 .long("put")
@@ -583,7 +583,12 @@ fn build_kube_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -
         )
 }
 
-fn build_wmi_cmd(auth_args: &[Arg], kerberos_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+fn build_wmi_cmd(
+    auth_args: &[Arg],
+    kerberos_args: &[Arg],
+    module_args: &[Arg],
+    export_args: &[Arg],
+) -> Command {
     Command::new("wmi")
         .about("WMI protocol (port 135)")
         .args(auth_args)
@@ -656,11 +661,9 @@ fn build_network_cmd(module_args: &[Arg], export_args: &[Arg]) -> Command {
                 .help("Perform a network scan (ARP/ping sweep)")
                 .action(ArgAction::SetTrue),
         )
-        .arg(
-            Arg::new("connect")
-                .long("connect")
-                .help("Attempt to connect to a specific WiFi network (e.g. --connect 'Corporate WiFi')"),
-        )
+        .arg(Arg::new("connect").long("connect").help(
+            "Attempt to connect to a specific WiFi network (e.g. --connect 'Corporate WiFi')",
+        ))
         .arg(
             Arg::new("devices")
                 .long("devices")
@@ -693,7 +696,6 @@ fn build_network_cmd(module_args: &[Arg], export_args: &[Arg]) -> Command {
         )
 }
 
-
 fn build_http_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
     Command::new("http")
         .about("HTTP / HTTPS protocol (port 80/443)")
@@ -713,12 +715,7 @@ fn build_http_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -
                 .help("Verify SSL certificate")
                 .action(ArgAction::SetTrue),
         )
-        .arg(
-            Arg::new("path")
-                .long("path")
-                .help("Path to request (default: /)")
-                .default_value("/"),
-        )
+        .arg(Arg::new("path").long("path").help("Path to request (default: /)").default_value("/"))
 }
 
 fn build_redis_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
@@ -852,9 +849,7 @@ fn build_dns_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) ->
                 .default_value("53")
                 .value_parser(clap::value_parser!(u16)),
         )
-        .arg(
-            Arg::new("enum").long("enum").help("Enumerate DNS records").action(ArgAction::SetTrue),
-        )
+        .arg(Arg::new("enum").long("enum").help("Enumerate DNS records").action(ArgAction::SetTrue))
 }
 
 fn build_ipmi_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
@@ -877,8 +872,12 @@ fn build_ipmi_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -
         )
 }
 
-
-fn build_smb_cmd(auth_args: &[Arg], kerberos_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+fn build_smb_cmd(
+    auth_args: &[Arg],
+    kerberos_args: &[Arg],
+    module_args: &[Arg],
+    export_args: &[Arg],
+) -> Command {
     Command::new("smb")
         .about("SMB protocol (port 445)")
         .args(auth_args)
@@ -925,18 +924,8 @@ fn build_smb_cmd(auth_args: &[Arg], kerberos_args: &[Arg], module_args: &[Arg], 
                 .action(ArgAction::SetTrue),
         )
         .arg(Arg::new("rid-brute").long("rid-brute").help("RID bruteforce").num_args(0..=1))
-        .arg(
-            Arg::new("sam")
-                .long("sam")
-                .help("Dump SAM hashes")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("lsa")
-                .long("lsa")
-                .help("Dump LSA secrets")
-                .action(ArgAction::SetTrue),
-        )
+        .arg(Arg::new("sam").long("sam").help("Dump SAM hashes").action(ArgAction::SetTrue))
+        .arg(Arg::new("lsa").long("lsa").help("Dump LSA secrets").action(ArgAction::SetTrue))
         .arg(
             Arg::new("ntds")
                 .long("ntds")
@@ -998,7 +987,12 @@ fn build_ssh_cmd(auth_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) ->
         )
 }
 
-fn build_ldap_cmd(auth_args: &[Arg], kerberos_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+fn build_ldap_cmd(
+    auth_args: &[Arg],
+    kerberos_args: &[Arg],
+    module_args: &[Arg],
+    export_args: &[Arg],
+) -> Command {
     Command::new("ldap")
         .about("LDAP protocol (port 389/636)")
         .args(auth_args)
@@ -1048,7 +1042,12 @@ fn build_ldap_cmd(auth_args: &[Arg], kerberos_args: &[Arg], module_args: &[Arg],
         )
 }
 
-fn build_winrm_cmd(auth_args: &[Arg], kerberos_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+fn build_winrm_cmd(
+    auth_args: &[Arg],
+    kerberos_args: &[Arg],
+    module_args: &[Arg],
+    export_args: &[Arg],
+) -> Command {
     Command::new("winrm")
         .about("WinRM protocol (port 5985/5986)")
         .args(auth_args)
@@ -1076,7 +1075,12 @@ fn build_winrm_cmd(auth_args: &[Arg], kerberos_args: &[Arg], module_args: &[Arg]
         )
 }
 
-fn build_mssql_cmd(auth_args: &[Arg], kerberos_args: &[Arg], module_args: &[Arg], export_args: &[Arg]) -> Command {
+fn build_mssql_cmd(
+    auth_args: &[Arg],
+    kerberos_args: &[Arg],
+    module_args: &[Arg],
+    export_args: &[Arg],
+) -> Command {
     Command::new("mssql")
         .about("MSSQL protocol (port 1433)")
         .args(auth_args)

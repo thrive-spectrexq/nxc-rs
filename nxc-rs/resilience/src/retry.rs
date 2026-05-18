@@ -176,6 +176,7 @@ impl RetryPolicy {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU32, Ordering};

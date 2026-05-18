@@ -136,6 +136,7 @@ pub fn aes_decrypt(ciphertext: &[u8], key: &[u8; 16]) -> Result<String, &'static
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
