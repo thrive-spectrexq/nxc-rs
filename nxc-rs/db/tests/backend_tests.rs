@@ -1,10 +1,10 @@
-use nxc_db::{backend::*, HostInfo, Credential, AuthResultEntry, Loot, NxcDb};
+use nxc_db::{backend::*, HostInfo, Credential, AuthResultEntry, NxcDb};
 use tempfile::tempdir;
 
-async fn setup_db() -> NxcDb {
+async fn setup_db() -> Box<dyn DatabaseBackend> {
     let dir = tempdir().unwrap();
     let db_path = dir.path().join("nxc_test.db");
-    NxcDb::new(&db_path, "default").unwrap()
+    Box::new(NxcDb::new(&db_path, "default").unwrap())
 }
 
 #[tokio::test]
