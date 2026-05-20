@@ -141,7 +141,7 @@ impl NxcProtocol for RedisProtocol {
             return Ok(AuthResult::success(redis_sess.admin));
         }
 
-        let password = creds.password.as_deref().unwrap_or_default();
+        let password = creds.password.as_deref().map(|s| s.to_string()).unwrap_or_default();
         let connection_info = if creds.username.is_empty() {
             format!("redis://:{}@{}:{}/", password, redis_sess.target, redis_sess.port)
         } else {
@@ -179,7 +179,7 @@ impl RedisProtocol {
     /// Get Redis INFO enumeration.
     pub async fn get_info(&self, session: &RedisSession) -> Result<String> {
         let connection_info = if let Some(ref creds) = session.credentials {
-            let password = creds.password.as_deref().unwrap_or_default();
+            let password = creds.password.as_deref().map(|s| s.to_string()).unwrap_or_default();
             if creds.username.is_empty() {
                 format!("redis://:{}@{}:{}/", password, session.target, session.port)
             } else {

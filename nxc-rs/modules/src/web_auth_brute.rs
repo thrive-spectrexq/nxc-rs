@@ -170,7 +170,7 @@ impl NxcModule for WebAuthBrute {
                 successful.push(json!({"username": username, "password": password}));
                 credentials_list.push(Credentials {
                     username,
-                    password: Some(password),
+                    password: Some(nxc_auth::Sensitive(password.to_string())),
                     domain: None,
                     nt_hash: None,
                     lm_hash: None,

@@ -106,8 +106,8 @@ impl GetModule {
         let mut ftp_stream = suppaftp::tokio::AsyncFtpStream::connect(&addr).await?;
 
         let empty = String::new();
-        let pass = ftp_sess.credentials.password.as_ref().unwrap_or(&empty);
-        ftp_stream.login(&ftp_sess.credentials.username, pass).await?;
+        let pass = ftp_sess.credentials.password.as_deref().map(|s| s.as_str()).unwrap_or(empty.as_str());
+        ftp_stream.login(ftp_sess.credentials.username.as_str(), pass).await?;
 
         // Transfer file
         let mut reader = ftp_stream.retr_as_stream(path).await?;

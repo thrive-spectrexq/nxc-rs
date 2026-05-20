@@ -74,8 +74,8 @@ impl NxcModule for Kerberoasting {
             tgt = krb_client
                 .request_tgt(
                     &creds.username,
-                    creds.password.as_deref(),
-                    creds.nt_hash.as_deref(),
+                    creds.password.as_deref().map(|x| x.as_str()),
+                    creds.nt_hash.as_deref().map(|x| x.as_str()),
                     None,
                 )
                 .await

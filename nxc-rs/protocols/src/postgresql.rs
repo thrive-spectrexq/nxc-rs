@@ -116,7 +116,7 @@ impl NxcProtocol for PostgresProtocol {
         };
 
         let username = &creds.username;
-        let password = creds.password.as_deref().unwrap_or_default();
+        let password = creds.password.as_deref().map(|s| s.to_string()).unwrap_or_default();
         let target = &pg_sess.target;
         let port = pg_sess.port;
 
@@ -185,7 +185,7 @@ impl NxcProtocol for PostgresProtocol {
             pg_sess.target,
             pg_sess.port,
             creds.username,
-            creds.password.as_deref().unwrap_or_default()
+            creds.password.as_deref().map(|s| s.to_string()).unwrap_or_default()
         );
 
         let (client, connection) = tokio_postgres::connect(&config, NoTls).await?;
@@ -228,7 +228,7 @@ impl PostgresProtocol {
             session.target,
             session.port,
             creds.username,
-            creds.password.as_deref().unwrap_or_default()
+            creds.password.as_deref().map(|s| s.to_string()).unwrap_or_default()
         );
 
         let (client, connection) = tokio_postgres::connect(&config, NoTls).await?;

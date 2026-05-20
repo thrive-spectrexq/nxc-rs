@@ -7,6 +7,7 @@ pub mod certificate;
 pub mod kerberos;
 pub mod ntlm;
 pub mod registry;
+pub mod sensitive;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -16,6 +17,7 @@ use zeroize::Zeroize;
 
 // Re-export key types for backward compatibility
 pub use certificate::CertificateAuth;
+pub use sensitive::Sensitive;
 pub use kerberos::{EncryptionType, KerberosClient, KerberosTicket};
 pub use ntlm::{
     calculate_lm_hash, calculate_nt_hash, calculate_v2_hash, NtlmAuthResult, NtlmAuthenticator,
@@ -45,11 +47,11 @@ pub enum AuthMethod {
 pub struct Credentials {
     pub domain: Option<String>,
     pub username: String,
-    pub password: Option<String>,
-    pub nt_hash: Option<String>,
-    pub lm_hash: Option<String>,
-    pub aes_128_key: Option<String>,
-    pub aes_256_key: Option<String>,
+    pub password: Option<Sensitive>,
+    pub nt_hash: Option<Sensitive>,
+    pub lm_hash: Option<Sensitive>,
+    pub aes_128_key: Option<Sensitive>,
+    pub aes_256_key: Option<Sensitive>,
     pub ccache_path: Option<String>,
     pub pfx_path: Option<String>,
     pub use_kerberos: bool,
@@ -61,7 +63,7 @@ impl Credentials {
         Self {
             domain: domain.map(std::string::ToString::to_string),
             username: username.to_string(),
-            password: Some(password.to_string()),
+            password: Some(Sensitive(password.to_string())),
             nt_hash: None,
             lm_hash: None,
             aes_128_key: None,
@@ -78,7 +80,7 @@ impl Credentials {
             domain: domain.map(std::string::ToString::to_string),
             username: username.to_string(),
             password: None,
-            nt_hash: Some(hash.to_string()),
+            nt_hash: Some(Sensitive(hash.to_string())),
             lm_hash: None,
             aes_128_key: None,
             aes_256_key: None,
@@ -97,7 +99,7 @@ impl Credentials {
             nt_hash: None,
             lm_hash: None,
             aes_128_key: None,
-            aes_256_key: Some(aes_256.to_string()),
+            aes_256_key: Some(Sensitive(aes_256.to_string())),
             ccache_path: None,
             pfx_path: None,
             use_kerberos: false,

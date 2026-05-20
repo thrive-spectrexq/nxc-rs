@@ -161,7 +161,7 @@ impl NxcModule for WebFuzzer {
                 let mut req = client.get(&url);
                 if let Some(c) = creds {
                     if let Some(pw) = &c.password {
-                        req = req.basic_auth(&c.username, Some(pw));
+                        req = req.basic_auth(&c.username, Some(pw.as_str()));
                     } else {
                         req = req.basic_auth(&c.username, None::<&str>);
                     }

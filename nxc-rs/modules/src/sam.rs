@@ -73,7 +73,7 @@ impl NxcModule for SamModule {
         // In a real run, we'd parse this from the hive data:
         let mut c = nxc_auth::Credentials::default();
         c.username = "Administrator".into();
-        c.nt_hash = Some("31d6cfe0d16ae931b73c59d7e0c089c0".into());
+        c.nt_hash = Some(nxc_auth::Sensitive("31d6cfe0d16ae931b73c59d7e0c089c0".to_string()));
         credentials.push(c);
 
         Ok(ModuleResult { success: true, output, data: serde_json::Value::Null, credentials })

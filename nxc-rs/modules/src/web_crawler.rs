@@ -73,7 +73,7 @@ impl NxcModule for WebCrawler {
             let mut req = http_sess.client.get(&url);
             if let Some(creds) = &http_sess.credentials {
                 if let Some(pw) = &creds.password {
-                    req = req.basic_auth(&creds.username, Some(pw));
+                    req = req.basic_auth(&creds.username, Some(pw.as_str()));
                 } else {
                     req = req.basic_auth(&creds.username, None::<&str>);
                 }

@@ -552,8 +552,8 @@ impl ExecutionEngine {
                                                 workspace: db_p.current_workspace().to_string(),
                                                 domain: None,
                                                 username: c_p.username.clone(),
-                                                password: c_p.password.clone(),
-                                                nt_hash: c_p.nt_hash.clone(),
+                                                password: c_p.password.as_deref().map(|s| s.to_string()),
+                                                nt_hash: c_p.nt_hash.as_deref().map(|s| s.to_string()),
                                                 lm_hash: None,
                                                 aes_128: None,
                                                 aes_256: None,
@@ -614,11 +614,11 @@ impl ExecutionEngine {
                                                                                 .to_string(),
                                                                             domain: m_cred.domain.clone(),
                                                                             username: m_cred.username.clone(),
-                                                                            password: m_cred.password.clone(),
-                                                                            nt_hash: m_cred.nt_hash.clone(),
-                                                                            lm_hash: m_cred.lm_hash.clone(),
-                                                                            aes_128: m_cred.aes_128_key.clone(),
-                                                                            aes_256: m_cred.aes_256_key.clone(),
+                                                                            password: m_cred.password.as_deref().map(|s| s.to_string()),
+                                                                            nt_hash: m_cred.nt_hash.as_deref().map(|s| s.to_string()),
+                                                                            lm_hash: m_cred.lm_hash.as_deref().map(|s| s.to_string()),
+                                                                            aes_128: m_cred.aes_128_key.as_deref().map(|s| s.to_string()),
+                                                                            aes_256: m_cred.aes_256_key.as_deref().map(|s| s.to_string()),
                                                                             source: Some(format!("{p_name}:{m_name}")),
                                                                             host_id: h_id,
                                                                             created_at: now,
@@ -832,7 +832,7 @@ mod tests {
                 _session: &mut dyn NxcSession,
                 creds: &Credentials,
             ) -> Result<AuthResult> {
-                if creds.password.as_deref() == Some("DUMMY_PASSWORD") {
+                if creds.password.as_deref().map(|s| s.as_str()) == Some("DUMMY_PASSWORD") {
                     Ok(AuthResult::success(creds.username == "admin"))
                 } else {
                     Ok(AuthResult::failure("Bad password", None))

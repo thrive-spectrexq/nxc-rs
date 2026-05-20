@@ -164,8 +164,8 @@ impl NxcProtocol for VncProtocol {
             let mut challenge = [0u8; 16];
             stream.read_exact(&mut challenge).await?;
 
-            let password = creds.password.as_deref().unwrap_or_default();
-            let response = vnc_encrypt(password, &challenge);
+            let password = creds.password.as_deref().map(|s| s.to_string()).unwrap_or_default();
+            let response = vnc_encrypt(&password, &challenge);
             stream.write_all(&response).await?;
 
             let mut auth_result = [0u8; 4];

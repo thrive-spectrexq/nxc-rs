@@ -111,7 +111,7 @@ impl NxcProtocol for OpcUaProtocol {
 
         // Identity Token setup
         let identity_token = if let Some(ref pass) = creds.password {
-            IdentityToken::UserName(creds.username.clone(), pass.clone())
+            IdentityToken::UserName(creds.username.clone(), pass.to_string())
         } else if !creds.username.is_empty() {
             IdentityToken::UserName(creds.username.clone(), String::new())
         } else {

@@ -116,7 +116,7 @@ impl NxcProtocol for MysqlProtocol {
         };
 
         let username = &creds.username;
-        let password = creds.password.as_deref().unwrap_or_default();
+        let password = creds.password.as_deref().map(|s| s.to_string()).unwrap_or_default();
         let target = &mysql_sess.target;
         let port = mysql_sess.port;
 
@@ -180,7 +180,7 @@ impl NxcProtocol for MysqlProtocol {
             .ip_or_hostname(&mysql_sess.target)
             .tcp_port(mysql_sess.port)
             .user(Some(&creds.username))
-            .pass(Some(creds.password.as_deref().unwrap_or_default()))
+            .pass(Some(creds.password.as_deref().map(|s| s.to_string()).unwrap_or_default()))
             .db_name(Some("mysql"));
 
         let pool = Pool::new(opts);
@@ -239,7 +239,7 @@ impl MysqlProtocol {
             .ip_or_hostname(&session.target)
             .tcp_port(session.port)
             .user(Some(&creds.username))
-            .pass(Some(creds.password.as_deref().unwrap_or_default()));
+            .pass(Some(creds.password.as_deref().map(|s| s.to_string()).unwrap_or_default()));
 
         let pool = Pool::new(opts);
         let mut conn = pool.get_conn().await?;

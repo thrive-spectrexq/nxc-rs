@@ -139,7 +139,7 @@ impl NxcProtocol for DockerProtocol {
         };
 
         let username = &creds.username;
-        let password = creds.password.as_deref().unwrap_or_default();
+        let password = creds.password.as_deref().map(|s| s.to_string()).unwrap_or_default();
 
         let addr = if docker_sess.is_registry {
             format!("http://{}:{}/v2/", docker_sess.target, docker_sess.port)

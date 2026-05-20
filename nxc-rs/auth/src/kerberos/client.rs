@@ -79,9 +79,9 @@ impl KerberosClient {
         let ticket = self
             .request_tgt(
                 &creds.username,
-                creds.password.as_deref(),
-                creds.nt_hash.as_deref(),
-                creds.aes_256_key.as_deref(),
+                creds.password.as_deref().map(|s| s.as_str()),
+                creds.nt_hash.as_deref().map(|s| s.as_str()),
+                creds.aes_256_key.as_deref().map(|s| s.as_str()),
             )
             .await?;
 

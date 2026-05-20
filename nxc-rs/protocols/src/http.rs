@@ -143,7 +143,7 @@ impl NxcProtocol for HttpProtocol {
         let mut req = http_sess.client.get(&url);
 
         if let Some(password) = &creds.password {
-            req = req.basic_auth(&creds.username, Some(password));
+            req = req.basic_auth(&creds.username, Some(password.as_str()));
         } else {
             req = req.basic_auth(&creds.username, None::<&str>);
         }

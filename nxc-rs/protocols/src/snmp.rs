@@ -109,9 +109,9 @@ impl NxcProtocol for SnmpProtocol {
 
         // For SNMP, the "password" is typically the community string.
         let community =
-            if let Some(ref pass) = creds.password { pass.clone() } else { "public".to_string() };
+            if let Some(ref pass) = creds.password { pass.as_str().to_string() } else { "public".to_string() };
 
-        debug!("SNMP: Testing community string '{}' on {}", community, snmp_sess.target);
+        debug!("SNMP: Testing community string '<REDACTED>' on {}", snmp_sess.target);
 
         let addr = format!("{}:{}", snmp_sess.target, snmp_sess.port);
         let timeout = self.timeout;
@@ -132,7 +132,7 @@ impl NxcProtocol for SnmpProtocol {
         match result {
             Ok(success) => {
                 if success {
-                    debug!("SNMP: Auth successful for community '{}'", community);
+                    debug!("SNMP: Auth successful for community '<REDACTED>'");
                     snmp_sess.community = community;
                     Ok(AuthResult::success(true))
                 } else {
@@ -140,7 +140,7 @@ impl NxcProtocol for SnmpProtocol {
                 }
             }
             Err(e) => {
-                debug!("SNMP: Auth failed for community '{}': {:?}", community, e);
+                debug!("SNMP: Auth failed for community '<REDACTED>': {:?}", e);
                 Ok(AuthResult::failure("SNMP Auth Failed", None))
             }
         }

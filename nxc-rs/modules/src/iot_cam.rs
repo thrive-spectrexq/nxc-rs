@@ -73,7 +73,7 @@ impl NxcModule for IotCam {
             // Bring along credentials if they were matched natively by the engine initially
             if let Some(creds) = &http_sess.credentials {
                 if let Some(password) = &creds.password {
-                    req = req.basic_auth(&creds.username, Some(password));
+                    req = req.basic_auth(&creds.username, Some(password.as_str()));
                 } else {
                     req = req.basic_auth(&creds.username, None::<&str>);
                 }

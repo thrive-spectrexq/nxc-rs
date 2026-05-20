@@ -146,13 +146,13 @@ impl NxcProtocol for MssqlProtocol {
             #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
             config.authentication(AuthMethod::sql_server(
                 format!("{domain}\\{username}"),
-                &password,
+                password.as_str(),
             ));
             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
             config
-                .authentication(AuthMethod::sql_server(format!("{domain}\\{username}"), &password));
+                .authentication(AuthMethod::sql_server(format!("{domain}\\{username}"), password.as_str()));
         } else {
-            config.authentication(AuthMethod::sql_server(&username, &password));
+            config.authentication(AuthMethod::sql_server(&username, password.as_str()));
         }
 
         config.trust_cert();
@@ -219,7 +219,7 @@ impl NxcProtocol for MssqlProtocol {
         config.port(mssql_sess.port);
 
         let user = &creds.username;
-        let pass = creds.password.as_deref().unwrap_or_default();
+        let pass = creds.password.as_deref().map(|s| s.to_string()).unwrap_or_default();
 
         if let Some(ref domain) = creds.domain {
             config.authentication(AuthMethod::sql_server(format!("{domain}\\{user}"), pass));
@@ -297,7 +297,7 @@ impl MssqlProtocol {
         config.port(session.port);
 
         let user = &creds.username;
-        let pass = creds.password.as_deref().unwrap_or_default();
+        let pass = creds.password.as_deref().map(|s| s.to_string()).unwrap_or_default();
 
         if let Some(ref domain) = creds.domain {
             config.authentication(AuthMethod::sql_server(format!("{domain}\\{user}"), pass));
@@ -368,7 +368,7 @@ impl MssqlProtocol {
         #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
         config.authentication(AuthMethod::sql_server(
             format!("{}\\{}", domain, creds.username),
-            creds.password.as_deref().unwrap_or_default(),
+            creds.password.as_deref().map(|s| s.to_string()).unwrap_or_default(),
         ));
 
         config.trust_cert();

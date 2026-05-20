@@ -47,7 +47,7 @@ image = "0.25"
 hex.workspace = true
 aes = { workspace = true }
 cipher = { workspace = true }
-opcua = { workspace = true, optional = true }
+opcua = { version = "0.12", default-features = false, features = ["client"], optional = true }
 
 [features]
 opcua-support = ["opcua"]

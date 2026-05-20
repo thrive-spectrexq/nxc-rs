@@ -319,11 +319,11 @@ async fn main() -> Result<()> {
                         let mut nxc_cred = nxc_auth::Credentials::default();
                         nxc_cred.domain = c.domain.clone();
                         nxc_cred.username = c.username.clone();
-                        nxc_cred.password = c.password.clone();
-                        nxc_cred.nt_hash = c.nt_hash.clone();
-                        nxc_cred.lm_hash = c.lm_hash.clone();
-                        nxc_cred.aes_128_key = c.aes_128.clone();
-                        nxc_cred.aes_256_key = c.aes_256.clone();
+                        nxc_cred.password = c.password.clone().map(nxc_auth::Sensitive);
+                        nxc_cred.nt_hash = c.nt_hash.clone().map(nxc_auth::Sensitive);
+                        nxc_cred.lm_hash = c.lm_hash.clone().map(nxc_auth::Sensitive);
+                        nxc_cred.aes_128_key = c.aes_128.clone().map(nxc_auth::Sensitive);
+                        nxc_cred.aes_256_key = c.aes_256.clone().map(nxc_auth::Sensitive);
                         creds.push(nxc_cred);
                     }
                     NxcGlobalOutput::info(&format!(
@@ -362,7 +362,8 @@ async fn main() -> Result<()> {
     let _timer =
         if profiling_enabled { Some(ScopedTimer::new("ExecutionEngine::run")) } else { None };
 
-    let results = engine.run(protocol, all_targets, creds).await;
+    let mut results = engine.run(protocol, all_targets, creds).await;
+    results.retain(|r| r.message != "Skipped (previous auth succeeded)");
 
     if profiling_enabled {
         log_memory_usage("Process End");

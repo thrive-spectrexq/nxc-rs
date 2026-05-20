@@ -929,9 +929,9 @@ impl SmbProtocol {
         let tgt = krb_client
             .request_tgt(
                 &creds.username,
-                creds.password.as_deref(),
-                creds.nt_hash.as_deref(),
-                creds.aes_256_key.as_deref(),
+                creds.password.as_deref().map(|x| x.as_str()),
+                creds.nt_hash.as_deref().map(|x| x.as_str()),
+                creds.aes_256_key.as_deref().map(|x| x.as_str()),
             )
             .await?;
         let tgs = krb_client.request_tgs(&tgt, &format!("cifs/{}", smb_sess.target)).await?;

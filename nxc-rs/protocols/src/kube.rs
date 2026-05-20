@@ -139,7 +139,7 @@ impl NxcProtocol for KubeProtocol {
 
         // Use password as bearer token if provided
         let req = if let Some(ref token) = creds.password {
-            client.get(&api_url).bearer_auth(token)
+            client.get(&api_url).bearer_auth(token.as_str())
         } else {
             // Try anonymous access
             client.get(&api_url)
@@ -151,7 +151,7 @@ impl NxcProtocol for KubeProtocol {
                 if status.is_success() {
                     kube_sess.admin = true;
                     kube_sess.namespace = Some("default".to_string());
-                    kube_sess.token = creds.password.clone();
+                    kube_sess.token = creds.password.as_deref().map(|s| s.to_string());
                     Ok(AuthResult::success(true))
                 } else if status.as_u16() == 403 {
                     // Authenticated but not authorized for this resource

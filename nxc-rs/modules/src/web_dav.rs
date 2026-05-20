@@ -61,7 +61,7 @@ impl NxcModule for WebDav {
         let mut req_options = http_sess.client.request(reqwest::Method::OPTIONS, &base_url);
         if let Some(creds) = &http_sess.credentials {
             if let Some(pw) = &creds.password {
-                req_options = req_options.basic_auth(&creds.username, Some(pw));
+                req_options = req_options.basic_auth(&creds.username, Some(pw.as_str()));
             } else {
                 req_options = req_options.basic_auth(&creds.username, None::<&str>);
             }
@@ -93,7 +93,7 @@ impl NxcModule for WebDav {
         let mut req_put = http_sess.client.put(&upload_url).body(payload.to_string());
         if let Some(creds) = &http_sess.credentials {
             if let Some(pw) = &creds.password {
-                req_put = req_put.basic_auth(&creds.username, Some(pw));
+                req_put = req_put.basic_auth(&creds.username, Some(pw.as_str()));
             } else {
                 req_put = req_put.basic_auth(&creds.username, None::<&str>);
             }

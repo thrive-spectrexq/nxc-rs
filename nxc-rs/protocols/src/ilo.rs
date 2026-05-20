@@ -132,7 +132,7 @@ impl NxcProtocol for IloProtocol {
             .ok_or_else(|| anyhow!("Invalid session type"))?;
 
         let username = &creds.username;
-        let password = creds.password.as_deref().unwrap_or("");
+        let password = creds.password.as_deref().map(|s| s.as_str()).unwrap_or("");
 
         info!("iLO: Authenticating as '{}' on {}", username, ilo_sess.target);
 
