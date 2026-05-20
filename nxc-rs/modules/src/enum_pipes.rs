@@ -6,7 +6,7 @@ use crate::{ModuleOptions, ModuleResult, NxcModule};
 use anyhow::Result;
 use async_trait::async_trait;
 use nxc_protocols::NxcSession;
-use tracing::{debug, info};
+use tracing::info;
 
 pub struct EnumPipesModule;
 

@@ -453,9 +453,10 @@ async fn main() -> Result<()> {
             "json" => reporting::export_json(&path, &report),
             "csv" => reporting::export_csv(&path, &results),
             "html" => reporting::export_html(&path, &report),
-            "md" => reporting::export_markdown(&path, &report),
-            "ndjson" => reporting::export_ndjson(&path, &results),
+            "pdf" => reporting::export_pdf(&path, &report),
             "xml" => reporting::export_xml(&path, &report),
+            "markdown" | "md" => reporting::export_markdown(&path, &report),
+            "ndjson" => reporting::export_ndjson(&path, &results),
             _ => unreachable!(),
         };
 

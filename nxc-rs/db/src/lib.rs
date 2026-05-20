@@ -257,7 +257,6 @@ impl NxcDb {
 
     /// Upsert a host (returns id).
     // ── Host operations ──
-
     pub fn upsert_host(&self, host: &HostInfo) -> Result<i64> {
         let conn = self.pool.get()?;
         conn.execute(
