@@ -12,7 +12,7 @@
 // framework to communicate with legacy Windows environments.
 
 use anyhow::Result;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, Mac, KeyInit as HmacKeyInit};
 use md4::{Digest, Md4};
 use md5::Md5;
 use rc4::cipher::{KeyInit, StreamCipher};
@@ -292,7 +292,7 @@ impl NtlmAuthenticator {
         blob.extend_from_slice(&[0; 4]); // End padding
 
         // 4. Calculate NTProofStr
-        let mut hmac = <HmacMd5 as Mac>::new_from_slice(&v2_hash)?;
+        let mut hmac = <HmacMd5 as HmacKeyInit>::new_from_slice(&v2_hash)?;
         hmac.update(&challenge.nonce);
         hmac.update(&blob);
         let nt_proof_str: [u8; 16] = hmac.finalize().into_bytes().into();
@@ -303,7 +303,7 @@ impl NtlmAuthenticator {
         nt_response.extend_from_slice(&blob);
 
         // 6. Compute session base key
-        let mut session_hmac = <HmacMd5 as Mac>::new_from_slice(&v2_hash)?;
+        let mut session_hmac = <HmacMd5 as HmacKeyInit>::new_from_slice(&v2_hash)?;
         session_hmac.update(&nt_proof_str);
         let session_base_key: Vec<u8> = session_hmac.finalize().into_bytes().to_vec();
 
@@ -493,7 +493,7 @@ impl NtlmSessionSecurity {
 
         // HMAC-MD5(SigningKey, SeqNum + Message)
         let mut hmac =
-            <HmacMd5 as Mac>::new_from_slice(&signing_key).unwrap_or_else(|_| unreachable!());
+            <HmacMd5 as HmacKeyInit>::new_from_slice(&signing_key).unwrap_or_else(|_| unreachable!());
         hmac.update(&seq_num.to_le_bytes());
         hmac.update(message);
         let mac = hmac.finalize().into_bytes();
@@ -528,7 +528,7 @@ pub fn calculate_nt_hash(password: &str) -> [u8; 16] {
 
 /// Calculate NTLMv2 hash: HMAC-MD5(NT_Hash, UPPERCASE(user) + UPPERCASE(domain)).
 pub fn calculate_v2_hash(username: &str, domain: &str, nt_hash: &[u8; 16]) -> [u8; 16] {
-    let mut hmac = <HmacMd5 as Mac>::new_from_slice(nt_hash)
+    let mut hmac = <HmacMd5 as HmacKeyInit>::new_from_slice(nt_hash)
         .unwrap_or_else(|_| unreachable!());
     let identity = format!("{}{}", username.to_uppercase(), domain.to_uppercase());
     let utf16: Vec<u16> = identity.encode_utf16().collect();
@@ -539,7 +539,7 @@ pub fn calculate_v2_hash(username: &str, domain: &str, nt_hash: &[u8; 16]) -> [u
 
 /// Calculate LM hash from a password (DES of "KGS!@#$%" with password key).
 pub fn calculate_lm_hash(password: &str) -> [u8; 16] {
-    use des::cipher::{BlockEncrypt, KeyInit};
+    use des::cipher::{BlockCipherEncrypt, KeyInit, Block};
     use des::Des;
 
     // SECURITY: The "KGS!@#$%" magic string and DES algorithm are MANDATORY
@@ -559,8 +559,8 @@ pub fn calculate_lm_hash(password: &str) -> [u8; 16] {
     let cipher1 = Des::new_from_slice(&key1).unwrap_or_else(|_| unreachable!());
     let cipher2 = Des::new_from_slice(&key2).unwrap_or_else(|_| unreachable!());
 
-    let mut block1 = des::cipher::generic_array::GenericArray::clone_from_slice(magic);
-    let mut block2 = des::cipher::generic_array::GenericArray::clone_from_slice(magic);
+    let mut block1 = Block::<Des>::clone_from_slice(magic);
+    let mut block2 = Block::<Des>::clone_from_slice(magic);
 
     cipher1.encrypt_block(&mut block1);
     cipher2.encrypt_block(&mut block2);

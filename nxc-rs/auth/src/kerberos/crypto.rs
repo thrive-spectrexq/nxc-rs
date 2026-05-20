@@ -1,5 +1,5 @@
 use anyhow::Result;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, Mac, KeyInit as HmacKeyInit};
 use md4::{Digest as Md4Digest, Md4};
 use md5::Md5;
 
@@ -12,7 +12,7 @@ type HmacSha1 = Hmac<Sha1>;
 
 use aes::Aes256;
 use cbc::cipher::block_padding::NoPadding;
-use cbc::cipher::{BlockDecryptMut, BlockEncryptMut, KeyIvInit};
+use cbc::cipher::KeyIvInit;
 
 use serde::{Deserialize, Serialize};
 
@@ -55,8 +55,7 @@ pub fn string2key_aes(password: &str, salt: &str, is_aes256: bool) -> Vec<u8> {
 /// AES-CTS DK (Derive Key) function (RFC 3962 §5.1)
 /// DK(base_key, well_known_constant)
 fn derive_key_aes(base_key: &[u8], _constant: &[u8], is_aes256: bool) -> Vec<u8> {
-    use aes::cipher::{BlockEncrypt, KeyInit};
-    use aes::cipher::generic_array::GenericArray;
+    use aes::cipher::{BlockCipherEncrypt, KeyInit, Block};
 
     let key_len = if is_aes256 { 32 } else { 16 };
 
@@ -74,14 +73,14 @@ fn derive_key_aes(base_key: &[u8], _constant: &[u8], is_aes256: bool) -> Vec<u8>
 
     if is_aes256 {
         if let Ok(cipher) = aes::Aes256::new_from_slice(base_key) {
-            let mut block = GenericArray::clone_from_slice(&folded_kerberos);
+            let mut block = Block::<aes::Aes256>::clone_from_slice(&folded_kerberos);
             cipher.encrypt_block(&mut block);
             result.extend_from_slice(&block);
             cipher.encrypt_block(&mut block);
             result.extend_from_slice(&block);
         }
     } else if let Ok(cipher) = aes::Aes128::new_from_slice(base_key) {
-        let mut block = GenericArray::clone_from_slice(&folded_kerberos);
+        let mut block = Block::<aes::Aes128>::clone_from_slice(&folded_kerberos);
         cipher.encrypt_block(&mut block);
         result.extend_from_slice(&block);
     }
@@ -102,7 +101,7 @@ pub fn decrypt_rc4_hmac(key: &[u8], key_usage: u32, ciphertext: &[u8]) -> Result
 
     // RC4-HMAC decryption (RFC 4757)
     // 1. K1 = HMAC-MD5(key, key_usage)
-    let mut hmac = <HmacMd5 as Mac>::new_from_slice(key)?;
+    let mut hmac = <HmacMd5 as HmacKeyInit>::new_from_slice(key)?;
     hmac.update(&key_usage.to_le_bytes());
     let k1 = hmac.finalize().into_bytes();
 
@@ -111,7 +110,7 @@ pub fn decrypt_rc4_hmac(key: &[u8], key_usage: u32, ciphertext: &[u8]) -> Result
     let enc_data = &ciphertext[16..];
 
     // 3. K3 = HMAC-MD5(K1, checksum)
-    let mut hmac2 = <HmacMd5 as Mac>::new_from_slice(&k1)?;
+    let mut hmac2 = <HmacMd5 as HmacKeyInit>::new_from_slice(&k1)?;
     hmac2.update(checksum);
     let k3 = hmac2.finalize().into_bytes();
 
@@ -124,7 +123,7 @@ pub fn decrypt_rc4_hmac(key: &[u8], key_usage: u32, ciphertext: &[u8]) -> Result
     rc4.apply_keystream(&mut decrypted);
 
     // 5. Verify checksum (HMAC-MD5(K1, decrypted))
-    let mut hmac_verify = <HmacMd5 as Mac>::new_from_slice(&k1)?;
+    let mut hmac_verify = <HmacMd5 as HmacKeyInit>::new_from_slice(&k1)?;
     hmac_verify.update(&decrypted);
     let expected_mac = hmac_verify.finalize().into_bytes();
 
@@ -149,7 +148,7 @@ pub fn encrypt_rc4_hmac(key: &[u8], key_usage: u32, plaintext: &[u8]) -> Result<
     };
 
     // 1. K1 = HMAC-MD5(key, key_usage)
-    let mut hmac = <HmacMd5 as Mac>::new_from_slice(key)?;
+    let mut hmac = <HmacMd5 as HmacKeyInit>::new_from_slice(key)?;
     hmac.update(&key_usage.to_le_bytes());
     let k1 = hmac.finalize().into_bytes();
 
@@ -163,12 +162,12 @@ pub fn encrypt_rc4_hmac(key: &[u8], key_usage: u32, plaintext: &[u8]) -> Result<
     data.extend_from_slice(plaintext);
 
     // 4. Calculate checksum: HMAC-MD5(K1, data)
-    let mut hmac_checksum = <HmacMd5 as Mac>::new_from_slice(&k1)?;
+    let mut hmac_checksum = <HmacMd5 as HmacKeyInit>::new_from_slice(&k1)?;
     hmac_checksum.update(&data);
     let checksum = hmac_checksum.finalize().into_bytes();
 
     // 5. K3 = HMAC-MD5(K1, checksum)
-    let mut hmac3 = <HmacMd5 as Mac>::new_from_slice(&k1)?;
+    let mut hmac3 = <HmacMd5 as HmacKeyInit>::new_from_slice(&k1)?;
     hmac3.update(&checksum);
     let k3 = hmac3.finalize().into_bytes();
 
@@ -211,7 +210,7 @@ pub fn decrypt_aes(
 
     // 2. Verify HMAC-SHA1-96
     let mut hmac =
-        HmacSha1::new_from_slice(key).map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
+        <HmacSha1 as HmacKeyInit>::new_from_slice(key).map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
     hmac.update(&key_usage.to_be_bytes()); // Simplified usage derivation
     hmac.update(enc_data);
     let full_mac = hmac.finalize().into_bytes();
@@ -231,7 +230,7 @@ pub fn decrypt_aes(
         // AD usually pads.
         if decrypted.len() % 16 == 0 {
             cbc::Decryptor::<Aes256>::new(key_arr.into(), &iv.into())
-                .decrypt_padded_vec_mut::<NoPadding>(&decrypted)
+                .decrypt_padded_vec::<NoPadding>(&decrypted)
                 .map_err(|e| anyhow::anyhow!("AES-CBC decrypt failed: {e}"))?
         } else {
             decrypted
@@ -270,14 +269,14 @@ pub fn encrypt_aes(
         let key_arr: &[u8; 32] = key[..32].try_into()?;
         let iv = [0u8; 16];
         cbc::Encryptor::<Aes256>::new(key_arr.into(), &iv.into())
-            .encrypt_padded_vec_mut::<NoPadding>(&data)
+            .encrypt_padded_vec::<NoPadding>(&data)
     } else {
         data
     };
 
     // Checksum: HMAC-SHA1-96(key, usage, enc_data)
     let mut hmac =
-        HmacSha1::new_from_slice(key).map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
+        <HmacSha1 as HmacKeyInit>::new_from_slice(key).map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
     hmac.update(&key_usage.to_be_bytes());
     hmac.update(&enc_data);
     let full_mac = hmac.finalize().into_bytes();
