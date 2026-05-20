@@ -195,6 +195,11 @@ fn parse_range(spec: &str) -> Result<Vec<Target>> {
     let start_octet = (base_int & 0xFF) as u8;
 
     let mut targets = Vec::new();
+    if end_octet < start_octet {
+        anyhow::bail!(
+            "Invalid IP range '{spec}': end octet ({end_octet}) is less than start octet ({start_octet})"
+        );
+    }
     for octet in start_octet..=end_octet {
         let ip_int = (base_int & 0xFFFFFF00) | octet as u32;
         let ip = std::net::Ipv4Addr::from(ip_int);
@@ -362,7 +367,24 @@ impl ExecutionEngine {
                 continue;
             }
 
+            // Per-host success tracker for continue_on_success logic
+            let host_succeeded: Arc<std::sync::atomic::AtomicBool> =
+                Arc::new(std::sync::atomic::AtomicBool::new(false));
+
             for cred in creds.iter() {
+                // Check if we should skip this credential based on previous success.
+                // We check it before acquiring a permit so we don't spawn useless tasks
+                // or wait for the semaphore unnecessarily.
+                //
+                // It is safe to use relaxed ordering here because the only consequence
+                // of reading a stale false is that we do an extra authentication attempt.
+                if !self.opts.continue_on_success && host_succeeded.load(Ordering::Relaxed) {
+                    if let Some(ref p) = pb {
+                        p.inc(1);
+                    }
+                    continue;
+                }
+
                 // ── Pre-flight fail-limit checks ──
                 // Global limit
                 if let Some(limit) = gfail_limit {
@@ -420,14 +442,39 @@ impl ExecutionEngine {
                 let global_fails_clone = global_fails.clone();
                 let user_fails_clone = user_fails.clone();
                 let host_fails_clone = host_fails.clone();
+                let host_succeeded_clone = host_succeeded.clone();
 
                 let handle = tokio::spawn(async move {
                     let start_time = std::time::Instant::now();
 
-                    // Apply jitter if specified (inside the task to not block submission)
+                    // Check host_succeeded AFTER acquiring semaphore, right before network I/O
+                    // This handles cases where tasks were spawned concurrently before the boolean was set.
+                    if !opts_clone.continue_on_success
+                        && host_succeeded_clone.load(Ordering::Relaxed)
+                    {
+                        drop(permit);
+                        if let Some(ref p) = pb_clone {
+                            p.inc(1);
+                        }
+                        // Return empty result which will be filtered out or ignored downstream,
+                        // rather than failing the scan or returning a dummy payload.
+                        return ExecutionResult {
+                            target: target_clone.display(),
+                            protocol: protocol_clone.name().to_string(),
+                            username: cred_clone.username.clone(),
+                            success: false,
+                            admin: false,
+                            message: "Skipped (previous auth succeeded)".to_string(),
+                            duration_ms: 0,
+                            module_data: std::collections::HashMap::new(),
+                        };
+                    }
+
+                    // Apply jitter if specified (random delay in [0, jitter_ms] to stagger requests)
                     if let Some(jitter) = opts_clone.jitter_ms {
                         if jitter > 0 {
-                            tokio::time::sleep(Duration::from_millis(jitter)).await;
+                            let delay = rand::random_range(0..=jitter);
+                            tokio::time::sleep(Duration::from_millis(delay)).await;
                         }
                     }
 
@@ -468,6 +515,9 @@ impl ExecutionEngine {
                             .await
                         {
                             Ok(auth_res) => {
+                                if auth_res.success {
+                                    host_succeeded_clone.store(true, Ordering::Relaxed);
+                                }
                                 let mut final_message = auth_res.message.clone();
 
                                 // Save to database if DB available (using spawn_blocking for synchronous SQLite)
@@ -700,6 +750,14 @@ mod tests {
     fn test_parse_range() {
         let targets = parse_targets("192.168.1.1-10").unwrap();
         assert_eq!(targets.len(), 10);
+    }
+
+    #[test]
+    fn test_parse_range_invalid_end_before_start() {
+        let result = parse_targets("192.168.1.100-50");
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("end octet"));
     }
 
     #[test]

@@ -11,6 +11,6 @@ pub mod timeout;
 
 pub use cache::TtlCache;
 pub use circuit_breaker::{CircuitBreaker, CircuitState};
-pub use pool::ConnectionPool;
+pub use pool::{CheckedOut, ConnectionPool};
 pub use retry::RetryPolicy;
 pub use timeout::TimeoutManager;

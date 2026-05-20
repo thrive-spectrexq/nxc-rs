@@ -18,6 +18,16 @@ struct PooledEntry<C> {
     last_used: Instant,
 }
 
+/// A connection checked out of the pool.
+///
+/// Preserves the original `created_at` so that max-lifetime eviction works
+/// correctly even after a connection has been returned and reissued.
+pub struct CheckedOut<C> {
+    pub connection: C,
+    /// The instant this connection was originally created (not the checkout time).
+    pub created_at: Instant,
+}
+
 /// A generic async connection pool.
 ///
 /// # Type Parameters
@@ -75,7 +85,11 @@ impl<C: Send + 'static> ConnectionPool<C> {
     }
 
     /// Get a connection from the pool, or create one using the provided factory.
-    pub async fn get_or_create<F, Fut>(&self, factory: F) -> Result<C>
+    ///
+    /// Returns a `CheckedOut<C>` wrapper. Pass it back via `return_checked_out()`
+    /// so the connection's original creation time is preserved for max-lifetime
+    /// eviction.
+    pub async fn get_or_create<F, Fut>(&self, factory: F) -> Result<CheckedOut<C>>
     where
         F: FnOnce() -> Fut,
         Fut: Future<Output = Result<C>>,
@@ -105,13 +119,17 @@ impl<C: Send + 'static> ConnectionPool<C> {
                 }
 
                 debug!("Pool '{}': reusing idle connection", self.name);
-                return Ok(entry.connection);
+                return Ok(CheckedOut {
+                    connection: entry.connection,
+                    created_at: entry.created_at,
+                });
             }
         }
 
         // No valid idle connection — create a new one
         debug!("Pool '{}': creating new connection", self.name);
-        factory().await
+        let connection = factory().await?;
+        Ok(CheckedOut { connection, created_at: Instant::now() })
     }
 
     /// Return a connection to the pool for reuse.
@@ -128,6 +146,28 @@ impl<C: Send + 'static> ConnectionPool<C> {
         pool.push_back(PooledEntry {
             connection,
             created_at: Instant::now(),
+            last_used: Instant::now(),
+        });
+
+        debug!("Pool '{}': connection returned ({}/{})", self.name, pool.len(), self.max_size);
+    }
+
+    /// Return a previously checked-out connection, preserving its original creation time.
+    ///
+    /// Prefer this over `put()` when the connection was obtained via `get_or_create()`
+    /// so that max-lifetime eviction is calculated from when the connection was
+    /// **first** created, not the current return time.
+    pub async fn return_checked_out(&self, checked_out: CheckedOut<C>) {
+        let mut pool = self.idle.lock().await;
+
+        if pool.len() >= self.max_size {
+            warn!("Pool '{}': at capacity ({}), dropping connection", self.name, self.max_size);
+            return;
+        }
+
+        pool.push_back(PooledEntry {
+            connection: checked_out.connection,
+            created_at: checked_out.created_at,  // preserve original birth time
             last_used: Instant::now(),
         });
 
@@ -174,9 +214,10 @@ mod tests {
     async fn test_create_when_empty() {
         let pool: ConnectionPool<String> = ConnectionPool::new(5, Duration::from_secs(60));
 
-        let conn = pool.get_or_create(|| async { Ok("new_connection".to_string()) }).await.unwrap();
+        let checked_out =
+            pool.get_or_create(|| async { Ok("new_connection".to_string()) }).await.unwrap();
 
-        assert_eq!(conn, "new_connection");
+        assert_eq!(checked_out.connection, "new_connection");
         assert_eq!(pool.idle_count().await, 0);
     }
 
@@ -189,10 +230,12 @@ mod tests {
         assert_eq!(pool.idle_count().await, 1);
 
         // Should reuse instead of creating new
-        let conn =
-            pool.get_or_create(|| async { Ok("should_not_create".to_string()) }).await.unwrap();
+        let checked_out = pool
+            .get_or_create(|| async { Ok("should_not_create".to_string()) })
+            .await
+            .unwrap();
 
-        assert_eq!(conn, "cached_conn");
+        assert_eq!(checked_out.connection, "cached_conn");
         assert_eq!(pool.idle_count().await, 0);
     }
 
@@ -241,8 +284,36 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Should skip the expired connection and create a new one
-        let conn = pool.get_or_create(|| async { Ok("fresh_conn".to_string()) }).await.unwrap();
+        let checked_out =
+            pool.get_or_create(|| async { Ok("fresh_conn".to_string()) }).await.unwrap();
 
-        assert_eq!(conn, "fresh_conn");
+        assert_eq!(checked_out.connection, "fresh_conn");
+    }
+
+    #[tokio::test]
+    async fn test_return_checked_out_preserves_created_at() {
+        let pool: ConnectionPool<String> =
+            ConnectionPool::new(5, Duration::from_secs(60)).with_max_lifetime(Duration::from_millis(150));
+
+        // Check out a fresh connection
+        let checked_out =
+            pool.get_or_create(|| async { Ok("conn".to_string()) }).await.unwrap();
+
+        let original_created_at = checked_out.created_at;
+
+        // Return it and immediately get it back
+        pool.return_checked_out(checked_out).await;
+        let second =
+            pool.get_or_create(|| async { Ok("new_conn".to_string()) }).await.unwrap();
+
+        // The creation time should be preserved, not reset to now
+        assert_eq!(second.connection, "conn");
+        assert!(second.created_at.elapsed() < original_created_at.elapsed() + Duration::from_millis(5));
+
+        // Wait for max lifetime to expire, then verify eviction
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        pool.return_checked_out(second).await;
+        let evicted = pool.evict_expired().await;
+        assert_eq!(evicted, 1);
     }
 }
