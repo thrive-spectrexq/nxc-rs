@@ -47,8 +47,8 @@ impl DatabaseBackend for NxcDb {
     ) -> Result<Vec<Credential>> {
         let db = self.clone();
         let ws = workspace.to_string();
-        let dom = domain.map(|s| s.to_string());
-        let src = source.map(|s| s.to_string());
+        let dom = domain.map(String::from);
+        let src = source.map(String::from);
         spawn_blocking(move || {
             let mut db_mut = db.clone();
             db_mut.set_workspace(&ws);

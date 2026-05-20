@@ -290,3 +290,202 @@ pub fn export_html(path: &str, report: &Report) -> Result<()> {
     file.flush()?;
     Ok(())
 }
+
+// ─── PDF Export (raw PDF 1.4, zero external dependencies) ───────
+
+/// Lightweight PDF 1.4 writer — produces valid documents with text streams.
+struct PdfWriter {
+    objects: Vec<Vec<u8>>,
+}
+
+impl PdfWriter {
+    fn new() -> Self {
+        Self { objects: Vec::new() }
+    }
+
+    /// Add an indirect object and return its 1-based object number.
+    fn add_object(&mut self, data: Vec<u8>) -> usize {
+        self.objects.push(data);
+        self.objects.len() // 1-based
+    }
+
+    /// Serialise the entire PDF to bytes.
+    fn finish(self, _pages_obj: usize, catalog_obj: usize) -> Vec<u8> {
+        let mut buf: Vec<u8> = Vec::new();
+        buf.extend_from_slice(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n");
+
+        // Write objects and record byte offsets
+        let mut offsets: Vec<usize> = Vec::new();
+        for (i, obj) in self.objects.iter().enumerate() {
+            offsets.push(buf.len());
+            let header = format!("{} 0 obj\n", i + 1);
+            buf.extend_from_slice(header.as_bytes());
+            buf.extend_from_slice(obj);
+            buf.extend_from_slice(b"\nendobj\n");
+        }
+
+        // Cross-reference table
+        let xref_offset = buf.len();
+        buf.extend_from_slice(b"xref\n");
+        let line = format!("0 {}\n", self.objects.len() + 1);
+        buf.extend_from_slice(line.as_bytes());
+        buf.extend_from_slice(b"0000000000 65535 f \n");
+        for off in &offsets {
+            let entry = format!("{:010} 00000 n \n", off);
+            buf.extend_from_slice(entry.as_bytes());
+        }
+
+        // Trailer
+        let trailer = format!(
+            "trailer\n<< /Size {} /Root {} 0 R >>\nstartxref\n{}\n%%EOF\n",
+            self.objects.len() + 1,
+            catalog_obj,
+            xref_offset,
+        );
+        buf.extend_from_slice(trailer.as_bytes());
+        buf
+    }
+}
+
+/// Escape text for a PDF string literal (parenthesised form).
+fn pdf_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '(' | ')' | '\\' => {
+                out.push('\\');
+                out.push(c);
+            }
+            _ if c.is_ascii() => out.push(c),
+            _ => out.push('?'), // non-ASCII → placeholder
+        }
+    }
+    out
+}
+
+/// Build a PDF text stream placing each line with `Td` / `Tj`.
+fn build_text_stream(lines: &[String], font_size: f32, leading: f32) -> Vec<u8> {
+    let mut stream = String::new();
+    stream.push_str("BT\n");
+    stream.push_str(&format!("/F1 {} Tf\n", font_size));
+    stream.push_str(&format!("{} TL\n", leading));
+    stream.push_str("36 756 Td\n"); // start near top-left with margins
+    for line in lines {
+        stream.push_str(&format!("({}) Tj T*\n", pdf_escape(line)));
+    }
+    stream.push_str("ET\n");
+
+    let length = stream.len();
+    let mut obj = format!("<< /Length {} >>\nstream\n", length).into_bytes();
+    obj.extend_from_slice(stream.as_bytes());
+    obj.extend_from_slice(b"\nendstream");
+    obj
+}
+
+/// Export results as a PDF 1.4 report (no external dependencies).
+pub fn export_pdf(path: &str, report: &Report) -> Result<()> {
+    let total = report.results.len();
+    let successes = report.results.iter().filter(|r| r.success).count();
+    let admins = report.results.iter().filter(|r| r.admin).count();
+    let failures = total - successes;
+
+    // ── Collect lines for the first content page (summary) ──────
+    let mut summary_lines: Vec<String> = vec![
+        "NetExec-RS Scan Report".to_string(),
+        String::new(),
+        format!("Timestamp : {}", report.timestamp),
+        format!("Protocol  : {}", report.protocol.to_uppercase()),
+        format!("Total     : {}", total),
+        format!("Successful: {}", successes),
+        format!("Admin     : {}", admins),
+        format!("Failed    : {}", failures),
+        String::new(),
+        "--- Results ---".to_string(),
+        String::new(),
+        format!(
+            "{:<18} {:<16} {:<8} {:<6} {:<10} {}",
+            "Target", "Username", "Success", "Admin", "Duration", "Message"
+        ),
+        "-".repeat(90),
+    ];
+
+    for res in &report.results {
+        let success_str = if res.success { "YES" } else { "NO" };
+        let admin_str = if res.admin { "YES" } else { "-" };
+        // Truncate message to keep rows legible
+        let msg: String = res.message.chars().take(40).collect();
+        summary_lines.push(format!(
+            "{:<18} {:<16} {:<8} {:<6} {:<10} {}",
+            truncate_str(&res.target, 17),
+            truncate_str(&res.username, 15),
+            success_str,
+            admin_str,
+            format!("{}ms", res.duration_ms),
+            msg,
+        ));
+    }
+
+    summary_lines.push(String::new());
+    summary_lines.push("Generated by NetExec-RS".to_string());
+
+    // ── Build PDF object tree ───────────────────────────────────
+    let mut pdf = PdfWriter::new();
+
+    // 1 – Font (Helvetica, a built-in base-14 font)
+    let font_obj = pdf.add_object(
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec(),
+    );
+
+    // 2 – Content stream
+    let stream = build_text_stream(&summary_lines, 9.0, 11.0);
+    let content_obj = pdf.add_object(stream);
+
+    // 3 – Page
+    // We will fix up /Parent after creating Pages object
+    let page_dict = format!(
+        "<< /Type /Page /Parent {} 0 R /MediaBox [0 0 612 792] /Contents {} 0 R /Resources << /Font << /F1 {} 0 R >> >> >>",
+        content_obj + 1, // pages_obj will be next
+        content_obj,
+        font_obj,
+    );
+    let page_obj = pdf.add_object(page_dict.into_bytes());
+
+    // 4 – Pages
+    let pages_dict = format!(
+        "<< /Type /Pages /Kids [{} 0 R] /Count 1 >>",
+        page_obj,
+    );
+    let pages_obj = pdf.add_object(pages_dict.into_bytes());
+
+    // Fix page /Parent to point to pages_obj
+    let fixed_page = format!(
+        "<< /Type /Page /Parent {} 0 R /MediaBox [0 0 612 792] /Contents {} 0 R /Resources << /Font << /F1 {} 0 R >> >> >>",
+        pages_obj,
+        content_obj,
+        font_obj,
+    );
+    pdf.objects[page_obj - 1] = fixed_page.into_bytes();
+
+    // 5 – Catalog
+    let catalog_dict = format!(
+        "<< /Type /Catalog /Pages {} 0 R >>",
+        pages_obj,
+    );
+    let catalog_obj = pdf.add_object(catalog_dict.into_bytes());
+
+    let bytes = pdf.finish(pages_obj, catalog_obj);
+
+    let mut file = File::create(path)?;
+    file.write_all(&bytes)?;
+    file.flush()?;
+    Ok(())
+}
+
+/// Truncate a string to at most `max` characters.
+fn truncate_str(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        format!("{}~", &s[..max - 1])
+    }
+}

@@ -32,10 +32,8 @@ impl NetworkConditionDetector {
 
     pub fn is_unreachable(&self, subnet: &str) -> bool {
         if let Some(entry) = self.subnet_failures.get(subnet) {
-            if entry.0 >= self.failure_threshold {
-                if entry.1.elapsed() < self.cooldown {
-                    return true;
-                }
+            if entry.0 >= self.failure_threshold && entry.1.elapsed() < self.cooldown {
+                return true;
             }
         }
         false

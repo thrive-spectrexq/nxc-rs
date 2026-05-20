@@ -83,6 +83,23 @@ pub mod wmi_enum;
 pub mod wmi_persist;
 pub mod zerologon;
 
+// ─── Phase 2D: Lateral Movement, Persistence, Evasion (15 modules) ──
+pub mod psexec;
+pub mod wmiexec;
+pub mod atexec;
+pub mod smbclient;
+pub mod rdp_exec;
+pub mod golden_ticket;
+pub mod silver_ticket;
+pub mod skeleton_key;
+pub mod dcsync;
+pub mod reg_persist;
+pub mod clm_bypass;
+pub mod ppid_spoof;
+pub mod token_impersonation;
+pub mod named_pipe_pivot;
+pub mod event_log_clear;
+
 // ─── Phase 1: SMB/AD Core Modules ───────────────────────────────
 pub mod add_computer;
 pub mod backup_operator;
@@ -518,6 +535,23 @@ impl ModuleRegistry {
 
         // ─── Wireless Reconnaissance ────────────────────────────────
         modules.insert("wifi_recon".into(), Box::new(wifi_recon::WifiRecon::new()));
+
+        // ─── Phase 2D: Lateral Movement, Persistence, Evasion (15 modules) ───
+        modules.insert("psexec".into(), Box::new(psexec::PsExecModule::new()));
+        modules.insert("wmiexec".into(), Box::new(wmiexec::WmiExecModule::new()));
+        modules.insert("atexec".into(), Box::new(atexec::AtExecModule::new()));
+        modules.insert("smbclient".into(), Box::new(smbclient::SmbClientModule::new()));
+        modules.insert("rdp_exec".into(), Box::new(rdp_exec::RdpExecModule::new()));
+        modules.insert("golden_ticket".into(), Box::new(golden_ticket::GoldenTicketModule::new()));
+        modules.insert("silver_ticket".into(), Box::new(silver_ticket::SilverTicketModule::new()));
+        modules.insert("skeleton_key".into(), Box::new(skeleton_key::SkeletonKeyModule::new()));
+        modules.insert("dcsync".into(), Box::new(dcsync::DcSyncModule::new()));
+        modules.insert("reg_persist".into(), Box::new(reg_persist::RegPersistModule::new()));
+        modules.insert("clm_bypass".into(), Box::new(clm_bypass::ClmBypassModule::new()));
+        modules.insert("ppid_spoof".into(), Box::new(ppid_spoof::PpidSpoofModule::new()));
+        modules.insert("token_impersonation".into(), Box::new(token_impersonation::TokenImpersonationModule::new()));
+        modules.insert("named_pipe_pivot".into(), Box::new(named_pipe_pivot::NamedPipePivotModule::new()));
+        modules.insert("event_log_clear".into(), Box::new(event_log_clear::EventLogClearModule::new()));
 
         Self { modules }
     }
