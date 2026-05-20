@@ -545,7 +545,7 @@ pub fn calculate_lm_hash(password: &str) -> [u8; 16] {
     // SECURITY: The "KGS!@#$%" magic string and DES algorithm are MANDATORY
     // for the legacy LM authentication protocol. These are insecure by modern
     // standards but required for protocol compatibility in a pentesting tool.
-    let magic: &[u8; 8] = b"KGS!@#$%";
+    let magic: &[u8; 8] = b"KGS!@#$%"; // lgtm[rust/hard-coded-cryptographic-value] Required protocol constant
     let mut pass_bytes = [0u8; 14];
     let upper = password.to_uppercase();
     let bytes = upper.as_bytes();
@@ -607,10 +607,10 @@ mod tests {
     #[test]
     fn test_nt_hash_computation() {
         // Known test vector: Password = "Password"
-        let hash = calculate_nt_hash("Password");
+        let hash = calculate_nt_hash("Password"); // lgtm[rust/hard-coded-cryptographic-value] Test data
         assert_eq!(hash.len(), 16);
         // The hash should be deterministic
-        let hash2 = calculate_nt_hash("Password");
+        let hash2 = calculate_nt_hash("Password"); // lgtm[rust/hard-coded-cryptographic-value] Test data
         assert_eq!(hash, hash2);
     }
 
@@ -623,7 +623,7 @@ mod tests {
 
     #[test]
     fn test_v2_hash() {
-        let nt_hash = calculate_nt_hash("Password");
+        let nt_hash = calculate_nt_hash("Password"); // lgtm[rust/hard-coded-cryptographic-value] Test data
         let v2 = calculate_v2_hash("User", "Domain", &nt_hash);
         assert_eq!(v2.len(), 16);
         // Should be different with different domain
@@ -695,7 +695,7 @@ mod tests {
     #[test]
     fn test_ntlmv2_full_flow() {
         let auth = NtlmAuthenticator::new(Some("TESTDOMAIN"));
-        let creds = Credentials::password("testuser", "DUMMY_PASSWORD", Some("TESTDOMAIN"));
+        let creds = Credentials::password("testuser", "DUMMY_PASSWORD", Some("TESTDOMAIN")); // lgtm[rust/hard-coded-cryptographic-value] Test data
         let t1 = auth.generate_type1();
         assert!(t1.starts_with(b"NTLMSSP\0"));
 

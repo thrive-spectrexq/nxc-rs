@@ -9,7 +9,8 @@ members = [
     "nxc-rs/ai",
     "nxc-rs/resilience",
     "nxc-rs/nxc-tests",
-    "nxc-rs/nxc-sessions"
+    "nxc-rs/nxc-sessions",
+    "nxc-rs/c2"
 ]
 resolver = "2"
 
@@ -57,11 +58,11 @@ base64 = "0.22"
 
 # NetExec-RS dependencies (unified on digest 0.10.x for p12 compatibility)
 md4 = "0.11"
-hmac = "0.12"
-md-5 = "0.10"
+hmac = "0.13"
+md-5 = "0.11"
 rc4 = "0.2"
-aes = "0.8"
-des = "0.8"
+aes = "0.9"
+des = "0.9"
 csv = "1.3"
 zeroize = { version = "1.8", features = ["derive"] }
 colored = "3.1"
@@ -70,16 +71,16 @@ hex = "0.4"
 # Kerberos, encryption & registry parsing
 kerberos_asn1 = "0.2"
 kerberos_constants = "0.0.9"
-pbkdf2 = { version = "0.12", features = ["hmac"] }
+pbkdf2 = { version = "0.13", features = ["hmac"] }
 rasn = "0.28"
-sha1 = "0.10"
-sha2 = "0.10"
-cbc = "0.1"
-cipher = { version = "0.4", features = ["alloc"] }
+sha1 = "0.11"
+sha2 = "0.11"
+cbc = "0.2"
+cipher = { version = "0.5", features = ["alloc"] }
 pem = "3.0"
 der-parser = "9.0"
 num-bigint = "0.4"
-digest = "0.10"
+digest = "0.11"
 ctap2-proto = "0.1"
 tempfile = "3.10"
 nt-hive = "0.3.0"

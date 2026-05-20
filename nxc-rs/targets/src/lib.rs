@@ -832,7 +832,7 @@ mod tests {
                 _session: &mut dyn NxcSession,
                 creds: &Credentials,
             ) -> Result<AuthResult> {
-                if creds.password.as_deref() == Some("DUMMY_PASSWORD") {
+                if creds.password.as_deref() == Some("DUMMY_PASSWORD") { // lgtm[rust/hard-coded-cryptographic-value] Test data
                     Ok(AuthResult::success(creds.username == "admin"))
                 } else {
                     Ok(AuthResult::failure("Bad password", None))
@@ -875,8 +875,8 @@ mod tests {
 
         let creds = vec![
             Credentials::password("admin", "wrong", None),
-            Credentials::password("admin", "DUMMY_PASSWORD", None),
-            Credentials::password("user", "DUMMY_PASSWORD", None),
+            Credentials::password("admin", "DUMMY_PASSWORD", None), // lgtm[rust/hard-coded-cryptographic-value] Test data
+            Credentials::password("user", "DUMMY_PASSWORD", None), // lgtm[rust/hard-coded-cryptographic-value] Test data
         ];
 
         // 4 targets * 3 creds = 12 total tasks

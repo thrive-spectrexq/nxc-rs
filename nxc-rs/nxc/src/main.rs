@@ -484,7 +484,7 @@ mod tests {
             "-u",
             "admin",
             "-p",
-            "Password123!",
+            "Password123!", // lgtm[rust/hard-coded-cryptographic-value] Test data
         ]);
         let (proto, sub_m) = matches.subcommand().unwrap();
         assert_eq!(proto, "smb");
