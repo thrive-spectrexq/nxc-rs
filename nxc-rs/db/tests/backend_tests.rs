@@ -3,15 +3,15 @@
 use nxc_db::{backend::*, HostInfo, Credential, AuthResultEntry, NxcDb};
 use tempfile::tempdir;
 
-async fn setup_db() -> Box<dyn DatabaseBackend> {
+async fn setup_db() -> (Box<dyn DatabaseBackend>, tempfile::TempDir) {
     let dir = tempdir().unwrap();
     let db_path = dir.path().join("nxc_test.db");
-    Box::new(NxcDb::new(&db_path, "default").unwrap())
+    (Box::new(NxcDb::new(&db_path, "default").unwrap()), dir)
 }
 
 #[tokio::test]
 async fn test_upsert_and_list_hosts() {
-    let db = setup_db().await;
+    let (db, _dir) = setup_db().await;
     let host = HostInfo {
         id: None,
         workspace: "default".to_string(),
@@ -37,7 +37,7 @@ async fn test_upsert_and_list_hosts() {
 
 #[tokio::test]
 async fn test_credentials_crud() {
-    let db = setup_db().await;
+    let (db, _dir) = setup_db().await;
     let host = HostInfo {
         id: None,
         workspace: "default".to_string(),
@@ -83,7 +83,7 @@ async fn test_credentials_crud() {
 
 #[tokio::test]
 async fn test_auth_results() {
-    let db = setup_db().await;
+    let (db, _dir) = setup_db().await;
     let host_id = db.upsert_host(&HostInfo {
         id: None,
         workspace: "default".to_string(),
@@ -118,7 +118,7 @@ async fn test_auth_results() {
 
 #[tokio::test]
 async fn test_vulnerabilities_and_attack_chains() {
-    let db = setup_db().await;
+    let (db, _dir) = setup_db().await;
     let host_id = db.upsert_host(&HostInfo {
         id: None,
         workspace: "default".to_string(),
@@ -165,7 +165,7 @@ async fn test_vulnerabilities_and_attack_chains() {
 
 #[tokio::test]
 async fn test_operations_log() {
-    let db = setup_db().await;
+    let (db, _dir) = setup_db().await;
     let log = OperationsLog {
         id: None,
         workspace: "default".to_string(),
