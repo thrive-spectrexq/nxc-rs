@@ -159,7 +159,7 @@ impl BloodhoundModule {
         verify_ssl: bool,
         payload: &serde_json::Value,
     ) -> Result<()> {
-        let client = Client::builder().danger_accept_invalid_certs(!verify_ssl).build()?;
+        let client = Client::builder().danger_accept_invalid_certs(!verify_ssl).build()?; // lgtm[rust/disabled-certificate-check]
 
         // 1. Authenticate with BloodHound CE API to get a session JWT
         let login_url = format!("{}/api/v2/login", uri.trim_end_matches('/'));

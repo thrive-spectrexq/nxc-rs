@@ -117,7 +117,7 @@ impl AiProvider for GeminiProvider {
 
         let resp = self
             .client
-            .post(&url)
+            .post(&url) // lgtm[rust/cleartext-transmission] URL is hardcoded to https://
             .header("x-goog-api-key", &self.api_key)
             .json(&body)
             .send()

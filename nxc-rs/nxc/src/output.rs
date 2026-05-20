@@ -60,7 +60,7 @@ impl NxcOutput {
 
     /// `[✔]` success — green. Use for auth successes.
     pub fn success(&self, msg: &str) {
-        println!("{} {} {}", self.prefix(), "✔".bold().green(), msg);
+        println!("{} {} {}", self.prefix(), "✔".bold().green(), msg); // lgtm[rust/cleartext-logging] By design to print cracked credentials to stdout
     }
 
     /// `[★]` admin success (Pwn3d!) — yellow highlight.
