@@ -6,6 +6,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+pub mod backend;
+pub mod sqlite_backend;
+
 // ─── Schema Constants ───────────────────────────────────────────
 
 /// SQL to create nxc tables (backward-compatible migrations).
@@ -109,7 +112,7 @@ pub struct Credential {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuthResultRecord {
+pub struct AuthResultEntry {
     pub id: Option<i64>,
     pub host_id: i64,
     pub credential_id: Option<i64>,
@@ -152,13 +155,48 @@ pub struct WorkspaceStats {
 
 // ─── Migration System ───────────────────────────────────────────
 
+pub const MIGRATION_3_PHASE1: &str = r#"
+CREATE TABLE IF NOT EXISTS nxc_vulnerabilities (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    host_id     INTEGER REFERENCES nxc_hosts(id),
+    cve_id      TEXT,
+    title       TEXT NOT NULL,
+    severity    TEXT,
+    description TEXT,
+    evidence    TEXT,
+    module_name TEXT,
+    detected_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS nxc_attack_chains (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace    TEXT NOT NULL DEFAULT 'default',
+    name         TEXT NOT NULL,
+    description  TEXT,
+    steps        TEXT NOT NULL,
+    risk_score   REAL,
+    created_at   INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS nxc_operations_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace    TEXT NOT NULL DEFAULT 'default',
+    operation    TEXT NOT NULL,
+    target       TEXT,
+    module       TEXT,
+    status       TEXT NOT NULL,
+    details      TEXT,
+    started_at   INTEGER NOT NULL,
+    completed_at INTEGER
+);
+"#;
+
 /// Ordered list of schema migrations. Each entry is (version, sql).
 /// New migrations are appended; existing ones must NEVER be modified.
 const MIGRATIONS: &[(i64, &str)] = &[
     (1, NXC_SCHEMA),
     (2, "DROP INDEX IF EXISTS idx_nxc_creds_unique; CREATE INDEX IF NOT EXISTS idx_nxc_creds_user ON nxc_credentials(workspace, username, domain);"),
-    // Future migrations:
-    // (3, "ALTER TABLE nxc_hosts ADD COLUMN agent TEXT;"),
+    (3, MIGRATION_3_PHASE1),
 ];
 
 /// Run pending migrations against the database.
@@ -166,6 +204,7 @@ fn run_migrations(conn: &rusqlite::Connection) -> Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS nxc_schema_version (
             version INTEGER PRIMARY KEY,
+
             applied_at INTEGER NOT NULL
         )",
     )?;
@@ -190,6 +229,7 @@ fn run_migrations(conn: &rusqlite::Connection) -> Result<()> {
 // ─── NxcDb Manager ──────────────────────────────────────────────
 
 /// Credential workspace database manager.
+#[derive(Clone)]
 pub struct NxcDb {
     pool: r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>,
     workspace: String,
@@ -201,13 +241,21 @@ impl NxcDb {
         let manager = r2d2_sqlite::SqliteConnectionManager::file(db_path);
         let pool = r2d2::Pool::new(manager)?;
 
-        // Run versioned migrations
         let conn = pool.get()?;
         run_migrations(&conn)?;
 
-        Ok(Self { pool, workspace: workspace.to_string() })
+        Ok(Self {
+            pool,
+            workspace: workspace.to_string(),
+        })
     }
 
+    /// Get a database connection from the pool.
+    pub fn get_connection(&self) -> Result<r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>> {
+        Ok(self.pool.get()?)
+    }
+
+    /// Upsert a host (returns id).
     // ── Host operations ──
 
     pub fn upsert_host(&self, host: &HostInfo) -> Result<i64> {

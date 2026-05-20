@@ -68,6 +68,38 @@ pub enum SshError {
     Unknown(String),
 }
 
+/// Errors that can occur during WinRM authentication and execution.
+#[derive(Error, Debug)]
+pub enum WinRmError {
+    #[error("Authentication failed: {0}")]
+    AuthFailed(String),
+
+    #[error("Connection failed: {0}")]
+    ConnectionFailed(String),
+
+    #[error("Execution failed: {0}")]
+    ExecutionFailed(String),
+
+    #[error("Unknown WinRM error: {0}")]
+    Unknown(String),
+}
+
+/// Errors that can occur during MSSQL authentication and querying.
+#[derive(Error, Debug)]
+pub enum MssqlError {
+    #[error("Authentication failed: {0}")]
+    AuthFailed(String),
+
+    #[error("Connection failed: {0}")]
+    ConnectionFailed(String),
+
+    #[error("Query failed: {0}")]
+    QueryFailed(String),
+
+    #[error("Unknown MSSQL error: {0}")]
+    Unknown(String),
+}
+
 /// Generic protocol error for wrapping underlying errors.
 #[derive(Error, Debug)]
 pub enum ProtocolError {
@@ -80,9 +112,41 @@ pub enum ProtocolError {
     #[error("SSH Error: {0}")]
     Ssh(#[from] SshError),
 
+    #[error("WinRM Error: {0}")]
+    WinRm(#[from] WinRmError),
+
+    #[error("MSSQL Error: {0}")]
+    Mssql(#[from] MssqlError),
+
     #[error("Generic protocol error: {0}")]
     Generic(String),
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),
+}
+
+impl ProtocolError {
+    /// Returns true if the error is an authentication failure (e.g., bad password).
+    pub fn is_auth_failure(&self) -> bool {
+        match self {
+            Self::Smb(SmbError::AuthFailed(_)) => true,
+            Self::Ldap(LdapError::BindFailed(_)) => true,
+            Self::Ssh(SshError::AuthFailed(_)) => true,
+            Self::WinRm(WinRmError::AuthFailed(_)) => true,
+            Self::Mssql(MssqlError::AuthFailed(_)) => true,
+            _ => false,
+        }
+    }
+
+    /// Returns true if the error is a network connection failure (e.g., unreachable, timeout).
+    pub fn is_connection_failure(&self) -> bool {
+        match self {
+            Self::Smb(SmbError::ConnectionFailed(_)) => true,
+            Self::Ldap(LdapError::ConnectionFailed(_)) => true,
+            Self::Ssh(SshError::ConnectionFailed(_)) => true,
+            Self::WinRm(WinRmError::ConnectionFailed(_)) => true,
+            Self::Mssql(MssqlError::ConnectionFailed(_)) => true,
+            _ => false,
+        }
+    }
 }

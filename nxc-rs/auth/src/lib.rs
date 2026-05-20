@@ -248,6 +248,55 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_credentials_password() {
+        let cred = Credentials::password("alice", "P@ssw0rd123", Some("CORP"));
+        assert_eq!(cred.username, "alice");
+        assert_eq!(cred.password.as_deref(), Some("P@ssw0rd123"));
+        assert_eq!(cred.domain.as_deref(), Some("CORP"));
+        assert_eq!(cred.auth_method(), AuthMethod::Password);
+        assert!(!cred.use_kerberos);
+    }
+
+    #[test]
+    fn test_credentials_nt_hash() {
+        let cred = Credentials::nt_hash("bob", "8846f7eaee8fb117ad06bdd830b7586c", None);
+        assert_eq!(cred.username, "bob");
+        assert_eq!(cred.nt_hash.as_deref(), Some("8846f7eaee8fb117ad06bdd830b7586c"));
+        assert!(cred.domain.is_none());
+        assert_eq!(cred.auth_method(), AuthMethod::NtHash);
+    }
+
+    #[test]
+    fn test_credentials_aes_key() {
+        let cred = Credentials::aes_key("charlie", "f0a1b2c3d4...", Some("CORP.LOCAL"));
+        assert_eq!(cred.username, "charlie");
+        assert_eq!(cred.aes_256_key.as_deref(), Some("f0a1b2c3d4..."));
+        assert_eq!(cred.auth_method(), AuthMethod::AesKey);
+    }
+
+    #[test]
+    fn test_credentials_ccache() {
+        let cred = Credentials::ccache("dave", "/tmp/krb5cc_1000", Some("CORP"));
+        assert_eq!(cred.ccache_path.as_deref(), Some("/tmp/krb5cc_1000"));
+        assert_eq!(cred.auth_method(), AuthMethod::KerberosTgt);
+    }
+
+    #[test]
+    fn test_credentials_certificate() {
+        let cred = Credentials::certificate("eve", "eve.pfx", Some("CORP"));
+        assert_eq!(cred.pfx_path.as_deref(), Some("eve.pfx"));
+        assert_eq!(cred.auth_method(), AuthMethod::Certificate);
+    }
+
+    #[test]
+    fn test_credentials_null_session() {
+        let cred = Credentials::null_session();
+        assert!(cred.username.is_empty());
+        assert!(cred.domain.is_none());
+        assert_eq!(cred.auth_method(), AuthMethod::NullSession);
+    }
+
+    #[test]
     fn test_credentials_auth_method_detection() {
         let pwd = Credentials::password("user", "pass", Some("DOMAIN"));
         assert_eq!(pwd.auth_method(), AuthMethod::Password);
@@ -269,11 +318,40 @@ mod tests {
     }
 
     #[test]
+    fn test_auth_result_success_admin() {
+        let res = AuthResult::success(true);
+        assert!(res.success);
+        assert!(res.admin);
+        assert_eq!(res.message, "Pwn3d!");
+        assert!(res.error_code.is_none());
+    }
+
+    #[test]
+    fn test_auth_result_success_user() {
+        let res = AuthResult::success(false);
+        assert!(res.success);
+        assert!(!res.admin);
+        assert_eq!(res.message, "Authenticated");
+    }
+
+    #[test]
+    fn test_auth_result_failure() {
+        let res = AuthResult::failure("Logon Failure", Some("STATUS_LOGON_FAILURE"));
+        assert!(!res.success);
+        assert!(!res.admin);
+        assert_eq!(res.message, "Logon Failure");
+        assert_eq!(res.error_code.as_deref(), Some("STATUS_LOGON_FAILURE"));
+    }
+
+    #[test]
     fn test_auth_result_display() {
         let success = AuthResult::success(true);
         assert!(format!("{success}").contains("Pwn3d!"));
 
+        let success_user = AuthResult::success(false);
+        assert!(format!("{success_user}").contains("Authenticated"));
+
         let fail = AuthResult::failure("Bad creds", None);
-        assert!(format!("{fail}").contains("Bad creds"));
+        assert!(format!("{fail}").contains("[-] Bad creds"));
     }
 }

@@ -7,7 +7,9 @@ members = [
     "nxc-rs/targets",
     "nxc-rs/nxc",
     "nxc-rs/ai",
-    "nxc-rs/resilience"
+    "nxc-rs/resilience",
+    "nxc-rs/nxc-tests",
+    "nxc-rs/nxc-sessions"
 ]
 resolver = "2"
 

@@ -1001,6 +1001,19 @@ dependencies = [
 
 [[package]]
 name = "dashmap"
+version = "5.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
+dependencies = [
+ "cfg-if",
+ "hashbrown 0.14.5",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core 0.9.12",
+]
+
+[[package]]
+name = "dashmap"
 version = "6.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6361d5c062261c78a176addb82d4c821ae42bed6089de0e12603cd25de2059c"
@@ -2876,6 +2889,7 @@ name = "nxc-db"
 version = "0.4.2"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "csv",
  "r2d2",
@@ -2885,6 +2899,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
+ "tokio",
  "tracing",
 ]
 
@@ -2965,10 +2980,23 @@ name = "nxc-resilience"
 version = "0.4.2"
 dependencies = [
  "anyhow",
- "dashmap",
+ "dashmap 6.2.1",
  "rand 0.10.1",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "nxc-sessions"
+version = "0.4.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "dashmap 5.5.3",
+ "serde",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -2978,7 +3006,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "dashmap",
+ "dashmap 6.2.1",
  "indicatif",
  "nxc-auth",
  "nxc-db",
@@ -2992,6 +3020,23 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "nxc-tests"
+version = "0.4.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "nxc-auth",
+ "nxc-db",
+ "nxc-modules",
+ "nxc-protocols",
+ "nxc-resilience",
+ "nxc-targets",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

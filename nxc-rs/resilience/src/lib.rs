@@ -5,12 +5,14 @@
 
 pub mod cache;
 pub mod circuit_breaker;
+pub mod network_detect;
 pub mod pool;
 pub mod retry;
 pub mod timeout;
 
 pub use cache::TtlCache;
 pub use circuit_breaker::{CircuitBreaker, CircuitState};
+pub use network_detect::NetworkConditionDetector;
 pub use pool::{CheckedOut, ConnectionPool};
 pub use retry::RetryPolicy;
 pub use timeout::TimeoutManager;
