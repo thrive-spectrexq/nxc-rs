@@ -3,12 +3,12 @@ use anyhow::Result;
 use std::sync::Arc;
 
 pub struct AttackPlanner {
-    tool_registry: Arc<ToolRegistry>,
+    _tool_registry: Arc<ToolRegistry>,
 }
 
 impl AttackPlanner {
     pub fn new(tool_registry: Arc<ToolRegistry>) -> Self {
-        Self { tool_registry }
+        Self { _tool_registry: tool_registry }
     }
 
     pub async fn plan_attack_path(&self, target_domain: &str) -> Result<Vec<String>> {
