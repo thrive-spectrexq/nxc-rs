@@ -15,7 +15,7 @@ use anyhow::Result;
 use hmac::{Hmac, Mac, KeyInit as HmacKeyInit};
 use md4::{Digest, Md4};
 use md5::Md5;
-use rc4::cipher::{KeyInit, StreamCipher};
+use rc4::cipher::StreamCipher;
 use rc4::Rc4;
 use tracing::debug;
 
@@ -559,8 +559,8 @@ pub fn calculate_lm_hash(password: &str) -> [u8; 16] {
     let cipher1 = Des::new_from_slice(&key1).unwrap_or_else(|_| unreachable!());
     let cipher2 = Des::new_from_slice(&key2).unwrap_or_else(|_| unreachable!());
 
-    let mut block1 = Block::<Des>::clone_from_slice(magic);
-    let mut block2 = Block::<Des>::clone_from_slice(magic);
+    let mut block1 = Block::<Des>::from(*magic);
+    let mut block2 = Block::<Des>::from(*magic);
 
     cipher1.encrypt_block(&mut block1);
     cipher2.encrypt_block(&mut block2);

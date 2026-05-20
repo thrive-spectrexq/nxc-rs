@@ -91,7 +91,7 @@ pub fn aes_encrypt(plaintext: &str, key: &[u8; 16]) -> Vec<u8> {
 
     let mut ciphertext = Vec::with_capacity(padded.len());
     for chunk in padded.chunks_exact(16) {
-        let mut block = Block::<Aes128>::clone_from_slice(chunk);
+        let mut block = *Block::<Aes128>::from_slice(chunk);
         cipher.encrypt_block(&mut block);
         ciphertext.extend_from_slice(&block);
     }
@@ -110,7 +110,7 @@ pub fn aes_decrypt(ciphertext: &[u8], key: &[u8; 16]) -> Result<String, &'static
     let mut plaintext = Vec::with_capacity(ciphertext.len());
 
     for chunk in ciphertext.chunks_exact(16) {
-        let mut block = Block::<Aes128>::clone_from_slice(chunk);
+        let mut block = *Block::<Aes128>::from_slice(chunk);
         cipher.decrypt_block(&mut block);
         plaintext.extend_from_slice(&block);
     }
