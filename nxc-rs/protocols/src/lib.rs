@@ -38,6 +38,10 @@ pub mod ssh;
 pub mod vnc;
 pub mod winrm;
 pub mod wmi;
+pub mod mqtt;
+pub mod modbus;
+pub mod exchange;
+pub mod telnet;
 
 // ─── Core Traits ────────────────────────────────────────────────
 
@@ -160,6 +164,10 @@ pub enum Protocol {
     Ilo,
     Kube,
     OpcUa,
+    Mqtt,
+    Modbus,
+    Exchange,
+    Telnet,
 }
 
 impl Protocol {
@@ -188,6 +196,10 @@ impl Protocol {
             Protocol::Ilo => "ilo",
             Protocol::Kube => "kube",
             Protocol::OpcUa => "opcua",
+            Protocol::Mqtt => "mqtt",
+            Protocol::Modbus => "modbus",
+            Protocol::Exchange => "exchange",
+            Protocol::Telnet => "telnet",
         }
     }
 
@@ -216,6 +228,10 @@ impl Protocol {
             Protocol::Ilo => 443,
             Protocol::Kube => 6443,
             Protocol::OpcUa => 4840,
+            Protocol::Mqtt => 1883,
+            Protocol::Modbus => 502,
+            Protocol::Exchange => 443,
+            Protocol::Telnet => 23,
         }
     }
 
@@ -246,6 +262,10 @@ impl Protocol {
             "ilo" | "idrac" | "bmc" => Some(Protocol::Ilo),
             "kube" | "kubernetes" | "k8s" => Some(Protocol::Kube),
             "opcua" | "opc" => Some(Protocol::OpcUa),
+            "mqtt" => Some(Protocol::Mqtt),
+            "modbus" => Some(Protocol::Modbus),
+            "exchange" | "ews" => Some(Protocol::Exchange),
+            "telnet" => Some(Protocol::Telnet),
             _ => None,
         }
     }
@@ -276,6 +296,10 @@ impl Protocol {
             Protocol::Ilo,
             Protocol::Kube,
             Protocol::OpcUa,
+            Protocol::Mqtt,
+            Protocol::Modbus,
+            Protocol::Exchange,
+            Protocol::Telnet,
         ]
     }
 }

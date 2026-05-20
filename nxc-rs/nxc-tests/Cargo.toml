@@ -1,0 +1,19 @@
+[package]
+name = "nxc-tests"
+version = "0.4.2"
+edition = "2021"
+publish = false
+
+[dependencies]
+nxc-auth = { path = "../auth" }
+nxc-protocols = { path = "../protocols" }
+nxc-modules = { path = "../modules" }
+nxc-db = { path = "../db" }
+nxc-targets = { path = "../targets" }
+nxc-resilience = { path = "../resilience" }
+
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+async-trait = { workspace = true }

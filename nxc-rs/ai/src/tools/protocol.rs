@@ -25,7 +25,7 @@ impl NxcTool for ProtocolTool {
             "properties": {
                 "protocol": {
                     "type": "string",
-                    "enum": ["smb", "ssh", "winrm", "wmi", "ftp", "vnc", "nfs", "adb", "network", "opcua", "ldap", "mssql", "rdp", "http", "redis", "postgres", "mysql", "snmp", "docker", "dns", "ipmi", "ilo", "kube"],
+                    "enum": ["smb", "ssh", "winrm", "wmi", "ftp", "vnc", "nfs", "adb", "network", "opcua", "ldap", "mssql", "rdp", "http", "redis", "postgres", "mysql", "snmp", "docker", "dns", "ipmi", "ilo", "kube", "mqtt", "modbus", "exchange", "telnet"],
                     "description": "The protocol to run"
                 },
                 "targets": {
@@ -116,6 +116,10 @@ impl NxcTool for ProtocolTool {
             Protocol::OpcUa => Arc::new(nxc_protocols::opcua::OpcUaProtocol::new()),
             #[cfg(not(feature = "opcua-support"))]
             Protocol::OpcUa => anyhow::bail!("OPC-UA support is not enabled. Recompile with the 'opcua-support' feature."),
+            Protocol::Mqtt => Arc::new(nxc_protocols::mqtt::MqttProtocol::new()),
+            Protocol::Modbus => Arc::new(nxc_protocols::modbus::ModbusProtocol::new()),
+            Protocol::Exchange => Arc::new(nxc_protocols::exchange::ExchangeProtocol::new()),
+            Protocol::Telnet => Arc::new(nxc_protocols::telnet::TelnetProtocol::new()),
         };
 
         let results = engine.run(protocol_handler, targets, creds).await;

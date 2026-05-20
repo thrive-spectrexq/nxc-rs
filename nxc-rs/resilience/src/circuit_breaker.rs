@@ -40,6 +40,7 @@ struct BreakerState {
     last_failure_time: Option<Instant>,
     total_successes: u64,
     total_failures: u64,
+    is_probing: bool,
 }
 
 /// Circuit breaker for a single target or service endpoint.
@@ -84,6 +85,7 @@ impl CircuitBreaker {
                 last_failure_time: None,
                 total_successes: 0,
                 total_failures: 0,
+                is_probing: false,
             })),
         }
     }
@@ -107,6 +109,19 @@ impl CircuitBreaker {
         F: FnOnce() -> Fut,
         Fut: Future<Output = Result<T>>,
     {
+        self.call_with_classifier(operation, |_| true).await
+    }
+
+    /// Execute an async operation through the circuit breaker, with a custom error classifier.
+    /// The classifier should return `true` if the error should be counted as a circuit failure
+    /// (e.g., a network timeout), or `false` if it should be ignored by the circuit breaker 
+    /// (e.g., an authentication failure).
+    pub async fn call_with_classifier<F, Fut, T, C>(&self, operation: F, classifier: C) -> Result<T>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = Result<T>>,
+        C: Fn(&anyhow::Error) -> bool,
+    {
         // Check if the circuit allows the call
         {
             let mut inner = self.state.lock().await;
@@ -121,7 +136,15 @@ impl CircuitBreaker {
                     ));
                 }
                 CircuitState::HalfOpen => {
+                    if inner.is_probing {
+                        debug!("Circuit breaker '{}' is HALF-OPEN but already probing, fast-failing request", self.name);
+                        return Err(anyhow!(
+                            "Circuit breaker '{}' is half-open and already probing",
+                            self.name
+                        ));
+                    }
                     debug!("Circuit breaker '{}' is HALF-OPEN, allowing probe request", self.name);
+                    inner.is_probing = true;
                 }
                 CircuitState::Closed => {}
             }
@@ -134,7 +157,13 @@ impl CircuitBreaker {
                 Ok(result)
             }
             Err(e) => {
-                self.record_failure().await;
+                if classifier(&e) {
+                    self.record_failure().await;
+                } else {
+                    // It failed, but it wasn't a fatal circuit error. If we were probing, we need to release the probe lock
+                    // without tripping the breaker. It means the target is reachable.
+                    self.record_success().await;
+                }
                 Err(e)
             }
         }
@@ -147,6 +176,7 @@ impl CircuitBreaker {
         inner.consecutive_failures = 0;
         inner.total_successes += 1;
         inner.state = CircuitState::Closed;
+        inner.is_probing = false;
 
         if previous_state != CircuitState::Closed {
             debug!(
@@ -162,6 +192,7 @@ impl CircuitBreaker {
         inner.consecutive_failures += 1;
         inner.total_failures += 1;
         inner.last_failure_time = Some(Instant::now());
+        inner.is_probing = false;
 
         if inner.consecutive_failures >= self.failure_threshold {
             if inner.state != CircuitState::Open {
@@ -195,6 +226,7 @@ impl CircuitBreaker {
         inner.state = CircuitState::Closed;
         inner.consecutive_failures = 0;
         inner.last_failure_time = None;
+        inner.is_probing = false;
         debug!("Circuit breaker '{}' manually reset to CLOSED", self.name);
     }
 

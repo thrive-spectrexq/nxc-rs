@@ -4,6 +4,8 @@
 //! They are invoked per-protocol with `-M <module> [-o KEY=VALUE]` flags.
 
 pub mod adb_screenshot;
+#[cfg(test)]
+pub mod test_helpers;
 pub mod adb_shell;
 pub mod adcs;
 pub mod asreproasting;
@@ -12,6 +14,7 @@ pub mod cms_enum;
 pub mod coerce_plus;
 pub mod cors_vuln;
 pub mod dcshadow;
+pub mod dcom_exec;
 pub mod docker_enum;
 pub mod dpapi;
 pub mod enum_dns;
@@ -28,6 +31,8 @@ pub mod jwt_audit;
 pub mod kerberoasting;
 pub mod laps;
 pub mod ldap_ad;
+pub mod ldap_enumeration;
+pub mod ldap_query;
 pub mod ldap_ma_quota;
 pub mod lfi_fuzzer;
 pub mod ls;
@@ -47,12 +52,14 @@ pub mod petitpotam;
 pub mod pg_enum;
 pub mod printerbug;
 pub mod psrp;
+pub mod pass_the_ticket;
 pub mod put;
 pub mod rdp_sec_check;
 pub mod redis_info;
 pub mod sam;
 pub mod scripting;
 pub mod secretsdump;
+pub mod shadow_credentials;
 pub mod shares;
 pub mod smb_ghost;
 pub mod smbexec;
@@ -68,6 +75,8 @@ pub mod web_crawler;
 pub mod web_dav;
 pub mod web_fuzzer;
 pub mod web_vuln;
+pub mod wifi_recon;
+pub mod winrm_exec;
 pub mod whoami;
 pub mod wmi_enum;
 pub mod wmi_persist;
@@ -101,7 +110,7 @@ pub mod find_computer;
 pub mod get_desc_users;
 pub mod get_info_users;
 pub mod group_mem;
-pub mod ldap_enumeration;
+// ldap_enumeration is declared above
 pub mod pso;
 pub mod rbcd;
 pub mod subnets; // get_network, get_unixpassword, ldap_checker, obsolete, pre2k
@@ -113,7 +122,7 @@ pub mod mssql_modules;
 pub mod persistence;
 
 // ─── Wireless Reconnaissance ────────────────────────────────────
-pub mod wifi_recon;
+// wifi_recon is declared above
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -312,6 +321,9 @@ impl ModuleRegistry {
         let snmp_enum: Box<dyn NxcModule> = Box::new(snmp_enum::SnmpEnum::new());
         modules.insert("snmp_enum".into(), snmp_enum);
 
+        modules.insert("dcshadow".into(), Box::new(dcshadow::DcshadowModule::new()));
+        modules.insert("dcom_exec".into(), Box::new(dcom_exec::DcomExec::new()));
+        
         let docker_enum: Box<dyn NxcModule> = Box::new(docker_enum::DockerEnum::new());
         modules.insert("docker_enum".into(), docker_enum);
 
@@ -443,6 +455,7 @@ impl ModuleRegistry {
         modules.insert("sccm".into(), Box::new(sccm::Sccm::new()));
         modules.insert("add_computer".into(), Box::new(add_computer::AddComputer::new()));
         modules.insert("shadowcoerce".into(), Box::new(shadowcoerce::ShadowCoerce::new()));
+        modules.insert("shadow_credentials".into(), Box::new(shadow_credentials::ShadowCredentials::new()));
 
         // ─── Phase 2: LDAP/AD Enumeration (14 modules) ─────────────
         modules.insert("daclread".into(), Box::new(daclread::DaclRead::new()));
@@ -460,6 +473,7 @@ impl ModuleRegistry {
         modules.insert("ldap_checker".into(), Box::new(ldap_enumeration::LdapChecker::new()));
         modules.insert("obsolete".into(), Box::new(ldap_enumeration::Obsolete::new()));
         modules.insert("pre2k".into(), Box::new(ldap_enumeration::Pre2k::new()));
+        modules.insert("pass_the_ticket".into(), Box::new(pass_the_ticket::PassTheTicket::new()));
 
         // ─── Phase 3: MSSQL Modules (6 modules) ────────────────────
         modules.insert("mssql_coerce".into(), Box::new(mssql_modules::MssqlCoerce::new()));
