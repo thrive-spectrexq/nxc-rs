@@ -331,7 +331,7 @@ impl PdfWriter {
         buf.extend_from_slice(line.as_bytes());
         buf.extend_from_slice(b"0000000000 65535 f \n");
         for off in &offsets {
-            let entry = format!("{:010} 00000 n \n", off);
+            let entry = format!("{off:010} 00000 n \n");
             buf.extend_from_slice(entry.as_bytes());
         }
 
@@ -367,8 +367,8 @@ fn pdf_escape(s: &str) -> String {
 fn build_text_stream(lines: &[String], font_size: f32, leading: f32) -> Vec<u8> {
     let mut stream = String::new();
     stream.push_str("BT\n");
-    stream.push_str(&format!("/F1 {} Tf\n", font_size));
-    stream.push_str(&format!("{} TL\n", leading));
+    stream.push_str(&format!("/F1 {font_size} Tf\n"));
+    stream.push_str(&format!("{leading} TL\n"));
     stream.push_str("36 756 Td\n"); // start near top-left with margins
     for line in lines {
         stream.push_str(&format!("({}) Tj T*\n", pdf_escape(line)));
@@ -376,7 +376,7 @@ fn build_text_stream(lines: &[String], font_size: f32, leading: f32) -> Vec<u8> 
     stream.push_str("ET\n");
 
     let length = stream.len();
-    let mut obj = format!("<< /Length {} >>\nstream\n", length).into_bytes();
+    let mut obj = format!("<< /Length {length} >>\nstream\n").into_bytes();
     obj.extend_from_slice(stream.as_bytes());
     obj.extend_from_slice(b"\nendstream");
     obj
@@ -452,24 +452,19 @@ pub fn export_pdf(path: &str, report: &Report) -> Result<()> {
 
     // 4 – Pages
     let pages_dict = format!(
-        "<< /Type /Pages /Kids [{} 0 R] /Count 1 >>",
-        page_obj,
+        "<< /Type /Pages /Kids [{page_obj} 0 R] /Count 1 >>",
     );
     let pages_obj = pdf.add_object(pages_dict.into_bytes());
 
     // Fix page /Parent to point to pages_obj
     let fixed_page = format!(
-        "<< /Type /Page /Parent {} 0 R /MediaBox [0 0 612 792] /Contents {} 0 R /Resources << /Font << /F1 {} 0 R >> >> >>",
-        pages_obj,
-        content_obj,
-        font_obj,
+        "<< /Type /Page /Parent {pages_obj} 0 R /MediaBox [0 0 612 792] /Contents {content_obj} 0 R /Resources << /Font << /F1 {font_obj} 0 R >> >> >>",
     );
     pdf.objects[page_obj - 1] = fixed_page.into_bytes();
 
     // 5 – Catalog
     let catalog_dict = format!(
-        "<< /Type /Catalog /Pages {} 0 R >>",
-        pages_obj,
+        "<< /Type /Catalog /Pages {pages_obj} 0 R >>",
     );
     let catalog_obj = pdf.add_object(catalog_dict.into_bytes());
 
