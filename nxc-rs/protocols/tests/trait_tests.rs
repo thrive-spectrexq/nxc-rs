@@ -41,7 +41,7 @@ impl NxcProtocol for MockProtocol {
         _session: &mut dyn NxcSession,
         _creds: &Credentials,
     ) -> Result<AuthResult> {
-        Ok(AuthResult::Failed)
+        Ok(AuthResult::failure("Authentication failed", None))
     }
 
     async fn execute(
