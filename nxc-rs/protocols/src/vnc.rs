@@ -328,16 +328,20 @@ fn vnc_encrypt(password: &str, challenge: &[u8; 16]) -> [u8; 16] {
     use des::cipher::{BlockCipherEncrypt, KeyInit, Block};
     use des::Des;
 
-    let key_arr = Block::<Des>::from_slice(&key);
-    let cipher = Des::new(key_arr);
+    let key_block: Block<Des> = key.into();
+    let cipher = Des::new(&key_block);
 
     let mut out = [0u8; 16];
-    let challenge_block1 = Block::<Des>::from_slice(&challenge[0..8]);
-    let out_block1 = Block::<Des>::from_mut_slice(&mut out[0..8]);
-    cipher.encrypt_block_b2b(challenge_block1, out_block1);
-    let challenge_block2 = Block::<Des>::from_slice(&challenge[8..16]);
-    let out_block2 = Block::<Des>::from_mut_slice(&mut out[8..16]);
-    cipher.encrypt_block_b2b(challenge_block2, out_block2);
+
+    let ch1: [u8; 8] = challenge[0..8].try_into().expect("8 bytes");
+    let mut block1: Block<Des> = ch1.into();
+    cipher.encrypt_block(&mut block1);
+    out[0..8].copy_from_slice(&block1);
+
+    let ch2: [u8; 8] = challenge[8..16].try_into().expect("8 bytes");
+    let mut block2: Block<Des> = ch2.into();
+    cipher.encrypt_block(&mut block2);
+    out[8..16].copy_from_slice(&block2);
     out
 }
 

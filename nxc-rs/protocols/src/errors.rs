@@ -128,25 +128,25 @@ pub enum ProtocolError {
 impl ProtocolError {
     /// Returns true if the error is an authentication failure (e.g., bad password).
     pub fn is_auth_failure(&self) -> bool {
-        match self {
-            Self::Smb(SmbError::AuthFailed(_)) => true,
-            Self::Ldap(LdapError::BindFailed(_)) => true,
-            Self::Ssh(SshError::AuthFailed(_)) => true,
-            Self::WinRm(WinRmError::AuthFailed(_)) => true,
-            Self::Mssql(MssqlError::AuthFailed(_)) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Self::Smb(SmbError::AuthFailed(_))
+                | Self::Ldap(LdapError::BindFailed(_))
+                | Self::Ssh(SshError::AuthFailed(_))
+                | Self::WinRm(WinRmError::AuthFailed(_))
+                | Self::Mssql(MssqlError::AuthFailed(_))
+        )
     }
 
     /// Returns true if the error is a network connection failure (e.g., unreachable, timeout).
     pub fn is_connection_failure(&self) -> bool {
-        match self {
-            Self::Smb(SmbError::ConnectionFailed(_)) => true,
-            Self::Ldap(LdapError::ConnectionFailed(_)) => true,
-            Self::Ssh(SshError::ConnectionFailed(_)) => true,
-            Self::WinRm(WinRmError::ConnectionFailed(_)) => true,
-            Self::Mssql(MssqlError::ConnectionFailed(_)) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Self::Smb(SmbError::ConnectionFailed(_))
+                | Self::Ldap(LdapError::ConnectionFailed(_))
+                | Self::Ssh(SshError::ConnectionFailed(_))
+                | Self::WinRm(WinRmError::ConnectionFailed(_))
+                | Self::Mssql(MssqlError::ConnectionFailed(_))
+        )
     }
 }
