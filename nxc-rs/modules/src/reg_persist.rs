@@ -79,62 +79,58 @@ impl NxcModule for RegPersistModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let action = opts.get("ACTION").map(|s| s.as_str()).unwrap_or("add");
-        let method = opts.get("METHOD").map(|s| s.as_str()).unwrap_or("run_key");
-        let name = opts.get("NAME").map(|s| s.as_str()).unwrap_or("WindowsUpdate");
+        let action = opts.get("ACTION").map(String::as_str).unwrap_or("add");
+        let method = opts.get("METHOD").map(String::as_str).unwrap_or("run_key");
+        let name = opts.get("NAME").map(String::as_str).unwrap_or("WindowsUpdate");
         let payload = opts.get("PAYLOAD")
             .ok_or_else(|| anyhow::anyhow!("PAYLOAD is required"))?;
-        let hive = opts.get("HIVE").map(|s| s.as_str()).unwrap_or("HKLM");
+        let hive = opts.get("HIVE").map(String::as_str).unwrap_or("HKLM");
 
         let target = session.target().to_string();
         tracing::info!(
-            "reg_persist: {} persistence ({}) on {} via {}",
-            action, method, target, hive
+            "reg_persist: {action} persistence ({method}) on {target} via {hive}"
         );
 
         let reg_path = match method {
-            "run_once" => format!("{}\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce", hive),
-            "service" => format!("{}\\SYSTEM\\CurrentControlSet\\Services\\{}", hive, name),
-            _ => format!("{}\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", hive),
+            "run_once" => format!("{hive}\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce"),
+            "service" => format!("{hive}\\SYSTEM\\CurrentControlSet\\Services\\{name}"),
+            _ => format!("{hive}\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"),
         };
 
         // Step 1: Connect to remote registry via SMB
-        tracing::debug!("reg_persist: Connecting to remote registry on {}", target);
+        tracing::debug!("reg_persist: Connecting to remote registry on {target}");
 
         let output_text = match action {
             "add" => {
-                tracing::debug!("reg_persist: Writing value '{}' = '{}' to {}", name, payload, reg_path);
+                tracing::debug!("reg_persist: Writing value '{name}' = '{payload}' to {reg_path}");
                 format!(
-                    "[*] Target: {}\n\
-                     [*] Method: {} ({})\n\
-                     [*] Key: {}\n\
-                     [*] Value: {} = {}\n\
+                    "[*] Target: {target}\n\
+                     [*] Method: {method} ({hive})\n\
+                     [*] Key: {reg_path}\n\
+                     [*] Value: {name} = {payload}\n\
                      [+] Registry persistence added successfully.\n\
-                     [+] Payload will execute on next logon/boot.",
-                    target, method, hive, reg_path, name, payload
+                     [+] Payload will execute on next logon/boot."
                 )
             }
             "remove" => {
-                tracing::debug!("reg_persist: Removing value '{}' from {}", name, reg_path);
+                tracing::debug!("reg_persist: Removing value '{name}' from {reg_path}");
                 format!(
-                    "[*] Target: {}\n\
-                     [*] Removing: {}\\{}\n\
-                     [+] Registry persistence removed.",
-                    target, reg_path, name
+                    "[*] Target: {target}\n\
+                     [*] Removing: {reg_path}\\{name}\n\
+                     [+] Registry persistence removed."
                 )
             }
             "check" => {
-                tracing::debug!("reg_persist: Checking {}", reg_path);
+                tracing::debug!("reg_persist: Checking {reg_path}");
                 format!(
-                    "[*] Target: {}\n\
-                     [*] Checking: {}\n\
-                     [*] Value '{}' = (checking...)\n\
-                     [+] Persistence check complete.",
-                    target, reg_path, name
+                    "[*] Target: {target}\n\
+                     [*] Checking: {reg_path}\n\
+                     [*] Value '{name}' = (checking...)\n\
+                     [+] Persistence check complete."
                 )
             }
             _ => {
-                return Err(anyhow::anyhow!("Unknown ACTION '{}'. Use: add, remove, check", action));
+                return Err(anyhow::anyhow!("Unknown ACTION '{action}'. Use: add, remove, check"));
             }
         };
 

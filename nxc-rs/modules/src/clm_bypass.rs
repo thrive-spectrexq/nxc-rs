@@ -62,11 +62,11 @@ impl NxcModule for ClmBypassModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let method = opts.get("METHOD").map(|s| s.as_str()).unwrap_or("custom_runspace");
+        let method = opts.get("METHOD").map(String::as_str).unwrap_or("custom_runspace");
         let cmd = opts.get("CMD").ok_or_else(|| anyhow::anyhow!("CMD is required"))?;
 
         let target = session.target().to_string();
-        tracing::info!("clm_bypass: Bypassing CLM on {} via {}", target, method);
+        tracing::info!("clm_bypass: Bypassing CLM on {target} via {method}");
 
         // Step 1: Check current language mode
         tracing::debug!("clm_bypass: Checking $ExecutionContext.SessionState.LanguageMode");
@@ -92,17 +92,16 @@ impl NxcModule for ClmBypassModule {
         };
 
         // Step 3: Execute command in full language mode
-        tracing::debug!("clm_bypass: Executing in Full Language Mode: {}", cmd);
+        tracing::debug!("clm_bypass: Executing in Full Language Mode: {cmd}");
 
         let output_text = format!(
-            "[*] Target: {}\n\
+            "[*] Target: {target}\n\
              [*] Current mode: ConstrainedLanguage\n\
-             [*] Bypass method: {}\n\
-             [*] {}\n\
-             [*] Executing: {}\n\
+             [*] Bypass method: {method}\n\
+             [*] {technique_detail}\n\
+             [*] Executing: {cmd}\n\
              [+] CLM bypassed — running in FullLanguage mode.\n\
-             [+] Command executed successfully.",
-            target, method, technique_detail, cmd
+             [+] Command executed successfully."
         );
 
         Ok(ModuleResult {

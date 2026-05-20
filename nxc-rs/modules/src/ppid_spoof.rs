@@ -68,19 +68,19 @@ impl NxcModule for PpidSpoofModule {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let cmd = opts.get("CMD").ok_or_else(|| anyhow::anyhow!("CMD is required"))?;
-        let ppid_target = opts.get("PPID_TARGET").map(|s| s.as_str()).unwrap_or("explorer.exe");
+        let ppid_target = opts.get("PPID_TARGET").map(String::as_str).unwrap_or("explorer.exe");
         let explicit_ppid = opts.get("PPID");
 
         let target = session.target().to_string();
-        tracing::info!("ppid_spoof: Spawning '{}' on {} with spoofed parent", cmd, target);
+        tracing::info!("ppid_spoof: Spawning '{cmd}' on {target} with spoofed parent");
 
         // Step 1: Determine parent PID
         let parent_info = if let Some(pid) = explicit_ppid {
-            tracing::debug!("ppid_spoof: Using explicit PPID: {}", pid);
-            format!("PID {}", pid)
+            tracing::debug!("ppid_spoof: Using explicit PPID: {pid}");
+            format!("PID {pid}")
         } else {
-            tracing::debug!("ppid_spoof: Finding PID of {} on target", ppid_target);
-            format!("{} (auto-detected)", ppid_target)
+            tracing::debug!("ppid_spoof: Finding PID of {ppid_target} on target");
+            format!("{ppid_target} (auto-detected)")
         };
 
         // Step 2: Open handle to parent process with PROCESS_CREATE_PROCESS
@@ -93,14 +93,13 @@ impl NxcModule for PpidSpoofModule {
         tracing::debug!("ppid_spoof: Calling CreateProcessA with spoofed parent");
 
         let output_text = format!(
-            "[*] Target: {}\n\
-             [*] Parent process: {}\n\
+            "[*] Target: {target}\n\
+             [*] Parent process: {parent_info}\n\
              [*] InitializeProcThreadAttributeList configured\n\
              [*] PROC_THREAD_ATTRIBUTE_PARENT_PROCESS set\n\
-             [*] Command: {}\n\
+             [*] Command: {cmd}\n\
              [+] Process created with spoofed PPID.\n\
-             [+] EDR will see {} as the parent process.",
-            target, parent_info, cmd, parent_info
+             [+] EDR will see {parent_info} as the parent process."
         );
 
         Ok(ModuleResult {

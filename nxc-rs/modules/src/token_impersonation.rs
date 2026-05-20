@@ -67,12 +67,12 @@ impl NxcModule for TokenImpersonationModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let action = opts.get("ACTION").map(|s| s.as_str()).unwrap_or("list");
+        let action = opts.get("ACTION").map(String::as_str).unwrap_or("list");
         let token_user = opts.get("TOKEN_USER");
         let cmd = opts.get("CMD");
 
         let target = session.target().to_string();
-        tracing::info!("token_impersonation: {} tokens on {}", action, target);
+        tracing::info!("token_impersonation: {action} tokens on {target}");
 
         let output_text = match action {
             "list" => {
@@ -86,7 +86,7 @@ impl NxcModule for TokenImpersonationModule {
                 tracing::debug!("token_impersonation: Classifying token types");
 
                 format!(
-                    "[*] Token enumeration on {}\n\
+                    "[*] Token enumeration on {target}\n\
                      [*] SeDebugPrivilege enabled\n\
                      \n\
                      Delegation Tokens Available:\n\
@@ -100,8 +100,7 @@ impl NxcModule for TokenImpersonationModule {
                      DOMAIN\\svc_backup\n\
                      DOMAIN\\svc_sql\n\
                      \n\
-                     [+] Found 5 unique tokens.",
-                    target
+                     [+] Found 5 unique tokens."
                 )
             }
             "impersonate" => {
@@ -109,42 +108,39 @@ impl NxcModule for TokenImpersonationModule {
                     .ok_or_else(|| anyhow::anyhow!("TOKEN_USER is required for impersonate action"))?;
 
                 // Step 1: Find token for specified user
-                tracing::debug!("token_impersonation: Searching for token: {}", user);
+                tracing::debug!("token_impersonation: Searching for token: {user}");
 
                 // Step 2: DuplicateTokenEx to create primary token
-                tracing::debug!("token_impersonation: Duplicating token for {}", user);
+                tracing::debug!("token_impersonation: Duplicating token for {user}");
 
                 // Step 3: ImpersonateLoggedOnUser or CreateProcessWithToken
                 if let Some(command) = cmd {
-                    tracing::debug!("token_impersonation: CreateProcessWithTokenW: {}", command);
+                    tracing::debug!("token_impersonation: CreateProcessWithTokenW: {command}");
                     format!(
-                        "[*] Target: {}\n\
-                         [*] Impersonating: {}\n\
+                        "[*] Target: {target}\n\
+                         [*] Impersonating: {user}\n\
                          [*] Token duplicated (DuplicateTokenEx)\n\
-                         [*] Executing: {}\n\
-                         [+] Command executed under {} context.",
-                        target, user, command, user
+                         [*] Executing: {command}\n\
+                         [+] Command executed under {user} context."
                     )
                 } else {
                     format!(
-                        "[*] Target: {}\n\
-                         [*] Impersonating: {}\n\
+                        "[*] Target: {target}\n\
+                         [*] Impersonating: {user}\n\
                          [*] Token duplicated (DuplicateTokenEx)\n\
-                         [+] Now running as {}.",
-                        target, user, user
+                         [+] Now running as {user}."
                     )
                 }
             }
             "revert" => {
                 tracing::debug!("token_impersonation: Reverting to original token");
                 format!(
-                    "[*] Target: {}\n\
-                     [+] Reverted to original security context.",
-                    target
+                    "[*] Target: {target}\n\
+                     [+] Reverted to original security context."
                 )
             }
             _ => {
-                return Err(anyhow::anyhow!("Unknown ACTION '{}'. Use: list, impersonate, revert", action));
+                return Err(anyhow::anyhow!("Unknown ACTION '{action}'. Use: list, impersonate, revert"));
             }
         };
 

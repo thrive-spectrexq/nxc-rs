@@ -93,8 +93,8 @@ impl NxcModule for SilverTicketModule {
             .ok_or_else(|| anyhow::anyhow!("DOMAIN_SID is required"))?;
         let spn = opts.get("SPN")
             .ok_or_else(|| anyhow::anyhow!("SPN is required"))?;
-        let user = opts.get("USER").map(|s| s.as_str()).unwrap_or("Administrator");
-        let output = opts.get("OUTPUT").map(|s| s.as_str()).unwrap_or("silver.ccache");
+        let user = opts.get("USER").map(String::as_str).unwrap_or("Administrator");
+        let output = opts.get("OUTPUT").map(String::as_str).unwrap_or("silver.ccache");
 
         let target = session.target().to_string();
         tracing::info!("silver_ticket: Forging TGS for {} as {} on {}", spn, user, target);
@@ -109,17 +109,16 @@ impl NxcModule for SilverTicketModule {
         tracing::debug!("silver_ticket: Domain SID: {}", domain_sid);
         tracing::debug!("silver_ticket: Encrypting service ticket with RC4-HMAC");
 
+        let hash_prefix = &service_hash[..8];
+        let hash_suffix = &service_hash[24..];
         let output_text = format!(
-            "[*] Domain : {}\n\
-             [*] SID    : {}\n\
-             [*] SPN    : {}\n\
-             [*] User   : {}\n\
-             [*] Hash   : {}...{}\n\
-             [+] Silver ticket forged and saved to: {}\n\
-             [+] This ticket grants access to {} only (no KDC involved).",
-            domain, domain_sid, spn, user,
-            &service_hash[..8], &service_hash[24..],
-            output, spn
+            "[*] Domain : {domain}\n\
+             [*] SID    : {domain_sid}\n\
+             [*] SPN    : {spn}\n\
+             [*] User   : {user}\n\
+             [*] Hash   : {hash_prefix}...{hash_suffix}\n\
+             [+] Silver ticket forged and saved to: {output}\n\
+             [+] This ticket grants access to {spn} only (no KDC involved)."
         );
 
         Ok(ModuleResult {

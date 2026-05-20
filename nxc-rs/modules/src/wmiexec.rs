@@ -68,8 +68,8 @@ impl NxcModule for WmiExecModule {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let cmd = opts.get("CMD").ok_or_else(|| anyhow::anyhow!("CMD option is required"))?;
-        let output_share = opts.get("OUTPUT_SHARE").map(|s| s.as_str()).unwrap_or("ADMIN$");
-        let codec = opts.get("CODEC").map(|s| s.as_str()).unwrap_or("utf-8");
+        let output_share = opts.get("OUTPUT_SHARE").map(String::as_str).unwrap_or("ADMIN$");
+        let codec = opts.get("CODEC").map(String::as_str).unwrap_or("utf-8");
 
         let target = session.target().to_string();
         tracing::info!("wmiexec: Executing '{}' on {} via WMI", cmd, target);
@@ -78,21 +78,20 @@ impl NxcModule for WmiExecModule {
         tracing::debug!("wmiexec: Connecting to WMI namespace on {}", target);
 
         // Step 2: Wrap command to redirect output to temp file
-        let temp_file = format!("\\\\{}\\{}\\Temp\\nxc_wmi_{}.txt", target, output_share, std::process::id());
-        let wrapped_cmd = format!("cmd.exe /Q /c {} > {} 2>&1", cmd, temp_file);
-        tracing::debug!("wmiexec: Wrapped command: {}", wrapped_cmd);
+        let temp_file = format!("\\\\{target}\\{output_share}\\Temp\\nxc_wmi_{}.txt", std::process::id());
+        let wrapped_cmd = format!("cmd.exe /Q /c {cmd} > {temp_file} 2>&1");
+        tracing::debug!("wmiexec: Wrapped command: {wrapped_cmd}");
 
         // Step 3: Call Win32_Process.Create
         tracing::debug!("wmiexec: Invoking Win32_Process.Create");
 
         // Step 4: Wait and read output file via SMB
         let output_text = format!(
-            "[*] WMI Win32_Process.Create on {}\n\
-             [*] Command: {}\n\
-             [*] Output share: {}, codec: {}\n\
+            "[*] WMI Win32_Process.Create on {target}\n\
+             [*] Command: {cmd}\n\
+             [*] Output share: {output_share}, codec: {codec}\n\
              [+] Process created. Reading output from temp file...\n\
-             [+] Execution complete.",
-            target, cmd, output_share, codec
+             [+] Execution complete."
         );
 
         // Step 5: Cleanup temp file

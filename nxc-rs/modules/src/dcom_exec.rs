@@ -57,14 +57,13 @@ impl NxcModule for DcomExec {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let command = opts.get("COMMAND").ok_or_else(|| anyhow::anyhow!("COMMAND is required"))?;
-        let method = opts.get("METHOD").map(|s| s.as_str()).unwrap_or("MMC20.Application");
+        let method = opts.get("METHOD").map(String::as_str).unwrap_or("MMC20.Application");
 
         tracing::info!("dcom_exec: Executing command via {} - {}", method, command);
         
         // Simulating DCOM execution logic
         let output = format!(
-            "Executed command '{}' successfully via DCOM object '{}'. \nNote: Output retrieval via DCOM is often blind or requires writing to a temp file.",
-            command, method
+            "Executed command '{command}' successfully via DCOM object '{method}'. \nNote: Output retrieval via DCOM is often blind or requires writing to a temp file."
         );
 
         Ok(ModuleResult {

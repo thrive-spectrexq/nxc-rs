@@ -97,10 +97,10 @@ impl NxcModule for GoldenTicketModule {
             .ok_or_else(|| anyhow::anyhow!("DOMAIN is required"))?;
         let domain_sid = opts.get("DOMAIN_SID")
             .ok_or_else(|| anyhow::anyhow!("DOMAIN_SID is required"))?;
-        let user = opts.get("USER").map(|s| s.as_str()).unwrap_or("Administrator");
-        let user_id = opts.get("USER_ID").map(|s| s.as_str()).unwrap_or("500");
-        let groups = opts.get("GROUPS").map(|s| s.as_str()).unwrap_or("513,512,520,518,519");
-        let output = opts.get("OUTPUT").map(|s| s.as_str()).unwrap_or("golden.ccache");
+        let user = opts.get("USER").map(String::as_str).unwrap_or("Administrator");
+        let user_id = opts.get("USER_ID").map(String::as_str).unwrap_or("500");
+        let groups = opts.get("GROUPS").map(String::as_str).unwrap_or("513,512,520,518,519");
+        let output = opts.get("OUTPUT").map(String::as_str).unwrap_or("golden.ccache");
 
         let target = session.target().to_string();
         tracing::info!(
@@ -124,17 +124,16 @@ impl NxcModule for GoldenTicketModule {
         // Step 4: Write ticket to file
         tracing::debug!("golden_ticket: Writing ticket to {}", output);
 
+        let krbtgt_prefix = &krbtgt_hash[..8];
+        let krbtgt_suffix = &krbtgt_hash[24..];
         let output_text = format!(
-            "[*] Domain  : {}\n\
-             [*] SID     : {}\n\
-             [*] User    : {} (RID {})\n\
-             [*] Groups  : {}\n\
-             [*] krbtgt  : {}...{}\n\
-             [+] Golden ticket forged and saved to: {}\n\
-             [+] Use with pass_the_ticket module to inject.",
-            domain, domain_sid, user, user_id, groups,
-            &krbtgt_hash[..8], &krbtgt_hash[24..],
-            output
+            "[*] Domain  : {domain}\n\
+             [*] SID     : {domain_sid}\n\
+             [*] User    : {user} (RID {user_id})\n\
+             [*] Groups  : {groups}\n\
+             [*] krbtgt  : {krbtgt_prefix}...{krbtgt_suffix}\n\
+             [+] Golden ticket forged and saved to: {output}\n\
+             [+] Use with pass_the_ticket module to inject."
         );
 
         Ok(ModuleResult {

@@ -1,6 +1,4 @@
-use anyhow::Result;
 use nxc_protocols::NxcSession;
-use nxc_auth::{AuthResult, Credentials};
 
 /// A mock session for testing modules without real network connections.
 pub struct MockSession {
