@@ -12,7 +12,7 @@ type HmacSha1 = Hmac<Sha1>;
 
 use aes::Aes256;
 use cbc::cipher::block_padding::NoPadding;
-use cbc::cipher::KeyIvInit;
+use cbc::cipher::{KeyIvInit, BlockModeDecrypt, BlockModeEncrypt};
 
 use serde::{Deserialize, Serialize};
 
@@ -73,14 +73,14 @@ fn derive_key_aes(base_key: &[u8], _constant: &[u8], is_aes256: bool) -> Vec<u8>
 
     if is_aes256 {
         if let Ok(cipher) = aes::Aes256::new_from_slice(base_key) {
-            let mut block = Block::<aes::Aes256>::clone_from_slice(&folded_kerberos);
+            let mut block = Block::<aes::Aes256>::from(folded_kerberos);
             cipher.encrypt_block(&mut block);
             result.extend_from_slice(&block);
             cipher.encrypt_block(&mut block);
             result.extend_from_slice(&block);
         }
     } else if let Ok(cipher) = aes::Aes128::new_from_slice(base_key) {
-        let mut block = Block::<aes::Aes128>::clone_from_slice(&folded_kerberos);
+        let mut block = Block::<aes::Aes128>::from(folded_kerberos);
         cipher.encrypt_block(&mut block);
         result.extend_from_slice(&block);
     }
