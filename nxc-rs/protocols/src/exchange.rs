@@ -87,7 +87,7 @@ impl NxcProtocol for ExchangeProtocol {
         
         let use_ssl = port == 443 || port == 8443;
         let scheme = if use_ssl { "https" } else { "http" };
-        let url = format!("{}://{}:{}/EWS/Exchange.asmx", scheme, target, port);
+        let url = format!("{scheme}://{target}:{port}/EWS/Exchange.asmx");
 
         let client = Client::builder()
             .timeout(self.timeout)
@@ -129,7 +129,9 @@ impl NxcProtocol for ExchangeProtocol {
         }
 
         let scheme = if exchange_sess.use_ssl { "https" } else { "http" };
-        let url = format!("{}://{}:{}/EWS/Exchange.asmx", scheme, exchange_sess.target, exchange_sess.port);
+        let target = &exchange_sess.target;
+        let port = exchange_sess.port;
+        let url = format!("{scheme}://{target}:{port}/EWS/Exchange.asmx");
 
         let client = Client::builder()
             .timeout(self.timeout)

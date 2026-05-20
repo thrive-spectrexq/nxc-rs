@@ -126,11 +126,13 @@ impl NxcProtocol for TelnetProtocol {
         let mut buf = [0u8; 1024];
         let _ = timeout(self.timeout, conn.read(&mut buf)).await;
         
-        let login_str = format!("{}\r\n", creds.username);
+        let username = &creds.username;
+        let login_str = format!("{username}\r\n");
         conn.write_all(login_str.as_bytes()).await?;
         let _ = timeout(self.timeout, conn.read(&mut buf)).await;
         
-        let pwd_str = format!("{}\r\n", creds.password.as_deref().unwrap_or_default());
+        let password = creds.password.as_deref().unwrap_or_default();
+        let pwd_str = format!("{password}\r\n");
         conn.write_all(pwd_str.as_bytes()).await?;
         let _ = timeout(self.timeout, conn.read(&mut buf)).await;
 
@@ -160,7 +162,7 @@ impl NxcProtocol for TelnetProtocol {
         let mut conn = TcpStream::connect((telnet_sess.target.as_str(), telnet_sess.port)).await?;
         
         // Send command and read output
-        let cmd_str = format!("{}\r\n", cmd);
+        let cmd_str = format!("{cmd}\r\n");
         conn.write_all(cmd_str.as_bytes()).await?;
         
         let mut buf = [0u8; 4096];
