@@ -67,5 +67,5 @@ async fn test_protocol_trait_base_functionality() {
     
     assert_eq!(session.protocol(), "mock");
     assert_eq!(session.target(), "10.0.0.1");
-    assert_eq!(session.is_admin(), false);
+    assert!(!session.is_admin());
 }
