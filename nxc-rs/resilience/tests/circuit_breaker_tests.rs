@@ -1,5 +1,9 @@
-use nxc_resilience::circuit_breaker::{CircuitState, CircuitBreaker};
-use nxc_protocols::errors::{ProtocolError, ProtocolErrorCategory};
+use anyhow::anyhow;
+use nxc_resilience::circuit_breaker::{CircuitBreaker, CircuitState};
+
+fn is_connection_failure(err: &anyhow::Error) -> bool {
+    err.to_string().contains("Connection refused")
+}
 
 #[tokio::test]
 async fn test_circuit_breaker_state_transitions() {
@@ -10,8 +14,12 @@ async fn test_circuit_breaker_state_transitions() {
 
     // Fail 3 times with a critical error
     for _ in 0..3 {
-        let err = ProtocolError::new(ProtocolErrorCategory::ConnectionFailure, "Connection refused");
-        breaker.record_failure(&err).await;
+        let _ = breaker
+            .call_with_classifier(
+                || async { Err::<(), _>(anyhow!("Connection refused")) },
+                is_connection_failure,
+            )
+            .await;
     }
 
     // Should be open now
@@ -24,7 +32,12 @@ async fn test_circuit_breaker_state_transitions() {
     assert_eq!(breaker.state().await, CircuitState::HalfOpen);
 
     // Record success in HalfOpen
-    breaker.record_success().await;
+    let _ = breaker
+        .call_with_classifier(
+            || async { Ok::<(), anyhow::Error>(()) },
+            is_connection_failure,
+        )
+        .await;
 
     // Should be closed now
     assert_eq!(breaker.state().await, CircuitState::Closed);
@@ -36,8 +49,12 @@ async fn test_circuit_breaker_ignores_auth_failures() {
 
     // Fail 5 times with auth errors
     for _ in 0..5 {
-        let err = ProtocolError::new(ProtocolErrorCategory::AuthFailure, "Logon failure");
-        breaker.record_failure(&err).await;
+        let _ = breaker
+            .call_with_classifier(
+                || async { Err::<(), _>(anyhow!("Logon failure")) },
+                is_connection_failure,
+            )
+            .await;
     }
 
     // Should remain closed because auth failures don't trip the breaker
