@@ -57,15 +57,14 @@ impl NxcModule for WinRmExec {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let command = opts.get("COMMAND").ok_or_else(|| anyhow::anyhow!("COMMAND is required"))?;
-        let use_ps = opts.get("PS").map(|s| s.as_str()).unwrap_or("true").to_lowercase() == "true";
+        let use_ps = opts.get("PS").map(String::as_str).unwrap_or("true").to_lowercase() == "true";
 
         let shell = if use_ps { "PowerShell" } else { "CMD" };
         tracing::info!("winrm_exec: Executing via WinRM {} - {}", shell, command);
         
         // Simulating WinRM execution logic
         let output = format!(
-            "[{}] Executed command '{}' successfully via WinRM.",
-            shell, command
+            "[{shell}] Executed command '{command}' successfully via WinRM."
         );
 
         Ok(ModuleResult {

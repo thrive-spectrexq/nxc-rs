@@ -73,19 +73,18 @@ impl NxcModule for NamedPipePivotModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let pipe_name = opts.get("PIPE_NAME").map(|s| s.as_str()).unwrap_or("nxcpivot");
+        let pipe_name = opts.get("PIPE_NAME").map(String::as_str).unwrap_or("nxcpivot");
         let forward_host = opts.get("FORWARD_HOST")
             .ok_or_else(|| anyhow::anyhow!("FORWARD_HOST is required"))?;
         let forward_port = opts.get("FORWARD_PORT")
             .ok_or_else(|| anyhow::anyhow!("FORWARD_PORT is required"))?;
-        let action = opts.get("ACTION").map(|s| s.as_str()).unwrap_or("create");
+        let action = opts.get("ACTION").map(String::as_str).unwrap_or("create");
 
         let target = session.target().to_string();
-        let pipe_path = format!("\\\\{}\\pipe\\{}", target, pipe_name);
+        let pipe_path = format!("\\\\{target}\\pipe\\{pipe_name}");
 
         tracing::info!(
-            "named_pipe_pivot: {} pivot pipe {} -> {}:{}",
-            action, pipe_path, forward_host, forward_port
+            "named_pipe_pivot: {action} pivot pipe {pipe_path} -> {forward_host}:{forward_port}"
         );
 
         let output_text = match action {
@@ -94,48 +93,43 @@ impl NxcModule for NamedPipePivotModule {
                 tracing::debug!("named_pipe_pivot: Uploading pivot agent");
 
                 // Step 2: Create named pipe server on target
-                tracing::debug!("named_pipe_pivot: Creating pipe: {}", pipe_path);
+                tracing::debug!("named_pipe_pivot: Creating pipe: {pipe_path}");
 
                 // Step 3: Configure forwarding to internal host
                 tracing::debug!(
-                    "named_pipe_pivot: Forwarding to {}:{}",
-                    forward_host, forward_port
+                    "named_pipe_pivot: Forwarding to {forward_host}:{forward_port}"
                 );
 
                 // Step 4: Start relay
                 tracing::debug!("named_pipe_pivot: Starting relay thread");
 
                 format!(
-                    "[*] Pivot target: {}\n\
-                     [*] Named pipe: {}\n\
-                     [*] Forwarding to: {}:{}\n\
+                    "[*] Pivot target: {target}\n\
+                     [*] Named pipe: {pipe_path}\n\
+                     [*] Forwarding to: {forward_host}:{forward_port}\n\
                      [+] Pivot pipe created and relay started.\n\
-                     [+] Connect to {} to reach {}:{}.",
-                    target, pipe_path, forward_host, forward_port,
-                    pipe_path, forward_host, forward_port
+                     [+] Connect to {pipe_path} to reach {forward_host}:{forward_port}."
                 )
             }
             "destroy" => {
-                tracing::debug!("named_pipe_pivot: Destroying pipe: {}", pipe_path);
+                tracing::debug!("named_pipe_pivot: Destroying pipe: {pipe_path}");
                 format!(
-                    "[*] Target: {}\n\
-                     [*] Destroying pipe: {}\n\
-                     [+] Pivot pipe destroyed and relay stopped.",
-                    target, pipe_path
+                    "[*] Target: {target}\n\
+                     [*] Destroying pipe: {pipe_path}\n\
+                     [+] Pivot pipe destroyed and relay stopped."
                 )
             }
             "status" => {
-                tracing::debug!("named_pipe_pivot: Checking pipe status: {}", pipe_path);
+                tracing::debug!("named_pipe_pivot: Checking pipe status: {pipe_path}");
                 format!(
-                    "[*] Target: {}\n\
-                     [*] Pipe: {}\n\
-                     [*] Forward: {}:{}\n\
-                     [+] Pivot is active.",
-                    target, pipe_path, forward_host, forward_port
+                    "[*] Target: {target}\n\
+                     [*] Pipe: {pipe_path}\n\
+                     [*] Forward: {forward_host}:{forward_port}\n\
+                     [+] Pivot is active."
                 )
             }
             _ => {
-                return Err(anyhow::anyhow!("Unknown ACTION '{}'. Use: create, destroy, status", action));
+                return Err(anyhow::anyhow!("Unknown ACTION '{action}'. Use: create, destroy, status"));
             }
         };
 

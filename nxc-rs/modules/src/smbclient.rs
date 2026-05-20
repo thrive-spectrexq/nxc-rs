@@ -74,8 +74,8 @@ impl NxcModule for SmbClientModule {
     ) -> Result<ModuleResult> {
         let action = opts.get("ACTION").ok_or_else(|| anyhow::anyhow!("ACTION is required"))?;
         let share = opts.get("SHARE").ok_or_else(|| anyhow::anyhow!("SHARE is required"))?;
-        let remote_path = opts.get("REMOTE_PATH").map(|s| s.as_str()).unwrap_or("/");
-        let local_path = opts.get("LOCAL_PATH").map(|s| s.as_str()).unwrap_or("");
+        let remote_path = opts.get("REMOTE_PATH").map(String::as_str).unwrap_or("/");
+        let local_path = opts.get("LOCAL_PATH").map(String::as_str).unwrap_or("");
 
         let target = session.target().to_string();
         tracing::info!("smbclient: {} on \\\\{}\\{}\\{}", action, target, share, remote_path);
@@ -84,40 +84,35 @@ impl NxcModule for SmbClientModule {
             "ls" => {
                 tracing::debug!("smbclient: Listing directory {}", remote_path);
                 format!(
-                    "[*] Listing \\\\{}\\{}\\{}\n  .           D  0\n  ..          D  0\n  (simulated directory listing)",
-                    target, share, remote_path
+                    "[*] Listing \\\\{target}\\{share}\\{remote_path}\n  .           D  0\n  ..          D  0\n  (simulated directory listing)"
                 )
             }
             "get" => {
                 tracing::debug!("smbclient: Downloading {} -> {}", remote_path, local_path);
                 format!(
-                    "[+] Downloaded \\\\{}\\{}\\{} -> {}",
-                    target, share, remote_path, local_path
+                    "[+] Downloaded \\\\{target}\\{share}\\{remote_path} -> {local_path}"
                 )
             }
             "put" => {
                 tracing::debug!("smbclient: Uploading {} -> {}", local_path, remote_path);
                 format!(
-                    "[+] Uploaded {} -> \\\\{}\\{}\\{}",
-                    local_path, target, share, remote_path
+                    "[+] Uploaded {local_path} -> \\\\{target}\\{share}\\{remote_path}"
                 )
             }
             "cat" => {
                 tracing::debug!("smbclient: Reading file {}", remote_path);
                 format!(
-                    "[*] Contents of \\\\{}\\{}\\{}\n(file contents would appear here)",
-                    target, share, remote_path
+                    "[*] Contents of \\\\{target}\\{share}\\{remote_path}\n(file contents would appear here)"
                 )
             }
             "rm" => {
                 tracing::debug!("smbclient: Deleting {}", remote_path);
                 format!(
-                    "[+] Deleted \\\\{}\\{}\\{}",
-                    target, share, remote_path
+                    "[+] Deleted \\\\{target}\\{share}\\{remote_path}"
                 )
             }
             _ => {
-                return Err(anyhow::anyhow!("Unknown ACTION '{}'. Use: ls, get, put, cat, rm", action));
+                return Err(anyhow::anyhow!("Unknown ACTION '{action}'. Use: ls, get, put, cat, rm"));
             }
         };
 

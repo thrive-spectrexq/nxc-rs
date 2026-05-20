@@ -68,8 +68,8 @@ impl NxcModule for PsExecModule {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let cmd = opts.get("CMD").ok_or_else(|| anyhow::anyhow!("CMD option is required"))?;
-        let service_name = opts.get("SERVICE_NAME").map(|s| s.as_str()).unwrap_or("NxcSvc");
-        let share = opts.get("SHARE").map(|s| s.as_str()).unwrap_or("ADMIN$");
+        let service_name = opts.get("SERVICE_NAME").map(String::as_str).unwrap_or("NxcSvc");
+        let share = opts.get("SHARE").map(String::as_str).unwrap_or("ADMIN$");
 
         let target = session.target().to_string();
         tracing::info!("psexec: Creating service '{}' on {} via {}", service_name, target, share);
@@ -85,11 +85,10 @@ impl NxcModule for PsExecModule {
 
         // Step 4: Read output from named pipe
         let output_text = format!(
-            "[*] Service '{}' created on {} (share: {})\n\
-             [*] Executing: {}\n\
+            "[*] Service '{service_name}' created on {target} (share: {share})\n\
+             [*] Executing: {cmd}\n\
              [*] Service started — reading output from named pipe...\n\
-             [+] Command executed successfully. Service cleaned up.",
-            service_name, target, share, cmd
+             [+] Command executed successfully. Service cleaned up."
         );
 
         // Step 5: Cleanup — stop and delete service, remove binary

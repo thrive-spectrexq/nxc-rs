@@ -72,22 +72,22 @@ impl NxcModule for DcSyncModule {
         let just_ntlm = opts.get("JUST_DC_NTLM")
             .map(|s| s.to_lowercase() == "true")
             .unwrap_or(false);
-        let output = opts.get("OUTPUT").map(|s| s.as_str()).unwrap_or("dcsync_hashes.txt");
+        let output = opts.get("OUTPUT").map(String::as_str).unwrap_or("dcsync_hashes.txt");
 
         let target = session.target().to_string();
-        tracing::info!("dcsync: Starting DCSync against {}", target);
+        tracing::info!("dcsync: Starting DCSync against {target}");
 
         // Step 1: Bind to the DRS RPC interface
-        tracing::debug!("dcsync: Binding to MS-DRSR interface on {}", target);
+        tracing::debug!("dcsync: Binding to MS-DRSR interface on {target}");
 
         // Step 2: DSGetDomainControllerInfo to get DC GUID
         tracing::debug!("dcsync: Retrieving DC info via DSGetDomainControllerInfo");
 
         // Step 3: DRSGetNCChanges — replication request
         let sync_target = target_user
-            .map(|u| format!("user '{}'", u))
+            .map(|u| format!("user '{u}'"))
             .unwrap_or_else(|| "ALL users".to_string());
-        tracing::debug!("dcsync: Requesting replication for {}", sync_target);
+        tracing::debug!("dcsync: Requesting replication for {sync_target}");
 
         // Step 4: Parse replicated data and extract hashes
         tracing::debug!("dcsync: Parsing NTLM hashes from replicated attributes");
@@ -95,14 +95,13 @@ impl NxcModule for DcSyncModule {
         let hash_type = if just_ntlm { "NTLM only" } else { "NTLM + Kerberos keys" };
 
         let output_text = format!(
-            "[*] DCSync target: {}\n\
-             [*] Replicating: {}\n\
-             [*] Hash format: {}\n\
+            "[*] DCSync target: {target}\n\
+             [*] Replicating: {sync_target}\n\
+             [*] Hash format: {hash_type}\n\
              [*] Binding to DRS RPC interface...\n\
              [+] Replication request sent (DRSGetNCChanges)\n\
-             [+] Hashes written to: {}\n\
-             [+] DCSync complete.",
-            target, sync_target, hash_type, output
+             [+] Hashes written to: {output}\n\
+             [+] DCSync complete."
         );
 
         let mut creds = vec![];

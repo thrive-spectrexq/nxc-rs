@@ -62,7 +62,7 @@ impl NxcModule for AtExecModule {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let cmd = opts.get("CMD").ok_or_else(|| anyhow::anyhow!("CMD option is required"))?;
-        let task_name = opts.get("TASK_NAME").map(|s| s.as_str()).unwrap_or("NxcTask");
+        let task_name = opts.get("TASK_NAME").map(String::as_str).unwrap_or("NxcTask");
 
         let target = session.target().to_string();
         tracing::info!("atexec: Scheduling task '{}' on {} to execute: {}", task_name, target, cmd);
@@ -72,24 +72,23 @@ impl NxcModule for AtExecModule {
 
         // Step 2: Create scheduled task with immediate trigger
         let output_file = format!("C:\\Windows\\Temp\\nxc_at_{}.txt", std::process::id());
-        let wrapped = format!("cmd.exe /C {} > {} 2>&1", cmd, output_file);
-        tracing::debug!("atexec: Registering task: {}", wrapped);
+        let wrapped = format!("cmd.exe /C {cmd} > {output_file} 2>&1");
+        tracing::debug!("atexec: Registering task: {wrapped}");
 
         // Step 3: Wait for task completion
         tracing::debug!("atexec: Waiting for task execution...");
 
         // Step 4: Read output from temp file via SMB
         let output_text = format!(
-            "[*] Task '{}' created on {}\n\
-             [*] Command: {}\n\
-             [*] Output written to: {}\n\
+            "[*] Task '{task_name}' created on {target}\n\
+             [*] Command: {cmd}\n\
+             [*] Output written to: {output_file}\n\
              [+] Task executed and output retrieved.\n\
-             [+] Task deleted.",
-            task_name, target, cmd, output_file
+             [+] Task deleted."
         );
 
         // Step 5: Delete the task and temp file
-        tracing::debug!("atexec: Deleting task '{}' and temp file", task_name);
+        tracing::debug!("atexec: Deleting task '{task_name}' and temp file");
 
         Ok(ModuleResult {
             credentials: vec![],

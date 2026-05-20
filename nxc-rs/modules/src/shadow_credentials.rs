@@ -56,15 +56,14 @@ impl NxcModule for ShadowCredentials {
         _session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let action = opts.get("ACTION").map(|s| s.as_str()).unwrap_or("info");
+        let action = opts.get("ACTION").map(String::as_str).unwrap_or("info");
         let target = opts.get("TARGET").ok_or_else(|| anyhow::anyhow!("TARGET is required"))?;
 
         tracing::info!("shadow_credentials: {} on target {}", action, target);
         
         // Simulating shadow credentials attack logic
         let output = format!(
-            "Successfully executed action '{}' for target '{}' regarding msDS-KeyCredentialLink.",
-            action, target
+            "Successfully executed action '{action}' for target '{target}' regarding msDS-KeyCredentialLink."
         );
 
         Ok(ModuleResult {

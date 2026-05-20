@@ -56,13 +56,13 @@ impl NxcModule for SkeletonKeyModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let password = opts.get("PASSWORD").map(|s| s.as_str()).unwrap_or("mimikatz");
+        let password = opts.get("PASSWORD").map(String::as_str).unwrap_or("mimikatz");
 
         let target = session.target().to_string();
-        tracing::info!("skeleton_key: Injecting skeleton key into LSASS on {}", target);
+        tracing::info!("skeleton_key: Injecting skeleton key into LSASS on {target}");
 
         // Step 1: Check if target is a domain controller
-        tracing::debug!("skeleton_key: Verifying target {} is a DC", target);
+        tracing::debug!("skeleton_key: Verifying target {target} is a DC");
 
         // Step 2: Open LSASS process handle with PROCESS_ALL_ACCESS
         tracing::debug!("skeleton_key: Opening LSASS process handle");
@@ -77,14 +77,13 @@ impl NxcModule for SkeletonKeyModule {
         tracing::debug!("skeleton_key: Verifying skeleton key injection");
 
         let output_text = format!(
-            "[*] Target: {} (Domain Controller)\n\
+            "[*] Target: {target} (Domain Controller)\n\
              [*] Opening LSASS process...\n\
              [*] Locating msv1_0 authentication package...\n\
              [*] Patching authentication routine...\n\
              [+] Skeleton key injected successfully!\n\
-             [+] All accounts now accept password: '{}'\n\
-             [!] Note: Does NOT survive reboot. Re-inject after DC restart.",
-            target, password
+             [+] All accounts now accept password: '{password}'\n\
+             [!] Note: Does NOT survive reboot. Re-inject after DC restart."
         );
 
         Ok(ModuleResult {

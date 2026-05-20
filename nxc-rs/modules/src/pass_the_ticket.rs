@@ -57,7 +57,7 @@ impl NxcModule for PassTheTicket {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let ticket = opts.get("TICKET").ok_or_else(|| anyhow::anyhow!("TICKET is required"))?;
-        let format = opts.get("FORMAT").map(|s| s.as_str()).unwrap_or("ccache");
+        let format = opts.get("FORMAT").map(String::as_str).unwrap_or("ccache");
 
         tracing::info!("pass_the_ticket: Injecting {} ticket...", format);
         
@@ -69,8 +69,7 @@ impl NxcModule for PassTheTicket {
         };
 
         let output = format!(
-            "Successfully injected {} ticket (preview: {}...) into session context.",
-            format, ticket_preview
+            "Successfully injected {format} ticket (preview: {ticket_preview}...) into session context."
         );
 
         Ok(ModuleResult {

@@ -61,11 +61,11 @@ impl NxcModule for EventLogClearModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let log_target = opts.get("LOG").map(|s| s.as_str()).unwrap_or("all");
-        let method = opts.get("METHOD").map(|s| s.as_str()).unwrap_or("api");
+        let log_target = opts.get("LOG").map(String::as_str).unwrap_or("all");
+        let method = opts.get("METHOD").map(String::as_str).unwrap_or("api");
 
         let target = session.target().to_string();
-        tracing::info!("event_log_clear: Clearing '{}' logs on {} via {}", log_target, target, method);
+        tracing::info!("event_log_clear: Clearing '{log_target}' logs on {target} via {method}");
 
         let logs_to_clear: Vec<&str> = if log_target.to_lowercase() == "all" {
             vec!["Security", "System", "Application", "Windows PowerShell", "Microsoft-Windows-Sysmon/Operational"]
@@ -74,48 +74,47 @@ impl NxcModule for EventLogClearModule {
         };
 
         // Step 1: Connect to the remote event log service
-        tracing::debug!("event_log_clear: Connecting to event log service on {}", target);
+        tracing::debug!("event_log_clear: Connecting to event log service on {target}");
 
         // Step 2: Clear each log
         let mut cleared = Vec::new();
         let failed: Vec<&str> = Vec::new();
 
         for log in &logs_to_clear {
-            tracing::debug!("event_log_clear: Clearing log: {}", log);
+            tracing::debug!("event_log_clear: Clearing log: {log}");
             match method {
                 "wevtutil" => {
-                    tracing::debug!("event_log_clear: wevtutil cl {}", log);
+                    tracing::debug!("event_log_clear: wevtutil cl {log}");
                 }
                 "powershell" => {
-                    tracing::debug!("event_log_clear: Clear-EventLog -LogName {}", log);
+                    tracing::debug!("event_log_clear: Clear-EventLog -LogName {log}");
                 }
                 _ => {
-                    tracing::debug!("event_log_clear: EvtClearLog({})", log);
+                    tracing::debug!("event_log_clear: EvtClearLog({log})");
                 }
             }
             cleared.push(*log);
         }
 
+        let logs_count = logs_to_clear.len();
+        let cleared_str = cleared.iter()
+            .map(|l| format!("  [+] Cleared: {l}\n"))
+            .collect::<String>();
+        let failed_str = if failed.is_empty() {
+            String::new()
+        } else {
+            failed.iter()
+                .map(|l| format!("  [-] Failed: {l}\n"))
+                .collect::<String>()
+        };
+
         let output_text = format!(
-            "[*] Target: {}\n\
-             [*] Method: {}\n\
-             [*] Clearing {} log(s)...\n\
-             {}\
-             {}\
-             [+] Event log clearing complete.",
-            target,
-            method,
-            logs_to_clear.len(),
-            cleared.iter()
-                .map(|l| format!("  [+] Cleared: {}\n", l))
-                .collect::<String>(),
-            if failed.is_empty() {
-                String::new()
-            } else {
-                failed.iter()
-                    .map(|l| format!("  [-] Failed: {}\n", l))
-                    .collect::<String>()
-            },
+            "[*] Target: {target}\n\
+             [*] Method: {method}\n\
+             [*] Clearing {logs_count} log(s)...\n\
+             {cleared_str}\
+             {failed_str}\
+             [+] Event log clearing complete."
         );
 
         Ok(ModuleResult {

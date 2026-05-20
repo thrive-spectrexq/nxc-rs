@@ -68,8 +68,8 @@ impl NxcModule for RdpExecModule {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let cmd = opts.get("CMD").ok_or_else(|| anyhow::anyhow!("CMD option is required"))?;
-        let method = opts.get("METHOD").map(|s| s.as_str()).unwrap_or("run_dialog");
-        let nla = opts.get("NLA").map(|s| s.as_str()).unwrap_or("true");
+        let method = opts.get("METHOD").map(String::as_str).unwrap_or("run_dialog");
+        let nla = opts.get("NLA").map(String::as_str).unwrap_or("true");
 
         let target = session.target().to_string();
         tracing::info!("rdp_exec: Executing '{}' on {} via RDP (method: {})", cmd, target, method);
@@ -92,13 +92,12 @@ impl NxcModule for RdpExecModule {
         tracing::debug!("rdp_exec: Injecting keystrokes for: {}", cmd);
 
         let output_text = format!(
-            "[*] RDP connection to {} established\n\
-             [*] Method: {}\n\
-             [*] {}\n\
-             [*] Command: {}\n\
+            "[*] RDP connection to {target} established\n\
+             [*] Method: {method}\n\
+             [*] {exec_detail}\n\
+             [*] Command: {cmd}\n\
              [+] Keystrokes injected, command executed.\n\
-             [*] Note: RDP execution is blind — no stdout capture.",
-            target, method, exec_detail, cmd
+             [*] Note: RDP execution is blind — no stdout capture."
         );
 
         Ok(ModuleResult {
