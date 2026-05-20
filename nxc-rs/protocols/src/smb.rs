@@ -280,6 +280,37 @@ impl SmbProtocol {
         Ok(shares)
     }
 
+    pub async fn enumerate_named_pipes(&self, session: &SmbSession) -> Result<Vec<String>> {
+        debug!("SMB: Enumerating named pipes on {}", session.target);
+        let mut pipes = Vec::new();
+
+        // Fallback to checking common pipes explicitly if directory listing isn't sufficient
+        let common_pipes = [
+            "lsarpc", "samr", "svcctl", "epmapper", "atsvc", "browser", "spoolss", "netlogon",
+            "srvsvc", "wkssvc", "winreg", "drsuapi", "eventlog",
+        ];
+        
+        if let Ok(tree_id) = self.tree_connect(session, "IPC$").await {
+            // Some Windows versions allow listing \PIPE\*
+            if let Ok(entries) = self.list_directory(session, "IPC$", "*").await {
+                for e in entries {
+                    pipes.push(e);
+                }
+            }
+
+            if pipes.is_empty() {
+                for pipe in common_pipes.iter() {
+                    // Try to open the pipe
+                    if let Ok(fid) = self.create_file(session, tree_id, pipe, 0x00000001, 0x0012019f).await {
+                        pipes.push(pipe.to_string());
+                        let _ = self.close_file(session, tree_id, &fid).await;
+                    }
+                }
+            }
+        }
+        Ok(pipes)
+    }
+
     pub async fn download_file(
         &self,
         session: &SmbSession,

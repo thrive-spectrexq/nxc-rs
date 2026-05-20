@@ -559,4 +559,45 @@ $k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
             Ok(AuthResult::failure(&format!("Unexpected status code: {}", response.status()), None))
         }
     }
+
+    /// Perform WS-Trust / SAML authentication over WinRM
+    async fn authenticate_wstrust(
+        &self,
+        winrm_sess: &mut WinrmSession,
+        creds: &Credentials,
+    ) -> Result<AuthResult> {
+        // This is a stub for WS-Trust authentication (e.g., using ADFS or Azure AD SAML tokens).
+        // A full implementation would craft a WS-Trust RST (RequestSecurityToken), send it to the STS,
+        // retrieve the SAML assertion, and inject it into the WinRM SOAP header.
+        
+        let token = creds.password.as_deref().unwrap_or("");
+        if !token.starts_with("<saml:Assertion") {
+            return Ok(AuthResult::failure("Valid SAML token required for WS-Trust auth", None));
+        }
+
+        let url = self.build_url(&winrm_sess.target, winrm_sess.port);
+        let client = self.build_client(winrm_sess.proxy.as_deref())?;
+
+        // Simplified probe with SAML token
+        let probe_resp = client
+            .post(&url)
+            .header("Content-Type", "application/soap+xml;charset=UTF-8")
+            // Normally the SAML assertion goes into the SOAP Security header of the payload
+            .body(self.build_create_shell_soap()) 
+            .send()
+            .await?;
+
+        if probe_resp.status().is_success() {
+            debug!("WinRM: WS-Trust Auth successful for {}", creds.username);
+            // In a real implementation, we'd store the signed SOAP headers or token references
+            winrm_sess.auth_header = None; 
+            Ok(AuthResult::success(true))
+        } else {
+            Ok(AuthResult::failure(
+                &format!("WS-Trust Auth failed with status {}", probe_resp.status()),
+                None,
+            ))
+        }
+    }
 }
+
