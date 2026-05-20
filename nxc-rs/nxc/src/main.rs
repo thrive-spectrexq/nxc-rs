@@ -146,11 +146,9 @@ async fn main() -> Result<()> {
     }
 
     // ── Build credentials ──
+    // NOTE: --db-creds supplements (or replaces) CLI credentials; the emptiness
+    // check is deferred until after the DB load below.
     let mut creds = build_credentials(sub_matches);
-    if creds.is_empty() {
-        NxcGlobalOutput::error("No credentials specified");
-        return Ok(());
-    }
 
     // ── Build execution options ──
     let mut threads = matches.get_one::<usize>("threads").copied().unwrap_or(100);
@@ -340,6 +338,12 @@ async fn main() -> Result<()> {
         } else {
             NxcGlobalOutput::warn("Database not initialized, cannot load --db-creds");
         }
+    }
+
+    // Deferred credential check — must come after --db-creds load
+    if creds.is_empty() {
+        NxcGlobalOutput::error("No credentials specified");
+        return Ok(());
     }
 
     // ── Run the execution engine ──

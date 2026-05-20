@@ -63,6 +63,15 @@ pub fn export_ndjson(path: &str, results: &[ExecutionResult]) -> Result<()> {
     Ok(())
 }
 
+/// Escape the five XML special characters in a string.
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 /// Export results as Metasploit-compatible XML.
 pub fn export_xml(path: &str, report: &Report) -> Result<()> {
     let mut file = File::create(path)?;
@@ -79,7 +88,7 @@ pub fn export_xml(path: &str, report: &Report) -> Result<()> {
 
     for (target, results) in hosts_map {
         writeln!(file, "    <host>")?;
-        writeln!(file, "      <address>{target}</address>")?;
+        writeln!(file, "      <address>{}</address>", xml_escape(target))?;
         writeln!(file, "      <services>")?;
 
         let protocol = report.protocol.to_uppercase();
@@ -111,9 +120,9 @@ pub fn export_xml(path: &str, report: &Report) -> Result<()> {
                 writeln!(
                     file,
                     "          <info>Username: {} | Admin: {} | Message: {}</info>",
-                    res.username,
+                    xml_escape(&res.username),
                     res.admin,
-                    res.message.replace("<", "&lt;").replace(">", "&gt;")
+                    xml_escape(&res.message),
                 )?;
                 writeln!(file, "        </vuln>")?;
             }
