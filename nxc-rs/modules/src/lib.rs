@@ -19,6 +19,7 @@ pub mod docker_enum;
 pub mod dpapi;
 pub mod enum_dns;
 pub mod enum_mssql;
+pub mod enum_pipes;
 pub mod enum_shares;
 pub mod execute_assembly;
 pub mod ftp_anon;
