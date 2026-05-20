@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use nxc_db::{backend::*, HostInfo, Credential, AuthResultEntry, NxcDb};
 use tempfile::tempdir;
 
