@@ -333,12 +333,14 @@ fn vnc_encrypt(password: &str, challenge: &[u8; 16]) -> [u8; 16] {
 
     let mut out = [0u8; 16];
 
-    let ch1: [u8; 8] = challenge[0..8].try_into().expect("8 bytes");
+    let mut ch1 = [0u8; 8];
+    ch1.copy_from_slice(&challenge[0..8]);
     let mut block1: Block<Des> = ch1.into();
     cipher.encrypt_block(&mut block1);
     out[0..8].copy_from_slice(&block1);
 
-    let ch2: [u8; 8] = challenge[8..16].try_into().expect("8 bytes");
+    let mut ch2 = [0u8; 8];
+    ch2.copy_from_slice(&challenge[8..16]);
     let mut block2: Block<Des> = ch2.into();
     cipher.encrypt_block(&mut block2);
     out[8..16].copy_from_slice(&block2);
