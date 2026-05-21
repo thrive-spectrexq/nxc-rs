@@ -8,7 +8,7 @@ description = "Distributed session cache and orchestration engine for NetExec-RS
 anyhow.workspace = true
 serde.workspace = true
 tokio = { workspace = true, features = ["full"] }
-dashmap = "5.5"
+dashmap = "6.2"
 uuid = { version = "1.8", features = ["v4"] }
 async-trait.workspace = true
 tracing.workspace = true
