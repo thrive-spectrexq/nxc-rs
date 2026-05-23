@@ -32,7 +32,7 @@ nxc-rs changes that:
 
 ## Key Features
 
-### ⚡ Performance & Reliability
+### Performance & Reliability
 - Tokio-powered async runtime for extreme concurrency
 - Optimized for large enterprise network operations
 - Low memory footprint with predictable performance
@@ -65,7 +65,7 @@ nxc-rs changes that:
 - WMI-based system intelligence
 - Credential and privilege discovery
 
-## 📡 Protocols & Capabilities
+## Protocols & Capabilities
 
 nxc-rs supports 22 protocols and 135+ modules, built for both reconnaissance and post-exploitation.
 
@@ -81,7 +81,7 @@ nxc-rs supports 22 protocols and 135+ modules, built for both reconnaissance and
 | **Web / DNS / FTP** | ✅ | Enumeration & recon |
 | **Cloud / Kube** | ✅ | Kubernetes & infrastructure probing |
 
-## 📦 Installation
+## Installation
 
 ### Quick Install
 
@@ -95,7 +95,7 @@ curl -sSf https://raw.githubusercontent.com/thrive-spectrexq/nxc-rs/master/insta
 iex (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/thrive-spectrexq/nxc-rs/master/install.ps1')
 ```
 
-### 🛠 Build from Source
+### Build from Source
 
 Requires Rust 1.94.0+
 
@@ -139,7 +139,7 @@ nxc nfs <target> --enum-shares
 
 Control operations using natural language.
 
-#### ⚙️ Setup
+#### Setup
 
 Set one provider:
 
@@ -150,7 +150,7 @@ export ANTHROPIC_API_KEY=...
 export OLLAMA_API_BASE=...
 ```
 
-#### 💡 Examples
+#### Examples
 ```bash
 nxc ai "Scan 10.0.0.0/24 for port 445 and identify OS versions"
 nxc ai "Enumerate all GPO names using LDAP"
@@ -174,7 +174,7 @@ nxc-rs is built as a modular Rust workspace:
 - Protocol-driven architecture
 - Clean separation of concerns
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome.
 
