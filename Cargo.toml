@@ -97,8 +97,8 @@ unsafe_code = "deny"
 [workspace.lints.clippy]
 # Correctness — critical for a security tool
 # TODO: Promote to "deny" after fixing existing instances
-unwrap_used = "warn"
-expect_used = "warn"
+unwrap_used = "deny"
+expect_used = "deny"
 
 # Idiomatic Rust
 uninlined_format_args = "deny"
