@@ -37,7 +37,7 @@ WORKDIR /app
 # Copy the binary from the builder stage
 COPY --from=builder /app/target/release/nxc /usr/local/bin/nxc
 
-# Create a non-root user (good practice)
+# Create a non-root user
 RUN useradd -ms /bin/bash nxcuser
 USER nxcuser
 
