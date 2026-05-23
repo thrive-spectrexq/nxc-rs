@@ -64,28 +64,28 @@ pub fn build_cli() -> Command {
     // ── Standard auth arguments (shared across all protocols) ──
     let auth_args = vec![
         Arg::new("target")
-            .help("Target IP(s), range(s), CIDR(s), hostname(s), or file(s)")
+            .help("Target IP(s), range(s), CIDR(s), hostname(s), or file(s) containing targets. Examples: 192.168.1.10, 10.0.0.0/24, targets.txt")
             .required(true)
             .num_args(1..)
             .index(1),
         Arg::new("username")
             .short('u')
             .long("username")
-            .help("Username(s) or file(s) containing usernames")
+            .help("Username(s) or file(s) containing usernames. Format: -u user -u file.txt")
             .num_args(1..),
         Arg::new("password")
             .short('p')
             .long("password")
-            .help("Password(s) or file(s) containing passwords")
+            .help("Password(s) or file(s) containing passwords. Format: -p pass -p file.txt")
             .num_args(1..),
         Arg::new("hash")
             .short('H')
             .long("hash")
-            .help("NTLM hash(es) for Pass-the-Hash")
+            .help("NTLM hash(es) for Pass-the-Hash. Format: LM:NT or just NT")
             .num_args(1..),
         Arg::new("no-bruteforce")
             .long("no-bruteforce")
-            .help("No spray when using files (user1 => pass1, user2 => pass2)")
+            .help("Disable cartesian product (spray); pairs user N with pass N instead")
             .action(ArgAction::SetTrue),
         Arg::new("continue-on-success")
             .long("continue-on-success")
@@ -130,7 +130,7 @@ pub fn build_cli() -> Command {
     // ── Module arguments ──
     let module_args = vec![
         Arg::new("module").short('M').long("module").help("Module to use").num_args(1..),
-        Arg::new("module-options").short('o').help("Module options (KEY=VALUE)").num_args(1..),
+        Arg::new("module-options").short('o').help("Module options. Example: -o FLAG=1 CMD=\"whoami\"").num_args(1..),
         Arg::new("list-modules")
             .short('L')
             .long("list-modules")
@@ -146,11 +146,11 @@ pub fn build_cli() -> Command {
     let export_args = vec![
         Arg::new("export")
             .long("export")
-            .help("Export results to a file (json, csv, html, md, ndjson, xml)")
+            .help("Export format. Examples: json, csv, html, md, ndjson, xml")
             .value_parser(["json", "csv", "html", "md", "ndjson", "xml"]),
         Arg::new("export-path")
             .long("export-path")
-            .help("Path to save the exported file")
+            .help("Path/filename for export. Example: /tmp/results.csv (defaults to nxc_report.<format>)")
             .default_value("nxc_report"),
     ];
 
