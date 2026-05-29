@@ -9,6 +9,6 @@ anyhow.workspace = true
 serde.workspace = true
 tokio = { workspace = true, features = ["full"] }
 dashmap = "6.2"
-uuid = { version = "1.8", features = ["v4"] }
+uuid = { version = "1.23", features = ["v4"] }
 async-trait.workspace = true
 tracing.workspace = true
