@@ -9,7 +9,7 @@ High-Performance Network Execution Framework (Rust)
 
 NetExec-RS (nxc-rs) is a high-performance network execution framework built in Rust, designed for modern red team operations at scale.
 
-Inspired by CrackMapExec and NetExec, nxc-rs reimagines network exploitation with:
+Inspired by NetExec and CrackMapExec, nxc-rs reimagines network exploitation with:
 
 - massive concurrency
 - intelligent orchestration
