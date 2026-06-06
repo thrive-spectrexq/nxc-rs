@@ -1,0 +1,51 @@
+# Cargo configuration for nxc-rs
+# This file contains project-specific Cargo settings
+
+[build]
+# Number of parallel jobs, defaults to # of CPUs
+# jobs = 4
+
+[term]
+# Set verbosity for Cargo's output
+# verbose = false
+# color = 'auto'
+
+[profile.dev]
+# Development build profile
+opt-level = 0
+debug = true
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = 'unwind'
+incremental = true
+
+[profile.release]
+# Release build profile
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+lto = true
+panic = 'unwind'
+codegen-units = 1
+
+[profile.test]
+# Test build profile
+opt-level = 1
+debug = true
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = 'unwind'
+incremental = true
+
+[profile.bench]
+# Benchmark build profile
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+lto = true
+panic = 'unwind'
+codegen-units = 1
