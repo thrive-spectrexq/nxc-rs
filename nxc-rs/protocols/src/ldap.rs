@@ -1,7 +1,7 @@
 //! # LDAP Protocol Handler
 //!
 //! LDAP protocol implementation using the `ldap3` crate.
-//! Supports simple bind authentication.
+//! Supports simple bind authentication and comprehensive Active Directory enumeration.
 
 use crate::{CommandOutput, NxcProtocol, NxcSession};
 use anyhow::{anyhow, Context, Result};
@@ -38,6 +38,57 @@ impl NxcSession for LdapSession {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+}
+
+// ─── AD Object Types ────────────────────────────────────────────
+
+/// Computer object information from Active Directory
+#[derive(Debug, Clone)]
+pub struct ComputerInfo {
+    pub name: String,
+    pub dns_hostname: String,
+    pub operating_system: String,
+    pub os_version: String,
+    pub last_logon: Option<String>,
+    pub is_dc: bool,
+    pub is_rodc: bool,
+}
+
+/// Service Principal Name entry for Kerberoasting
+#[derive(Debug, Clone)]
+pub struct SpnEntry {
+    pub account_name: String,
+    pub spn: String,
+    pub account_type: String,
+    pub enabled: bool,
+    pub password_set: Option<String>,
+}
+
+/// Sensitive security object information
+#[derive(Debug, Clone)]
+pub struct SensitiveObject {
+    pub name: String,
+    pub dn: String,
+    pub object_type: String,
+    pub risk_level: String,
+    pub details: String,
+}
+
+/// Group Policy Object information
+#[derive(Debug, Clone)]
+pub struct GpoInfo {
+    pub name: String,
+    pub display_name: String,
+    pub gpc_file_sys_path: String,
+    pub version_number: u32,
+}
+
+/// Organizational Unit hierarchy
+#[derive(Debug, Clone)]
+pub struct OuInfo {
+    pub name: String,
+    pub dn: String,
+    pub description: Option<String>,
 }
 
 // ─── LDAP Protocol Handler ───────────────────────────────────────
@@ -179,6 +230,241 @@ impl LdapProtocol {
         Ok(entries
             .into_iter()
             .filter_map(|e| e.attrs.get("cn").and_then(|v| v.first()).cloned())
+            .collect())
+    }
+
+    /// Enumerate computers with OS information
+    pub async fn enumerate_computers(&self, session: &LdapSession) -> Result<Vec<ComputerInfo>> {
+        let base_dn = self.get_base_dn(session).await?;
+        let entries = self
+            .search(
+                session,
+                &base_dn,
+                ldap3::Scope::Subtree,
+                "(objectClass=computer)",
+                vec!["cn", "dNSHostName", "operatingSystem", "operatingSystemVersion", "lastLogonTimestamp", "primaryGroupID"],
+            )
+            .await?;
+
+        let mut computers = Vec::new();
+        for entry in entries {
+            let name = entry.attrs.get("cn").and_then(|v| v.first()).cloned().unwrap_or_default();
+            let dns_hostname = entry.attrs.get("dNSHostName").and_then(|v| v.first()).cloned().unwrap_or_default();
+            let operating_system = entry.attrs.get("operatingSystem").and_then(|v| v.first()).cloned().unwrap_or_default();
+            let os_version = entry.attrs.get("operatingSystemVersion").and_then(|v| v.first()).cloned().unwrap_or_default();
+            let last_logon = entry.attrs.get("lastLogonTimestamp").and_then(|v| v.first()).cloned();
+            
+            // Check if it's a DC (primary group ID 516 = domain controllers)
+            let is_dc = entry.attrs.get("primaryGroupID")
+                .and_then(|v| v.first())
+                .map(|v| v == "516")
+                .unwrap_or(false);
+
+            computers.push(ComputerInfo {
+                name,
+                dns_hostname,
+                operating_system,
+                os_version,
+                last_logon,
+                is_dc,
+                is_rodc: false, // Would need additional check via RODC group membership
+            });
+        }
+
+        Ok(computers)
+    }
+
+    /// Enumerate Service Principal Names (SPNs) for Kerberoasting
+    pub async fn enumerate_spns(&self, session: &LdapSession) -> Result<Vec<SpnEntry>> {
+        let base_dn = self.get_base_dn(session).await?;
+        let entries = self
+            .search(
+                session,
+                &base_dn,
+                ldap3::Scope::Subtree,
+                "(&(servicePrincipalName=*)(|(objectClass=user)(objectClass=computer)))",
+                vec!["sAMAccountName", "servicePrincipalName", "objectClass", "userAccountControl", "pwdLastSet"],
+            )
+            .await?;
+
+        let mut spns = Vec::new();
+        for entry in entries {
+            let account_name = entry.attrs.get("sAMAccountName").and_then(|v| v.first()).cloned().unwrap_or_default();
+            let account_type = entry.attrs.get("objectClass")
+                .and_then(|v| v.first())
+                .map(|v| if v.contains("computer") { "Computer".to_string() } else { "User".to_string() })
+                .unwrap_or_default();
+
+            // Check if account is enabled (userAccountControl bit 2 = disabled)
+            let uac = entry.attrs.get("userAccountControl")
+                .and_then(|v| v.first())
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(0);
+            let enabled = (uac & 0x0002) == 0;
+
+            let pwd_last_set = entry.attrs.get("pwdLastSet").and_then(|v| v.first()).cloned();
+
+            if let Some(spn_list) = entry.attrs.get("servicePrincipalName") {
+                for spn in spn_list {
+                    spns.push(SpnEntry {
+                        account_name: account_name.clone(),
+                        spn: spn.clone(),
+                        account_type: account_type.clone(),
+                        enabled,
+                        password_set: pwd_last_set.clone(),
+                    });
+                }
+            }
+        }
+
+        Ok(spns)
+    }
+
+    /// Detect unconstrained delegation (dangerous for privilege escalation)
+    pub async fn detect_unconstrained_delegation(&self, session: &LdapSession) -> Result<Vec<SensitiveObject>> {
+        let base_dn = self.get_base_dn(session).await?;
+        // userAccountControl: 0x80000 = TRUSTED_FOR_DELEGATION
+        let entries = self
+            .search(
+                session,
+                &base_dn,
+                ldap3::Scope::Subtree,
+                "(&(|(objectClass=user)(objectClass=computer))(userAccountControl:1.2.840.113556.1.4.803:=524288))",
+                vec!["sAMAccountName", "objectClass", "distinguishedName"],
+            )
+            .await?;
+
+        let mut sensitive = Vec::new();
+        for entry in entries {
+            let name = entry.attrs.get("sAMAccountName").and_then(|v| v.first()).cloned().unwrap_or_default();
+            let dn = entry.dn.clone();
+            let obj_type = entry.attrs.get("objectClass")
+                .and_then(|v| v.first())
+                .cloned()
+                .unwrap_or_else(|| "Unknown".to_string());
+
+            sensitive.push(SensitiveObject {
+                name,
+                dn,
+                object_type: obj_type,
+                risk_level: "HIGH".to_string(),
+                details: "Unconstrained delegation enabled - can impersonate any user".to_string(),
+            });
+        }
+
+        Ok(sensitive)
+    }
+
+    /// Detect constrained delegation accounts
+    pub async fn detect_constrained_delegation(&self, session: &LdapSession) -> Result<Vec<SensitiveObject>> {
+        let base_dn = self.get_base_dn(session).await?;
+        let entries = self
+            .search(
+                session,
+                &base_dn,
+                ldap3::Scope::Subtree,
+                "(msDS-AllowedToDelegateTo=*)",
+                vec!["sAMAccountName", "msDS-AllowedToDelegateTo", "distinguishedName"],
+            )
+            .await?;
+
+        let mut sensitive = Vec::new();
+        for entry in entries {
+            let name = entry.attrs.get("sAMAccountName").and_then(|v| v.first()).cloned().unwrap_or_default();
+            let dn = entry.dn.clone();
+            let delegated_to = entry.attrs.get("msDS-AllowedToDelegateTo")
+                .map(|v| v.join(", "))
+                .unwrap_or_default();
+
+            sensitive.push(SensitiveObject {
+                name,
+                dn,
+                object_type: "Constrained Delegation".to_string(),
+                risk_level: "MEDIUM".to_string(),
+                details: format!("Can delegate to: {}", delegated_to),
+            });
+        }
+
+        Ok(sensitive)
+    }
+
+    /// Enumerate Group Policy Objects
+    pub async fn enumerate_gpos(&self, session: &LdapSession) -> Result<Vec<GpoInfo>> {
+        let base_dn = self.get_base_dn(session).await?;
+        let gpo_container = format!("CN=Policies,CN=System,{}", base_dn);
+        
+        let entries = self
+            .search(
+                session,
+                &gpo_container,
+                ldap3::Scope::OneLevel,
+                "(objectClass=groupPolicyContainer)",
+                vec!["cn", "displayName", "gPCFileSysPath", "versionNumber"],
+            )
+            .await?;
+
+        let mut gpos = Vec::new();
+        for entry in entries {
+            let name = entry.attrs.get("cn").and_then(|v| v.first()).cloned().unwrap_or_default();
+            let display_name = entry.attrs.get("displayName").and_then(|v| v.first()).cloned().unwrap_or_default();
+            let gpc_path = entry.attrs.get("gPCFileSysPath").and_then(|v| v.first()).cloned().unwrap_or_default();
+            let version = entry.attrs.get("versionNumber")
+                .and_then(|v| v.first())
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(0);
+
+            gpos.push(GpoInfo {
+                name,
+                display_name,
+                gpc_file_sys_path: gpc_path,
+                version_number: version,
+            });
+        }
+
+        Ok(gpos)
+    }
+
+    /// Enumerate Organizational Units
+    pub async fn enumerate_ous(&self, session: &LdapSession) -> Result<Vec<OuInfo>> {
+        let base_dn = self.get_base_dn(session).await?;
+        let entries = self
+            .search(
+                session,
+                &base_dn,
+                ldap3::Scope::Subtree,
+                "(objectClass=organizationalUnit)",
+                vec!["name", "distinguishedName", "description"],
+            )
+            .await?;
+
+        let mut ous = Vec::new();
+        for entry in entries {
+            let name = entry.attrs.get("name").and_then(|v| v.first()).cloned().unwrap_or_default();
+            let dn = entry.dn.clone();
+            let description = entry.attrs.get("description").and_then(|v| v.first()).cloned();
+
+            ous.push(OuInfo { name, dn, description });
+        }
+
+        Ok(ous)
+    }
+
+    /// Detect gMSA accounts (Group Managed Service Accounts)
+    pub async fn enumerate_gmsa(&self, session: &LdapSession) -> Result<Vec<String>> {
+        let base_dn = self.get_base_dn(session).await?;
+        let entries = self
+            .search(
+                session,
+                &base_dn,
+                ldap3::Scope::Subtree,
+                "(objectClass=msDS-GroupManagedServiceAccount)",
+                vec!["sAMAccountName"],
+            )
+            .await?;
+
+        Ok(entries
+            .into_iter()
+            .filter_map(|e| e.attrs.get("sAMAccountName").and_then(|v| v.first()).cloned())
             .collect())
     }
 
@@ -527,5 +813,33 @@ mod tests {
     fn test_decode_sid_short_buffer() {
         let result = decode_sid(&[0x01, 0x00, 0x00]);
         assert!(result.starts_with("[SID: "));
+    }
+
+    #[test]
+    fn test_computer_info_struct() {
+        let comp = ComputerInfo {
+            name: "DC01".to_string(),
+            dns_hostname: "dc01.corp.local".to_string(),
+            operating_system: "Windows Server 2019".to_string(),
+            os_version: "10.0.17763".to_string(),
+            last_logon: Some("2026-06-19".to_string()),
+            is_dc: true,
+            is_rodc: false,
+        };
+        assert_eq!(comp.name, "DC01");
+        assert!(comp.is_dc);
+    }
+
+    #[test]
+    fn test_spn_entry_struct() {
+        let spn = SpnEntry {
+            account_name: "sqlserver".to_string(),
+            spn: "MSSQLSvc/db01.corp.local:1433".to_string(),
+            account_type: "Computer".to_string(),
+            enabled: true,
+            password_set: Some("2026-01-15".to_string()),
+        };
+        assert!(spn.spn.contains("MSSQLSvc"));
+        assert!(spn.enabled);
     }
 }
