@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS nxc_credentials (
     aes_256    TEXT,
     source     TEXT,
     host_id    INTEGER REFERENCES nxc_hosts(id),
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    UNIQUE(workspace, domain, username)
 );
 
 CREATE TABLE IF NOT EXISTS nxc_auth_results (
@@ -63,7 +64,7 @@ CREATE TABLE IF NOT EXISTS nxc_shares (
     write_access INTEGER DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_nxc_creds_user ON nxc_credentials(workspace, username, domain);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_nxc_creds_user ON nxc_credentials(workspace, domain, username);
 
 CREATE TABLE IF NOT EXISTS nxc_loot (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -191,12 +192,18 @@ CREATE TABLE IF NOT EXISTS nxc_operations_log (
 );
 "#;
 
+pub const MIGRATION_4: &str = r#"
+DROP INDEX IF EXISTS idx_nxc_creds_user;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_nxc_creds_user ON nxc_credentials(workspace, domain, username);
+"#;
+
 /// Ordered list of schema migrations. Each entry is (version, sql).
 /// New migrations are appended; existing ones must NEVER be modified.
 const MIGRATIONS: &[(i64, &str)] = &[
     (1, NXC_SCHEMA),
     (2, "DROP INDEX IF EXISTS idx_nxc_creds_unique; CREATE INDEX IF NOT EXISTS idx_nxc_creds_user ON nxc_credentials(workspace, username, domain);"),
     (3, MIGRATION_3_PHASE1),
+    (4, MIGRATION_4),
 ];
 
 /// Run pending migrations against the database.
@@ -211,7 +218,10 @@ fn run_migrations(conn: &rusqlite::Connection) -> Result<()> {
 
     let current: i64 = conn
         .query_row("SELECT COALESCE(MAX(version), 0) FROM nxc_schema_version", [], |row| row.get(0))
-        .unwrap_or(0);
+        .unwrap_or_else(|e| {
+            tracing::warn!("Failed to query schema version: {e}");
+            0
+        });
 
     for (version, sql) in MIGRATIONS {
         if *version > current {
@@ -330,7 +340,12 @@ impl NxcDb {
         conn.execute(
             "INSERT INTO nxc_credentials (workspace, domain, username, password, nt_hash, lm_hash, aes_128, aes_256, source, host_id, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-             ",
+             ON CONFLICT(workspace, domain, username) DO UPDATE SET
+                password = COALESCE(excluded.password, password),
+                nt_hash = COALESCE(excluded.nt_hash, nt_hash),
+                lm_hash = COALESCE(excluded.lm_hash, lm_hash),
+                aes_128 = COALESCE(excluded.aes_128, aes_128),
+                aes_256 = COALESCE(excluded.aes_256, aes_256)",
             rusqlite::params![
                 cred.workspace, cred.domain, cred.username, cred.password,
                 cred.nt_hash, cred.lm_hash, cred.aes_128, cred.aes_256,

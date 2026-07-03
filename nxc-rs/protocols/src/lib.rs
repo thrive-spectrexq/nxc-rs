@@ -3,10 +3,14 @@
 //! Each protocol (SMB, LDAP, WinRM, etc.) implements the `NxcProtocol` trait,
 //! providing connect, authenticate, and execute capabilities.
 
+use std::fmt;
+use std::str::FromStr;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 pub mod ad_setup;
 pub mod adb;
@@ -14,12 +18,15 @@ pub mod connection;
 pub mod dns;
 pub mod docker;
 pub mod errors;
+pub mod exchange;
 pub mod ftp;
 pub mod http;
 pub mod ilo;
 pub mod ipmi;
 pub mod kube;
 pub mod ldap;
+pub mod modbus;
+pub mod mqtt;
 pub mod mssql;
 pub mod mysql;
 pub mod network;
@@ -35,13 +42,11 @@ pub mod smb;
 pub mod snmp;
 pub mod socks;
 pub mod ssh;
+pub mod telnet;
 pub mod vnc;
+pub mod wifi;
 pub mod winrm;
 pub mod wmi;
-pub mod mqtt;
-pub mod modbus;
-pub mod exchange;
-pub mod telnet;
 
 // ─── Core Traits ────────────────────────────────────────────────
 
@@ -138,39 +143,107 @@ pub trait NxcProtocol: Send + Sync {
 
 // ─── Protocol Catalogue ─────────────────────────────────────────
 
+/// Error returned when parsing an unrecognised protocol name.
+#[derive(Debug, Clone, Error)]
+#[error("unknown protocol: '{0}'")]
+pub struct ProtocolParseError(pub String);
+
 /// Supported protocol identifiers.
+///
+/// Each variant maps to a protocol handler that implements [`NxcProtocol`].
+/// Use [`Protocol::ALL`] for the full list, or parse from a string via
+/// the [`FromStr`] implementation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Protocol {
+    /// Server Message Block — Windows file sharing and RPC.
     Smb,
+    /// Lightweight Directory Access Protocol (includes LDAPS alias).
     Ldap,
+    /// Windows Remote Management (WS-Management).
     WinRm,
+    /// Windows Management Instrumentation (DCOM/RPC).
     Wmi,
+    /// Remote Desktop Protocol.
     Rdp,
+    /// Microsoft SQL Server.
     Mssql,
+    /// Secure Shell.
     Ssh,
+    /// File Transfer Protocol.
     Ftp,
+    /// Virtual Network Computing (remote framebuffer).
     Vnc,
+    /// Network File System.
     Nfs,
+    /// Android Debug Bridge.
     Adb,
+    /// Network / WiFi scanning and enumeration.
     Network,
+    /// HTTP(S) web services.
     Http,
+    /// Redis in-memory data store.
     Redis,
+    /// PostgreSQL database.
     Postgres,
+    /// MySQL / MariaDB database.
     Mysql,
+    /// Simple Network Management Protocol.
     Snmp,
+    /// Docker engine API.
     Docker,
+    /// Domain Name System.
     Dns,
+    /// Intelligent Platform Management Interface.
     Ipmi,
+    /// HP iLO / Dell iDRAC / generic BMC.
     Ilo,
+    /// Kubernetes API server.
     Kube,
+    /// OPC Unified Architecture (industrial automation).
     OpcUa,
+    /// Message Queuing Telemetry Transport (IoT messaging).
     Mqtt,
+    /// Modbus industrial communication protocol.
     Modbus,
+    /// Microsoft Exchange Web Services.
     Exchange,
+    /// Telnet remote terminal.
     Telnet,
 }
 
 impl Protocol {
+    /// All supported protocol variants.
+    pub const ALL: &[Protocol] = &[
+        Protocol::Smb,
+        Protocol::Ldap,
+        Protocol::WinRm,
+        Protocol::Wmi,
+        Protocol::Rdp,
+        Protocol::Mssql,
+        Protocol::Ssh,
+        Protocol::Ftp,
+        Protocol::Vnc,
+        Protocol::Nfs,
+        Protocol::Adb,
+        Protocol::Network,
+        Protocol::Http,
+        Protocol::Redis,
+        Protocol::Postgres,
+        Protocol::Mysql,
+        Protocol::Snmp,
+        Protocol::Docker,
+        Protocol::Dns,
+        Protocol::Ipmi,
+        Protocol::Ilo,
+        Protocol::Kube,
+        Protocol::OpcUa,
+        Protocol::Mqtt,
+        Protocol::Modbus,
+        Protocol::Exchange,
+        Protocol::Telnet,
+    ];
+
+    /// Canonical lowercase name of this protocol.
     pub fn name(&self) -> &'static str {
         match self {
             Protocol::Smb => "smb",
@@ -203,6 +276,7 @@ impl Protocol {
         }
     }
 
+    /// Default port number for this protocol.
     pub fn default_port(&self) -> u16 {
         match self {
             Protocol::Smb => 445,
@@ -234,72 +308,47 @@ impl Protocol {
             Protocol::Telnet => 23,
         }
     }
+}
 
-    /// Parse a protocol name from CLI input.
-    #[allow(clippy::should_implement_trait)]
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "smb" => Some(Protocol::Smb),
-            "ldap" | "ldaps" => Some(Protocol::Ldap),
-            "winrm" => Some(Protocol::WinRm),
-            "wmi" => Some(Protocol::Wmi),
-            "rdp" => Some(Protocol::Rdp),
-            "mssql" => Some(Protocol::Mssql),
-            "ssh" => Some(Protocol::Ssh),
-            "ftp" => Some(Protocol::Ftp),
-            "vnc" => Some(Protocol::Vnc),
-            "nfs" => Some(Protocol::Nfs),
-            "adb" => Some(Protocol::Adb),
-            "network" | "net" | "wifi" => Some(Protocol::Network),
-            "http" => Some(Protocol::Http),
-            "redis" => Some(Protocol::Redis),
-            "postgres" | "postgresql" => Some(Protocol::Postgres),
-            "mysql" => Some(Protocol::Mysql),
-            "snmp" => Some(Protocol::Snmp),
-            "docker" => Some(Protocol::Docker),
-            "dns" => Some(Protocol::Dns),
-            "ipmi" => Some(Protocol::Ipmi),
-            "ilo" | "idrac" | "bmc" => Some(Protocol::Ilo),
-            "kube" | "kubernetes" | "k8s" => Some(Protocol::Kube),
-            "opcua" | "opc" => Some(Protocol::OpcUa),
-            "mqtt" => Some(Protocol::Mqtt),
-            "modbus" => Some(Protocol::Modbus),
-            "exchange" | "ews" => Some(Protocol::Exchange),
-            "telnet" => Some(Protocol::Telnet),
-            _ => None,
-        }
+impl fmt::Display for Protocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
     }
+}
 
-    /// Return all supported protocols.
-    pub fn all() -> Vec<Self> {
-        vec![
-            Protocol::Smb,
-            Protocol::Ldap,
-            Protocol::WinRm,
-            Protocol::Wmi,
-            Protocol::Rdp,
-            Protocol::Mssql,
-            Protocol::Ssh,
-            Protocol::Ftp,
-            Protocol::Vnc,
-            Protocol::Nfs,
-            Protocol::Adb,
-            Protocol::Network,
-            Protocol::Http,
-            Protocol::Redis,
-            Protocol::Postgres,
-            Protocol::Mysql,
-            Protocol::Snmp,
-            Protocol::Docker,
-            Protocol::Dns,
-            Protocol::Ipmi,
-            Protocol::Ilo,
-            Protocol::Kube,
-            Protocol::OpcUa,
-            Protocol::Mqtt,
-            Protocol::Modbus,
-            Protocol::Exchange,
-            Protocol::Telnet,
-        ]
+impl FromStr for Protocol {
+    type Err = ProtocolParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "smb" => Ok(Protocol::Smb),
+            "ldap" | "ldaps" => Ok(Protocol::Ldap),
+            "winrm" => Ok(Protocol::WinRm),
+            "wmi" => Ok(Protocol::Wmi),
+            "rdp" => Ok(Protocol::Rdp),
+            "mssql" => Ok(Protocol::Mssql),
+            "ssh" => Ok(Protocol::Ssh),
+            "ftp" => Ok(Protocol::Ftp),
+            "vnc" => Ok(Protocol::Vnc),
+            "nfs" => Ok(Protocol::Nfs),
+            "adb" => Ok(Protocol::Adb),
+            "network" | "net" | "wifi" => Ok(Protocol::Network),
+            "http" => Ok(Protocol::Http),
+            "redis" => Ok(Protocol::Redis),
+            "postgres" | "postgresql" => Ok(Protocol::Postgres),
+            "mysql" => Ok(Protocol::Mysql),
+            "snmp" => Ok(Protocol::Snmp),
+            "docker" => Ok(Protocol::Docker),
+            "dns" => Ok(Protocol::Dns),
+            "ipmi" => Ok(Protocol::Ipmi),
+            "ilo" | "idrac" | "bmc" => Ok(Protocol::Ilo),
+            "kube" | "kubernetes" | "k8s" => Ok(Protocol::Kube),
+            "opcua" | "opc" => Ok(Protocol::OpcUa),
+            "mqtt" => Ok(Protocol::Mqtt),
+            "modbus" => Ok(Protocol::Modbus),
+            "exchange" | "ews" => Ok(Protocol::Exchange),
+            "telnet" => Ok(Protocol::Telnet),
+            _ => Err(ProtocolParseError(s.to_owned())),
+        }
     }
 }

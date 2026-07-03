@@ -46,7 +46,7 @@ impl NxcTool for ProtocolTool {
         let protocol_name = args["protocol"].as_str().context("Missing protocol")?;
         let targets_list = args["targets"].as_array().context("Missing targets list")?;
 
-        let protocol_enum = Protocol::from_str(protocol_name).context("Unsupported protocol")?;
+        let protocol_enum = protocol_name.parse::<Protocol>().context("Unsupported protocol")?;
 
         let mut targets = Vec::new();
         for t in targets_list {

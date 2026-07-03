@@ -11,5 +11,5 @@ workspace = true
 tokio = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
-dashmap = "6"
+dashmap = { workspace = true }
 rand = { workspace = true }
