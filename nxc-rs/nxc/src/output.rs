@@ -54,7 +54,7 @@ impl NxcOutput {
     }
 
     /// `[◈]` informational display — blue.
-    pub fn display(&self, msg: &str) {
+    pub fn _display(&self, msg: &str) {
         println!("{} {} {}", self.prefix(), "◈".bold().blue(), msg);
     }
 
@@ -80,12 +80,12 @@ impl NxcOutput {
     }
 
     /// Highlighted important message — yellow.
-    pub fn highlight(&self, msg: &str) {
+    pub fn _highlight(&self, msg: &str) {
         println!("{} {}", self.prefix(), msg.bold().yellow());
     }
 
     /// `[!]` error — red bold.
-    pub fn error(&self, msg: &str) {
+    pub fn _error(&self, msg: &str) {
         eprintln!("{} {} {}", self.prefix(), "⚠".bold().red(), msg.red());
     }
 }
@@ -161,7 +161,7 @@ impl NxcGlobalOutput {
         println!("{} {}", "🕷".bold().blue(), msg);
     }
 
-    pub fn success(msg: &str) {
+    pub fn _success(msg: &str) {
         println!("{} {}", "✔".bold().green(), msg);
     }
 
