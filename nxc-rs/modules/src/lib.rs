@@ -157,6 +157,43 @@ pub struct ModuleOption {
 /// Parsed module options from `-o KEY=VALUE` flags.
 pub type ModuleOptions = HashMap<String, String>;
 
+// ─── Module Options Ext ─────────────────────────────────────────
+
+/// Helper trait for easily parsing typed values out of `ModuleOptions`.
+pub trait ModuleOptionsExt {
+    /// Get a string option, falling back to a default value.
+    fn get_string(&self, key: &str, default: &str) -> String;
+    
+    /// Get a boolean option, falling back to a default value.
+    fn get_bool(&self, key: &str, default: bool) -> bool;
+    
+    /// Get an unsigned 16-bit integer option, falling back to a default value.
+    fn get_u16(&self, key: &str, default: u16) -> u16;
+}
+
+impl ModuleOptionsExt for ModuleOptions {
+    fn get_string(&self, key: &str, default: &str) -> String {
+        self.get(key).cloned().unwrap_or_else(|| default.to_string())
+    }
+
+    fn get_bool(&self, key: &str, default: bool) -> bool {
+        self.get(key)
+            .map(|s| s.to_lowercase())
+            .and_then(|v| match v.as_str() {
+                "true" | "1" | "yes" | "y" => Some(true),
+                "false" | "0" | "no" | "n" => Some(false),
+                _ => v.parse::<bool>().ok(),
+            })
+            .unwrap_or(default)
+    }
+
+    fn get_u16(&self, key: &str, default: u16) -> u16 {
+        self.get(key)
+            .and_then(|v| v.parse::<u16>().ok())
+            .unwrap_or(default)
+    }
+}
+
 /// Result returned by [`NxcModule::run`] after module execution.
 ///
 /// Contains the success status, human-readable output, structured
