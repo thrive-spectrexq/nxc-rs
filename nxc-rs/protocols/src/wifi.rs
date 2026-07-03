@@ -228,40 +228,40 @@ impl NxcProtocol for WifiProtocol {
 
         if self.scan {
             match self.scan_networks().await {
-                Ok(out) => final_message.push_str(&format!("\n[WiFi Scan Results]\n{}\n", out)),
+                Ok(out) => final_message.push_str(&format!("\n[WiFi Scan Results]\n{out}\n")),
                 Err(e) => {
                     success = false;
-                    final_message.push_str(&format!("\n[WiFi Scan Error] {}\n", e));
+                    final_message.push_str(&format!("\n[WiFi Scan Error] {e}\n"));
                 }
             }
         }
 
         if let Some(ref ssid) = self.connect {
             match self.connect_ssid(ssid).await {
-                Ok(out) => final_message.push_str(&format!("\n[WiFi Connect Result]\n{}\n", out)),
+                Ok(out) => final_message.push_str(&format!("\n[WiFi Connect Result]\n{out}\n")),
                 Err(e) => {
                     success = false;
-                    final_message.push_str(&format!("\n[WiFi Connect Error] {}\n", e));
+                    final_message.push_str(&format!("\n[WiFi Connect Error] {e}\n"));
                 }
             }
         }
 
         if self.devices {
             match self.sweep_devices().await {
-                Ok(out) => final_message.push_str(&format!("\n[ARP Sweep Results]\n{}\n", out)),
+                Ok(out) => final_message.push_str(&format!("\n[ARP Sweep Results]\n{out}\n")),
                 Err(e) => {
                     success = false;
-                    final_message.push_str(&format!("\n[ARP Sweep Error] {}\n", e));
+                    final_message.push_str(&format!("\n[ARP Sweep Error] {e}\n"));
                 }
             }
         }
 
         if self.profiles {
             match self.list_profiles().await {
-                Ok(out) => final_message.push_str(&format!("\n[WiFi Profiles]\n{}\n", out)),
+                Ok(out) => final_message.push_str(&format!("\n[WiFi Profiles]\n{out}\n")),
                 Err(e) => {
                     success = false;
-                    final_message.push_str(&format!("\n[WiFi Profiles Error] {}\n", e));
+                    final_message.push_str(&format!("\n[WiFi Profiles Error] {e}\n"));
                 }
             }
         }
@@ -269,7 +269,7 @@ impl NxcProtocol for WifiProtocol {
         if self.dump {
             match self.dump_profiles().await {
                 Ok(out) => {
-                    final_message.push_str(&format!("\n[WiFi Profile Dump]\n{}\n", out));
+                    final_message.push_str(&format!("\n[WiFi Profile Dump]\n{out}\n"));
                     // Because a dump is typically an administrative win context in offensive tooling,
                     // we'll flag it as admin if we successfully dumped any keys (though netsh wlan doesn't
                     // strictly require SYSTEM, just local user access for their own profiles)
@@ -277,7 +277,7 @@ impl NxcProtocol for WifiProtocol {
                 }
                 Err(e) => {
                     success = false;
-                    final_message.push_str(&format!("\n[WiFi Dump Error] {}\n", e));
+                    final_message.push_str(&format!("\n[WiFi Dump Error] {e}\n"));
                 }
             }
         }
