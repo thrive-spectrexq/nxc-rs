@@ -21,10 +21,10 @@ serde_json = { workspace = true }
 ldap3 = { workspace = true }
 chrono = { workspace = true }
 hex = { workspace = true }
-bytes = "1.11.1"
+bytes = { workspace = true }
 reqwest = { workspace = true, features = ["multipart"] }
 zip = "8.5"
-base64 = "0.22"
+base64 = { workspace = true }
 uuid = { workspace = true }
 rhai = { version = "1.25", features = ["sync"] }
 ssh2 = { workspace = true }

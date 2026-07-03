@@ -1,7 +1,11 @@
 [package]
 name = "nxc-c2"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
+description = "NetExec-RS C2 module"
+
+[lints]
+workspace = true
 
 [dependencies]
 tokio = { workspace = true }

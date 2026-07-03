@@ -370,7 +370,7 @@ async fn main() -> Result<()> {
 
     // ── Display results ──
     let port = sub_matches.get_one::<u16>("port").copied().unwrap_or_else(|| {
-        Protocol::from_str(protocol_name).map(|p| p.default_port()).unwrap_or(0)
+        protocol_name.parse::<Protocol>().map(|p| p.default_port()).unwrap_or(0)
     });
 
     for result in &results {

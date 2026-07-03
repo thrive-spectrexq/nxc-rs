@@ -1,3 +1,15 @@
+//! Session management for nxc-rs
+//! 
+//! Handles caching, storing, and tracking of network execution sessions 
+//! across different protocols and targets.
+
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::uninlined_format_args,
+    clippy::redundant_closure
+)]
+
 use anyhow::Result;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};

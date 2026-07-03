@@ -1,3 +1,15 @@
+//! C2 backend infrastructure for nxc-rs
+//! 
+//! Provides traits and implementations for connecting to and interacting with 
+//! Command and Control (C2) frameworks like Sliver.
+
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::uninlined_format_args,
+    clippy::redundant_closure
+)]
+
 use async_trait::async_trait;
 use serde_json::Value;
 

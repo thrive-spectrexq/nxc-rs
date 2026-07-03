@@ -4,11 +4,14 @@ version.workspace = true
 edition.workspace = true
 description = "Distributed session cache and orchestration engine for NetExec-RS"
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow.workspace = true
 serde.workspace = true
 tokio = { workspace = true, features = ["full"] }
-dashmap = "6.2"
-uuid = { version = "1.23", features = ["v4"] }
+dashmap = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 async-trait.workspace = true
 tracing.workspace = true

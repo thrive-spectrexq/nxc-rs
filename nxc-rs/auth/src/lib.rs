@@ -39,6 +39,22 @@ pub enum AuthMethod {
     Guest,
 }
 
+impl fmt::Display for AuthMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Password => write!(f, "password"),
+            Self::NtHash => write!(f, "NT hash"),
+            Self::LmNtHash => write!(f, "LM/NT hash"),
+            Self::KerberosTgt => write!(f, "Kerberos TGT"),
+            Self::KerberosTgs => write!(f, "Kerberos TGS"),
+            Self::Certificate => write!(f, "certificate"),
+            Self::AesKey => write!(f, "AES key"),
+            Self::NullSession => write!(f, "null session"),
+            Self::Guest => write!(f, "guest"),
+        }
+    }
+}
+
 /// Credentials container — zeroized on drop for security.
 #[derive(Debug, Clone, Serialize, Deserialize, Zeroize, Default)]
 #[zeroize(drop)]
@@ -55,101 +71,88 @@ pub struct Credentials {
     pub use_kerberos: bool,
 }
 
+impl fmt::Display for Credentials {
+    /// Formats a safe representation: `domain\username (auth_method)`.
+    ///
+    /// Passwords, hashes, and keys are **never** included in the output.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let auth = self.auth_method();
+        let user = &self.username;
+        if let Some(domain) = &self.domain {
+            write!(f, "{domain}\\{user} ({auth})")
+        } else {
+            write!(f, "{user} ({auth})")
+        }
+    }
+}
+
 impl Credentials {
     /// Create simple password credentials.
     pub fn password(username: &str, password: &str, domain: Option<&str>) -> Self {
-        Self {
-            domain: domain.map(std::string::ToString::to_string),
-            username: username.to_string(),
-            password: Some(password.to_string()),
-            nt_hash: None,
-            lm_hash: None,
-            aes_128_key: None,
-            aes_256_key: None,
-            ccache_path: None,
-            pfx_path: None,
-            use_kerberos: false,
-        }
+        let mut c = Self::default();
+        c.domain = domain.map(String::from);
+        c.username = username.to_string();
+        c.password = Some(password.to_string());
+        c
     }
 
     /// Create pass-the-hash credentials.
     pub fn nt_hash(username: &str, hash: &str, domain: Option<&str>) -> Self {
-        Self {
-            domain: domain.map(std::string::ToString::to_string),
-            username: username.to_string(),
-            password: None,
-            nt_hash: Some(hash.to_string()),
-            lm_hash: None,
-            aes_128_key: None,
-            aes_256_key: None,
-            ccache_path: None,
-            pfx_path: None,
-            use_kerberos: false,
-        }
+        let mut c = Self::default();
+        c.domain = domain.map(String::from);
+        c.username = username.to_string();
+        c.nt_hash = Some(hash.to_string());
+        c
     }
 
     /// Create AES key credentials (overpass-the-hash).
     pub fn aes_key(username: &str, aes_256: &str, domain: Option<&str>) -> Self {
-        Self {
-            domain: domain.map(std::string::ToString::to_string),
-            username: username.to_string(),
-            password: None,
-            nt_hash: None,
-            lm_hash: None,
-            aes_128_key: None,
-            aes_256_key: Some(aes_256.to_string()),
-            ccache_path: None,
-            pfx_path: None,
-            use_kerberos: false,
-        }
+        let mut c = Self::default();
+        c.domain = domain.map(String::from);
+        c.username = username.to_string();
+        c.aes_256_key = Some(aes_256.to_string());
+        c
     }
 
     /// Create credentials from a ccache file (ticket reuse).
     pub fn ccache(username: &str, path: &str, domain: Option<&str>) -> Self {
-        Self {
-            domain: domain.map(std::string::ToString::to_string),
-            username: username.to_string(),
-            password: None,
-            nt_hash: None,
-            lm_hash: None,
-            aes_128_key: None,
-            aes_256_key: None,
-            ccache_path: Some(path.to_string()),
-            pfx_path: None,
-            use_kerberos: false,
-        }
+        let mut c = Self::default();
+        c.domain = domain.map(String::from);
+        c.username = username.to_string();
+        c.ccache_path = Some(path.to_string());
+        c
     }
 
     /// Create certificate-based credentials.
     pub fn certificate(username: &str, pfx_path: &str, domain: Option<&str>) -> Self {
-        Self {
-            domain: domain.map(std::string::ToString::to_string),
-            username: username.to_string(),
-            password: None,
-            nt_hash: None,
-            lm_hash: None,
-            aes_128_key: None,
-            aes_256_key: None,
-            ccache_path: None,
-            pfx_path: Some(pfx_path.to_string()),
-            use_kerberos: false,
-        }
+        let mut c = Self::default();
+        c.domain = domain.map(String::from);
+        c.username = username.to_string();
+        c.pfx_path = Some(pfx_path.to_string());
+        c
     }
 
     /// Create null session (anonymous) credentials.
     pub fn null_session() -> Self {
-        Self {
-            domain: None,
-            username: String::new(),
-            password: None,
-            nt_hash: None,
-            lm_hash: None,
-            aes_128_key: None,
-            aes_256_key: None,
-            ccache_path: None,
-            pfx_path: None,
-            use_kerberos: false,
-        }
+        Self::default()
+    }
+
+    /// Returns `true` if this represents a null (anonymous) session.
+    pub fn is_null_session(&self) -> bool {
+        self.auth_method() == AuthMethod::NullSession
+    }
+
+    /// Returns `true` if at least one credential field is populated.
+    ///
+    /// Checks `password`, `nt_hash`, `aes_128_key`, `aes_256_key`,
+    /// `ccache_path`, and `pfx_path`.
+    pub fn has_valid_credentials(&self) -> bool {
+        self.password.is_some()
+            || self.nt_hash.is_some()
+            || self.aes_128_key.is_some()
+            || self.aes_256_key.is_some()
+            || self.ccache_path.is_some()
+            || self.pfx_path.is_some()
     }
 
     /// Determine the best auth method based on available credentials.
@@ -198,21 +201,22 @@ impl AuthResult {
             success: false,
             admin: false,
             message: message.to_string(),
-            error_code: code.map(std::string::ToString::to_string),
+            error_code: code.map(String::from),
         }
     }
 }
 
 impl fmt::Display for AuthResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let msg = &self.message;
         if self.success {
             if self.admin {
-                write!(f, "[+] {} (Pwn3d!)", self.message)
+                write!(f, "[+] {msg} (Pwn3d!)")
             } else {
-                write!(f, "[+] {}", self.message)
+                write!(f, "[+] {msg}")
             }
         } else {
-            write!(f, "[-] {}", self.message)
+            write!(f, "[-] {msg}")
         }
     }
 }
