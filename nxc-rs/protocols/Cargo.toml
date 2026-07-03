@@ -15,6 +15,7 @@ tokio-rustls = "0.26"
 rustls-pki-types = "1.0"
 nxc-auth = { path = "../auth" }
 nxc-resilience = { path = "../resilience" }
+nxc-db = { path = "../db" }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }

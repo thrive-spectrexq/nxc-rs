@@ -73,7 +73,7 @@ impl DatabaseBackend for NxcDb {
         spawn_blocking(move || db.add_loot(&l)).await?
     }
 
-    async fn add_share(&self, _share: &crate::backend::ShareInfo) -> Result<i64> {
+    async fn add_share(&self, _share: &crate::ShareInfo) -> Result<i64> {
         // Not currently implemented in NxcDb natively, but we could add it
         Ok(0)
     }

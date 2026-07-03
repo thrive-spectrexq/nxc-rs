@@ -138,11 +138,26 @@ pub struct Loot {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShareInfo {
     pub id: Option<i64>,
-    pub host_id: i64,
+    pub host_id: Option<i64>,
     pub name: String,
+    pub share_type: Option<String>,
     pub remark: Option<String>,
     pub read_access: bool,
     pub write_access: bool,
+}
+
+impl std::fmt::Display for ShareInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let access = match (self.read_access, self.write_access) {
+            (true, true) => "READ, WRITE",
+            (true, false) => "READ",
+            (false, true) => "WRITE",
+            (false, false) => "NO ACCESS",
+        };
+        let share_type = self.share_type.as_deref().unwrap_or("UNKNOWN");
+        let remark = self.remark.as_deref().unwrap_or("");
+        write!(f, "{:<15} {:<10} {:<15} ({access})", self.name, share_type, remark)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

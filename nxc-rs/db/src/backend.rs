@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::{AuthResultEntry, Credential, HostInfo, Loot};
+use crate::{AuthResultEntry, Credential, HostInfo, Loot, ShareInfo};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Vulnerability {
@@ -48,15 +48,6 @@ pub struct OperationsLog {
     pub completed_at: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ShareInfo {
-    pub id: Option<i64>,
-    pub host_id: i64,
-    pub share: String,
-    pub permissions: String,
-    pub remark: String,
-}
-
 #[derive(Debug, Default, Clone)]
 pub struct Stats {
     pub hosts: i64,
@@ -84,7 +75,6 @@ pub trait DatabaseBackend: Send + Sync {
     // Loot
     async fn add_loot(&self, loot: &Loot) -> Result<i64>;
 
-    // Shares
     async fn add_share(&self, share: &ShareInfo) -> Result<i64>;
 
     // Workspaces

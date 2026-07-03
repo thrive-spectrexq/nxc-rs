@@ -4,14 +4,11 @@
 //! Boot Key, NT hashes, and LSA secrets.
 
 use anyhow::{anyhow, Result};
-use hmac::Hmac;
 use md5::{Digest, Md5};
 use nt_hive::{Hive, KeyNode, KeyValue};
 use rc4::{KeyInit, Rc4, StreamCipher};
-use sha2::Sha256;
 
-#[allow(dead_code)]
-type HmacSha256 = Hmac<Sha256>;
+
 
 /// Registry Secret Extractor
 pub struct RegistrySecrets;

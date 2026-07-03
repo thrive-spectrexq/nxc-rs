@@ -2945,6 +2945,7 @@ dependencies = [
  "mysql_async",
  "native-tls",
  "nxc-auth",
+ "nxc-db",
  "nxc-resilience",
  "opcua",
  "rand 0.10.2",
