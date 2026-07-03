@@ -123,26 +123,7 @@ impl NxcSession for SmbSession {
 
 // ─── SMB Share Info ─────────────────────────────────────────────
 
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct ShareInfo {
-    pub name: String,
-    pub share_type: String,
-    pub remark: String,
-    pub read_access: bool,
-    pub write_access: bool,
-}
-
-impl std::fmt::Display for ShareInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let access = match (self.read_access, self.write_access) {
-            (true, true) => "READ, WRITE",
-            (true, false) => "READ",
-            (false, true) => "WRITE",
-            (false, false) => "NO ACCESS",
-        };
-        write!(f, "{:<15} {:<10} {:<15} ({})", self.name, self.share_type, self.remark, access)
-    }
-}
+pub use nxc_db::ShareInfo;
 
 // ─── SMB File Info ─────────────────────────────────────────────
 
@@ -269,9 +250,11 @@ impl SmbProtocol {
         for share in &common_shares {
             if self.tree_connect(session, share).await.is_ok() {
                 shares.push(ShareInfo {
+                    id: None,
+                    host_id: None,
                     name: share.to_string(),
-                    share_type: "DISK".to_string(),
-                    remark: "".to_string(),
+                    share_type: Some("DISK".to_string()),
+                    remark: Some("".to_string()),
                     read_access: true,
                     write_access: share.ends_with('$') && share != &"IPC$",
                 });
@@ -861,19 +844,16 @@ impl SmbProtocol {
         }
 
         for i in 0..names.len().min(entry_types.len()) {
-            let type_str = match entry_types[i] & 0x0FFFFFFF {
-                0x00000000 => "DISK",
-                0x00000001 => "PRINT",
-                0x00000002 => "DEVICE",
-                0x00000003 => "IPC",
-                _ => "UNKNOWN",
-            };
-            let name = &names[i];
-            shares.push(ShareInfo {
-                name: name.clone(),
-                share_type: type_str.to_string(),
-                remark: remarks.get(i).cloned().unwrap_or_default(),
-                read_access: false, // Will be checked via TreeConnect
+            let netname = names[i].clone();
+            let stype = entry_types[i];
+            let remark = remarks.get(i).cloned().unwrap_or_default();
+            shares.push(nxc_db::ShareInfo {
+                id: None,
+                host_id: None,
+                name: netname,
+                share_type: Some(format!("0x{stype:08x}")),
+                remark: Some(remark),
+                read_access: false, // Updated by caller later
                 write_access: false,
             });
         }

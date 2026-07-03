@@ -400,3 +400,40 @@ impl MssqlProtocol {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn test_mssql_protocol_config() {
+        let proto = MssqlProtocol::new();
+        assert_eq!(proto.timeout, Duration::from_secs(10));
+        let proto2 = MssqlProtocol::with_timeout(Duration::from_secs(30));
+        assert_eq!(proto2.timeout, Duration::from_secs(30));
+    }
+
+    #[test]
+    fn test_mssql_protocol_traits() {
+        let proto = MssqlProtocol::new();
+        assert_eq!(proto.name(), "mssql");
+        assert_eq!(proto.default_port(), 1433);
+        assert!(proto.supports_exec());
+        assert!(proto.supported_modules().contains(&"mssql_enum"));
+    }
+
+    #[test]
+    fn test_mssql_session() {
+        let sess = MssqlSession {
+            target: "127.0.0.1".to_string(),
+            port: 1433,
+            admin: true,
+            credentials: None,
+            proxy: None,
+        };
+        assert_eq!(sess.protocol(), "mssql");
+        assert_eq!(sess.target(), "127.0.0.1");
+        assert!(sess.is_admin());
+    }
+}

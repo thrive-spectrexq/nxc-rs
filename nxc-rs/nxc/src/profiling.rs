@@ -14,8 +14,8 @@ pub struct MemorySnapshot {
     /// Virtual memory size in bytes (if available).
     pub vms_bytes: Option<u64>,
     /// Timestamp of the snapshot.
-    #[allow(dead_code)]
-    pub timestamp: std::time::Instant,
+
+    pub _timestamp: std::time::Instant,
 }
 
 /// Capture a memory snapshot of the current process.
@@ -25,7 +25,7 @@ pub struct MemorySnapshot {
 pub fn capture_memory_snapshot() -> MemorySnapshot {
     let (rss, vms) = get_process_memory();
 
-    MemorySnapshot { rss_bytes: rss, vms_bytes: vms, timestamp: std::time::Instant::now() }
+    MemorySnapshot { rss_bytes: rss, vms_bytes: vms, _timestamp: std::time::Instant::now() }
 }
 
 /// Log the current memory usage.
@@ -99,8 +99,8 @@ impl ScopedTimer {
     }
 
     /// Get the elapsed time.
-    #[allow(dead_code)]
-    pub fn elapsed(&self) -> std::time::Duration {
+
+    pub fn _elapsed(&self) -> std::time::Duration {
         self.start.elapsed()
     }
 }
@@ -128,7 +128,7 @@ mod tests {
     fn test_scoped_timer() {
         let timer = ScopedTimer::new("test_op");
         std::thread::sleep(std::time::Duration::from_millis(10));
-        assert!(timer.elapsed().as_millis() >= 10);
+        assert!(timer._elapsed().as_millis() >= 10);
         // Timer logs on drop
     }
 }

@@ -71,8 +71,9 @@ impl NxcModule for EnumShares {
         for share in shares {
             let read = if share.read_access { "READ" } else { "" };
             let write = if share.write_access { "WRITE" } else { "" };
+            let remark_str = share.remark.as_deref().unwrap_or("");
             output_lines
-                .push(format!("{:<15} {:<10} {:<10} {}", share.name, read, write, share.remark));
+                .push(format!("{:<15} {:<10} {:<10} {}", share.name, read, write, remark_str));
 
             share_data.push(serde_json::json!({
                 "name": share.name,

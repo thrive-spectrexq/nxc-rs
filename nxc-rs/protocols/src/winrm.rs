@@ -561,8 +561,8 @@ $k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
     }
 
     /// Perform WS-Trust / SAML authentication over WinRM
-    #[allow(dead_code)]
-    async fn authenticate_wstrust(
+
+    async fn _authenticate_wstrust(
         &self,
         winrm_sess: &mut WinrmSession,
         creds: &Credentials,
@@ -599,6 +599,66 @@ $k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
                 None,
             ))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn test_winrm_protocol_config() {
+        let proto = WinrmProtocol::new()
+            .with_timeout(Duration::from_secs(42))
+            .with_verify_ssl(true);
+        assert_eq!(proto.timeout, Duration::from_secs(42));
+        assert!(proto.verify_ssl);
+    }
+
+    #[test]
+    fn test_build_url() {
+        let proto = WinrmProtocol::new();
+        assert_eq!(proto.build_url("127.0.0.1", 5985), "http://127.0.0.1:5985/wsman");
+        assert_eq!(proto.build_url("127.0.0.1", 5986), "https://127.0.0.1:5986/wsman");
+        assert_eq!(proto.build_url("dc01.local", 1234), "http://dc01.local:1234/wsman");
+    }
+
+    #[test]
+    fn test_build_soap_messages() {
+        let proto = WinrmProtocol::new();
+        let create = proto.build_create_shell_soap();
+        assert!(create.contains("http://schemas.xmlsoap.org/ws/2004/09/transfer/Create"));
+        assert!(create.contains("WINRS_NOPROFILE"));
+
+        let cmd = proto.build_command_soap("shell-123", "whoami");
+        assert!(cmd.contains("<w:Selector Name=\"ShellId\">shell-123</w:Selector>"));
+        assert!(cmd.contains("<rsp:Command>\"whoami\"</rsp:Command>"));
+
+        let receive = proto.build_receive_soap("shell-123", "cmd-456");
+        assert!(receive.contains("CommandId=\"cmd-456\""));
+
+        let delete = proto.build_delete_shell_soap("shell-123");
+        assert!(delete.contains("http://schemas.xmlsoap.org/ws/2004/09/transfer/Delete"));
+    }
+
+    #[test]
+    fn test_extract_xml_tag() {
+        let proto = WinrmProtocol::new();
+        let xml = r#"<rsp:ShellId>foo-bar-baz</rsp:ShellId>"#;
+        assert_eq!(proto.extract_xml_tag(xml, "rsp:ShellId").unwrap(), "foo-bar-baz");
+
+        let xml_nested = r#"<rsp:Response><rsp:CommandId>cmd-123</rsp:CommandId></rsp:Response>"#;
+        assert_eq!(proto.extract_xml_tag(xml_nested, "rsp:CommandId").unwrap(), "cmd-123");
+    }
+
+    #[test]
+    fn test_prepend_bypass() {
+        let proto = WinrmProtocol::new();
+        let cmd = "powershell -c whoami";
+        let bypassed = proto.prepend_bypass(cmd);
+        assert!(bypassed.starts_with("powershell -c \"$md = "));
+        assert!(bypassed.contains("whoami\""));
     }
 }
 

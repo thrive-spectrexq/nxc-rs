@@ -301,3 +301,40 @@ impl NxcProtocol for RdpProtocol {
         Err(anyhow!("RDP explicit command execution requires injected GUI input (not yet ported)."))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn test_rdp_protocol_config() {
+        let proto = RdpProtocol::new();
+        assert_eq!(proto.timeout, Duration::from_secs(10));
+        let proto2 = RdpProtocol::with_timeout(Duration::from_secs(20));
+        assert_eq!(proto2.timeout, Duration::from_secs(20));
+    }
+
+    #[test]
+    fn test_rdp_protocol_traits() {
+        let proto = RdpProtocol::new();
+        assert_eq!(proto.name(), "rdp");
+        assert_eq!(proto.default_port(), 3389);
+        assert!(proto.supports_exec());
+        assert!(proto.supported_modules().contains(&"rdp_sec_check"));
+    }
+
+    #[test]
+    fn test_rdp_session() {
+        let sess = RdpSession {
+            target: "10.0.0.5".to_string(),
+            port: 3389,
+            is_nla: true,
+            admin: false,
+        };
+        assert_eq!(sess.protocol(), "rdp");
+        assert_eq!(sess.target(), "10.0.0.5");
+        assert!(!sess.is_admin());
+    }
+}
+

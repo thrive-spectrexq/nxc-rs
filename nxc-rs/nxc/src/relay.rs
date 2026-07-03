@@ -11,16 +11,16 @@ use tracing::{debug, error, info, warn};
 
 /// Captured NTLM hash from a relayed authentication.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+
 pub struct CapturedHash {
     /// Source IP of the authenticating client.
-    pub client_ip: String,
+    pub _client_ip: String,
     /// NTLM username extracted from the Type 3 message.
-    pub username: String,
+    pub _username: String,
     /// NTLM domain extracted from the Type 3 message.
-    pub domain: String,
+    pub _domain: String,
     /// The full NTLMv2 hash in `user::domain:challenge:nt_proof:blob` format.
-    pub hash_string: String,
+    pub _hash_string: String,
 }
 
 /// NTLM Relay server configuration.
@@ -53,8 +53,8 @@ impl RelayServer {
     }
 
     /// Create a capture-only relay on the given address.
-    #[allow(dead_code)]
-    pub fn capture_only(bind_addr: &str) -> Self {
+
+    pub fn _capture_only(bind_addr: &str) -> Self {
         Self::new(RelayConfig {
             bind_addr: bind_addr.to_string(),
             relay_target: None,
@@ -63,8 +63,8 @@ impl RelayServer {
     }
 
     /// Get all captured hashes so far.
-    #[allow(dead_code)]
-    pub async fn captured_hashes(&self) -> Vec<CapturedHash> {
+
+    pub async fn _captured_hashes(&self) -> Vec<CapturedHash> {
         self.captured.lock().await.clone()
     }
 
@@ -290,10 +290,10 @@ async fn handle_http_ntlm(
                                 match extract_type3_info(&ntlm_bytes, challenge) {
                                     Ok((username, domain, hash_str)) => {
                                         let hash = CapturedHash {
-                                            client_ip: client_ip.to_string(),
-                                            username: username.clone(),
-                                            domain: domain.clone(),
-                                            hash_string: hash_str.clone(),
+                                            _client_ip: client_ip.to_string(),
+                                            _username: username.clone(),
+                                            _domain: domain.clone(),
+                                            _hash_string: hash_str.clone(),
                                         };
 
                                         info!(

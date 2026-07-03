@@ -15,7 +15,7 @@ pub struct NxcOutput {
     pub hostname: String,
 }
 
-#[allow(dead_code)]
+
 impl NxcOutput {
     pub fn new(protocol: &str, host: &str, port: u16, hostname: Option<&str>) -> Self {
         Self {
@@ -99,7 +99,7 @@ impl fmt::Display for NxcOutput {
 /// Global-level output (not tied to a specific connection).
 pub struct NxcGlobalOutput;
 
-#[allow(dead_code)]
+
 impl NxcGlobalOutput {
     pub fn banner(version: &str, codename: &str) {
         let spider = format!(
