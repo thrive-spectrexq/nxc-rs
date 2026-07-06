@@ -2679,9 +2679,9 @@ dependencies = [
 
 [[package]]
 name = "num-bigint"
-version = "0.4.7"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c863e9ab5e7bf9c99ba75e1050f1e4d624ae87ed3532d6238ffbdc7b585dbbe6"
+checksum = "c89e69e7e0f03bea5ef08013795c25018e101932225a656383bd384495ecc367"
 dependencies = [
  "num-integer",
  "num-traits",
@@ -2735,7 +2735,7 @@ dependencies = [
 
 [[package]]
 name = "nxc"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2767,7 +2767,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-ai"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2787,7 +2787,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-auth"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "aes",
  "aes-kw",
@@ -2825,7 +2825,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-c2"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2837,7 +2837,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-db"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2856,7 +2856,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-modules"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2883,7 +2883,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-protocols"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "aes",
  "anyhow",
@@ -2929,7 +2929,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-resilience"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "dashmap",
@@ -2940,7 +2940,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-sessions"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2953,7 +2953,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-targets"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2976,7 +2976,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-tests"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
