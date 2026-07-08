@@ -525,9 +525,9 @@ checksum = "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495"
 
 [[package]]
 name = "bytes"
-version = "1.12.0"
+version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ae3f5d315924270530207e2a68396c3cc547f6dca3fbdca317cfb1a51edb593"
+checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "bzip2"
@@ -2735,7 +2735,7 @@ dependencies = [
 
 [[package]]
 name = "nxc"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2767,7 +2767,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-ai"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2787,7 +2787,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-auth"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "aes",
  "aes-kw",
@@ -2825,7 +2825,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-c2"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2837,7 +2837,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-db"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2856,7 +2856,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-modules"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2883,7 +2883,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-protocols"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "aes",
  "anyhow",
@@ -2929,7 +2929,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-resilience"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "dashmap",
@@ -2940,7 +2940,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-sessions"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2953,7 +2953,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-targets"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2976,7 +2976,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-tests"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "async-trait",
