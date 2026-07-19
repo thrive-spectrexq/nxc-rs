@@ -283,14 +283,15 @@ impl NxcDb {
     // ── Host operations ──
     pub fn upsert_host(&self, host: &HostInfo) -> Result<i64> {
         let conn = self.pool.get()?;
-        conn.execute(
+        let id: i64 = conn.query_row(
             "INSERT INTO nxc_hosts (workspace, ip, hostname, domain, os, os_version, smb_signing, signing_req, dc, first_seen, last_seen)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
              ON CONFLICT(workspace, ip) DO UPDATE SET
                 hostname = COALESCE(excluded.hostname, hostname),
                 domain = COALESCE(excluded.domain, domain),
                 os = COALESCE(excluded.os, os),
-                last_seen = excluded.last_seen",
+                last_seen = excluded.last_seen
+             RETURNING id",
             rusqlite::params![
                 host.workspace, host.ip, host.hostname, host.domain,
                 host.os, host.os_version,
@@ -299,8 +300,9 @@ impl NxcDb {
                 host.is_dc as i32,
                 host.first_seen, host.last_seen
             ],
+            |row| row.get(0)
         )?;
-        Ok(conn.last_insert_rowid())
+        Ok(id)
     }
 
     pub fn list_hosts(&self) -> Result<Vec<HostInfo>> {
