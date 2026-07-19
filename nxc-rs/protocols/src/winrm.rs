@@ -579,7 +579,6 @@ $k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
     }
 
     /// Perform WS-Trust / SAML authentication over WinRM
-
     async fn _authenticate_wstrust(
         &self,
         winrm_sess: &mut WinrmSession,

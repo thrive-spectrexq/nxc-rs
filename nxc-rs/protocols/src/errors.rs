@@ -602,8 +602,7 @@ mod tests {
     fn from_addr_parse_error() {
         let parse_err: std::net::AddrParseError = "not-an-ip"
             .parse::<std::net::IpAddr>()
-            .err()
-            .expect("test setup: should fail to parse");
+            .expect_err("test setup: should fail to parse");
         let err = ProtocolError::from(parse_err);
         assert!(matches!(err, ProtocolError::Generic(_)));
     }

@@ -71,7 +71,7 @@ impl WifiProtocol {
 
         if !output.status.success() {
             let error_msg = if !stderr.is_empty() { stderr } else { stdout };
-            return Err(anyhow!("Scan failed: {}", error_msg));
+            return Err(anyhow!("Scan failed: {error_msg}"));
         }
 
         Ok(stdout)
@@ -80,7 +80,7 @@ impl WifiProtocol {
     /// Connect to a specific SSID using `netsh wlan connect name="..."`
     async fn connect_ssid(&self, ssid: &str) -> Result<String> {
         let output = tokio::process::Command::new("netsh")
-            .args(["wlan", "connect", &format!("name={}", ssid)])
+            .args(["wlan", "connect", &format!("name={ssid}")])
             .output()
             .await?;
 
@@ -89,7 +89,7 @@ impl WifiProtocol {
 
         if !output.status.success() {
             let error_msg = if !stderr.is_empty() { stderr } else { stdout };
-            return Err(anyhow!("Connect failed: {}", error_msg));
+            return Err(anyhow!("Connect failed: {error_msg}"));
         }
 
         Ok(stdout)
@@ -104,7 +104,7 @@ impl WifiProtocol {
 
         if !output.status.success() {
             let error_msg = if !stderr.is_empty() { stderr } else { stdout };
-            return Err(anyhow!("Device sweep failed: {}", error_msg));
+            return Err(anyhow!("Device sweep failed: {error_msg}"));
         }
 
         Ok(stdout)
@@ -122,7 +122,7 @@ impl WifiProtocol {
 
         if !output.status.success() {
             let error_msg = if !stderr.is_empty() { stderr } else { stdout };
-            return Err(anyhow!("List profiles failed: {}", error_msg));
+            return Err(anyhow!("List profiles failed: {error_msg}"));
         }
 
         Ok(stdout)
@@ -150,7 +150,7 @@ impl WifiProtocol {
                             "wlan",
                             "show",
                             "profile",
-                            &format!("name={}", profile_name),
+                            &format!("name={profile_name}"),
                             "key=clear",
                         ])
                         .output()
@@ -171,7 +171,7 @@ impl WifiProtocol {
                         }
 
                         dumped_credentials
-                            .push_str(&format!("{:<30} : {}\n", profile_name, password));
+                            .push_str(&format!("{profile_name:<30} : {password}\n"));
                     }
                 }
             }
