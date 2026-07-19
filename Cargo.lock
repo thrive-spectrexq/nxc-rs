@@ -2732,7 +2732,7 @@ dependencies = [
 
 [[package]]
 name = "nxc"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2764,7 +2764,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-ai"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2784,7 +2784,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-auth"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "aes",
  "aes-kw",
@@ -2822,7 +2822,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-c2"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2834,7 +2834,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-db"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2853,7 +2853,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-modules"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2880,7 +2880,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-protocols"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "aes",
  "anyhow",
@@ -2926,7 +2926,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-resilience"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "dashmap",
@@ -2937,7 +2937,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-sessions"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2950,7 +2950,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-targets"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2973,7 +2973,7 @@ dependencies = [
 
 [[package]]
 name = "nxc-tests"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "async-trait",

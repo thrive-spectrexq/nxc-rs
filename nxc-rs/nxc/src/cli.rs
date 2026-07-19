@@ -373,7 +373,7 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
     let mut creds = Vec::new();
 
     let mut usernames: Vec<String> = Vec::new();
-    if let Some(vals) = matches.get_many::<String>("username") {
+    if let Some(vals) = matches.try_get_many::<String>("username").unwrap_or(None) {
         for val in vals {
             if std::path::Path::new(val).exists() {
                 if let Ok(content) = std::fs::read_to_string(val) {
@@ -388,7 +388,7 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
     }
 
     let mut passwords: Vec<String> = Vec::new();
-    if let Some(vals) = matches.get_many::<String>("password") {
+    if let Some(vals) = matches.try_get_many::<String>("password").unwrap_or(None) {
         for val in vals {
             if std::path::Path::new(val).exists() {
                 if let Ok(content) = std::fs::read_to_string(val) {
@@ -403,7 +403,7 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
     }
 
     let mut hashes: Vec<String> = Vec::new();
-    if let Some(vals) = matches.get_many::<String>("hash") {
+    if let Some(vals) = matches.try_get_many::<String>("hash").unwrap_or(None) {
         for val in vals {
             if std::path::Path::new(val).exists() {
                 if let Ok(content) = std::fs::read_to_string(val) {
@@ -417,8 +417,8 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
         }
     }
 
-    let no_bruteforce = matches.get_flag("no-bruteforce");
-    let use_kerberos = matches.get_flag("kerberos");
+    let no_bruteforce = matches.try_get_one::<bool>("no-bruteforce").unwrap_or(None).copied().unwrap_or(false);
+    let use_kerberos = matches.try_get_one::<bool>("kerberos").unwrap_or(None).copied().unwrap_or(false);
 
     // If no credentials provided, use null session
     if usernames.is_empty() && passwords.is_empty() && hashes.is_empty() {

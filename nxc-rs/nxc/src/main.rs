@@ -98,7 +98,7 @@ async fn main() -> Result<()> {
     };
 
     // ── Handle --list-modules ──
-    if sub_matches.get_flag("list-modules") {
+    if sub_matches.try_get_one::<bool>("list-modules").unwrap_or(None).copied().unwrap_or(false) {
         let registry = ModuleRegistry::new();
         let modules = registry.list(Some(protocol_name));
         if modules.is_empty() {
@@ -126,7 +126,8 @@ async fn main() -> Result<()> {
 
     // ── Parse targets ──
     let target_specs: Vec<&str> = sub_matches
-        .get_many::<String>("target")
+        .try_get_many::<String>("target")
+        .unwrap_or(None)
         .map(|vals| vals.map(std::string::String::as_str).collect())
         .unwrap_or_default();
 
@@ -141,8 +142,13 @@ async fn main() -> Result<()> {
     }
 
     if all_targets.is_empty() {
-        NxcGlobalOutput::error("No valid targets specified");
-        return Ok(());
+        if protocol_name == "network" || protocol_name == "ai" {
+            // Provide a dummy target so the ExecutionEngine fires at least once
+            all_targets.push(nxc_targets::Target::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1))));
+        } else {
+            NxcGlobalOutput::error("No valid targets specified");
+            return Ok(());
+        }
     }
 
     // ── Build credentials ──
@@ -157,8 +163,8 @@ async fn main() -> Result<()> {
     let mut shuffle = matches.get_flag("shuffle");
     let proxy = matches.get_one::<String>("proxy").cloned();
     let stealth = matches.get_flag("stealth");
-    let continue_on_success = sub_matches.get_flag("continue-on-success");
-    let no_bruteforce = sub_matches.get_flag("no-bruteforce");
+    let continue_on_success = sub_matches.try_get_one::<bool>("continue-on-success").unwrap_or(None).copied().unwrap_or(false);
+    let no_bruteforce = sub_matches.try_get_one::<bool>("no-bruteforce").unwrap_or(None).copied().unwrap_or(false);
     let profiling_enabled = matches.get_flag("profiling");
     let retries = matches.get_one::<u32>("retries").copied().unwrap_or(3);
     let cb_threshold = matches.get_one::<u32>("cb-threshold").copied().unwrap_or(5);
@@ -184,12 +190,12 @@ async fn main() -> Result<()> {
     // Map protocol-specific flags to modules safely
     match protocol_name {
         "vnc" => {
-            if sub_matches.get_flag("screenshot") && !modules.contains(&"screenshot".to_string()) {
+            if sub_matches.try_get_one::<bool>("screenshot").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"screenshot".to_string()) {
                 modules.push("screenshot".to_string());
             }
         }
         "adb" => {
-            if sub_matches.get_flag("screenshot")
+            if sub_matches.try_get_one::<bool>("screenshot").unwrap_or(None).copied().unwrap_or(false)
                 && !modules.contains(&"adb_screenshot".to_string())
             {
                 modules.push("adb_screenshot".to_string());
@@ -199,37 +205,37 @@ async fn main() -> Result<()> {
             // rdp screenshot module pending
         }
         "ldap" => {
-            if sub_matches.get_flag("gmsa") && !modules.contains(&"gmsa".to_string()) {
+            if sub_matches.try_get_one::<bool>("gmsa").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"gmsa".to_string()) {
                 modules.push("gmsa".to_string());
             }
         }
         "redis" => {
-            if sub_matches.get_flag("info") && !modules.contains(&"redis_info".to_string()) {
+            if sub_matches.try_get_one::<bool>("info").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"redis_info".to_string()) {
                 modules.push("redis_info".to_string());
             }
         }
         "postgres" | "postgresql" => {
-            if sub_matches.get_flag("dbs") && !modules.contains(&"pg_enum".to_string()) {
+            if sub_matches.try_get_one::<bool>("dbs").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"pg_enum".to_string()) {
                 modules.push("pg_enum".to_string());
             }
         }
         "mysql" => {
-            if sub_matches.get_flag("dbs") && !modules.contains(&"mysql_enum".to_string()) {
+            if sub_matches.try_get_one::<bool>("dbs").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"mysql_enum".to_string()) {
                 modules.push("mysql_enum".to_string());
             }
         }
         "snmp" => {
-            if sub_matches.get_flag("enum") && !modules.contains(&"snmp_enum".to_string()) {
+            if sub_matches.try_get_one::<bool>("enum").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"snmp_enum".to_string()) {
                 modules.push("snmp_enum".to_string());
             }
         }
         "docker" => {
-            if sub_matches.get_flag("enum") && !modules.contains(&"docker_enum".to_string()) {
+            if sub_matches.try_get_one::<bool>("enum").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"docker_enum".to_string()) {
                 modules.push("docker_enum".to_string());
             }
         }
         "opcua" => {
-            if sub_matches.get_flag("enum") && !modules.contains(&"opcua_enum".to_string()) {
+            if sub_matches.try_get_one::<bool>("enum").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"opcua_enum".to_string()) {
                 modules.push("opcua_enum".to_string());
             }
         }
@@ -237,7 +243,7 @@ async fn main() -> Result<()> {
     }
 
     let mut module_opts = std::collections::HashMap::new();
-    if let Some(opts) = sub_matches.get_many::<String>("module-options") {
+    if let Some(opts) = sub_matches.try_get_many::<String>("module-options").unwrap_or(None) {
         for opt in opts {
             if let Some((k, v)) = opt.split_once('=') {
                 module_opts.insert(k.to_string(), v.to_string());
@@ -245,7 +251,7 @@ async fn main() -> Result<()> {
         }
     }
 
-    let verify_ssl = sub_matches.get_flag("verify-ssl");
+    let verify_ssl = sub_matches.try_get_one::<bool>("verify-ssl").unwrap_or(None).copied().unwrap_or(false);
 
     let exec_opts = ExecutionOpts {
         threads,
@@ -258,9 +264,9 @@ async fn main() -> Result<()> {
         modules,
         module_opts,
         verify_ssl,
-        gfail_limit: sub_matches.get_one::<u32>("gfail-limit").copied(),
-        ufail_limit: sub_matches.get_one::<u32>("ufail-limit").copied(),
-        fail_limit: sub_matches.get_one::<u32>("fail-limit").copied(),
+        gfail_limit: sub_matches.try_get_one::<u32>("gfail-limit").unwrap_or(None).copied(),
+        ufail_limit: sub_matches.try_get_one::<u32>("ufail-limit").unwrap_or(None).copied(),
+        fail_limit: sub_matches.try_get_one::<u32>("fail-limit").unwrap_or(None).copied(),
     };
 
     // ── Setup Database ──
@@ -311,7 +317,7 @@ async fn main() -> Result<()> {
     ));
 
     // ── Load Credentials from DB if requested ──
-    if sub_matches.get_flag("db-creds") {
+    if sub_matches.try_get_one::<bool>("db-creds").unwrap_or(None).copied().unwrap_or(false) {
         if let Some(ref d) = db {
             match d.list_credentials() {
                 Ok(db_creds) => {
@@ -369,7 +375,7 @@ async fn main() -> Result<()> {
     }
 
     // ── Display results ──
-    let port = sub_matches.get_one::<u16>("port").copied().unwrap_or_else(|| {
+    let port = sub_matches.try_get_one::<u16>("port").unwrap_or(None).copied().unwrap_or_else(|| {
         protocol_name.parse::<Protocol>().map(|p| p.default_port()).unwrap_or(0)
     });
 
@@ -433,14 +439,14 @@ async fn main() -> Result<()> {
     }
 
     // Automated raw result logging if requested
-    if let Some(log_res_path) = sub_matches.get_one::<String>("log-results") {
+    if let Some(log_res_path) = sub_matches.try_get_one::<String>("log-results").unwrap_or(None) {
         if let Err(e) = reporting::export_ndjson(log_res_path, &results) {
             NxcGlobalOutput::warn(&format!("Failed to write results log: {e}"));
         }
     }
 
     // 2. User-requested Exports
-    if let Some(format) = sub_matches.get_one::<String>("export") {
+    if let Some(format) = sub_matches.try_get_one::<String>("export").unwrap_or(None) {
         let mut path = sub_matches
             .get_one::<String>("export-path")
             .ok_or_else(|| anyhow::anyhow!("--export-path is required when using --export"))?
