@@ -51,6 +51,8 @@ pub mod wmi;
 // ─── Core Traits ────────────────────────────────────────────────
 
 /// Trait for an active protocol session.
+///
+/// Implementors of this trait represent a living connection to a remote target.
 pub trait NxcSession: Send + Sync + 'static {
     /// Protocol name for this session.
     fn protocol(&self) -> &'static str;
@@ -75,14 +77,32 @@ impl dyn NxcSession {
 }
 
 /// Output from remote command execution.
+///
+/// Contains standard output, standard error, and the optional exit code of the command.
+///
+/// # Examples
+/// ```
+/// use nxc_protocols::CommandOutput;
+///
+/// let output = CommandOutput {
+///     stdout: "Pinging 1.1.1.1...".to_string(),
+///     stderr: "".to_string(),
+///     exit_code: Some(0),
+/// };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandOutput {
+    /// The standard output of the executed command.
     pub stdout: String,
+    /// The standard error of the executed command.
     pub stderr: String,
+    /// The exit code of the executed command, if available.
     pub exit_code: Option<i32>,
 }
 
 /// Protocol handler trait — implemented once per protocol.
+///
+/// This trait defines the core interface that every protocol module (like SMB, SSH, LDAP) must implement.
 #[async_trait]
 pub trait NxcProtocol: Send + Sync {
     /// Protocol name (e.g. "smb", "ldap", "ssh").

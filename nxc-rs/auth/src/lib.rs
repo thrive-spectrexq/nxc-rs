@@ -56,6 +56,18 @@ impl fmt::Display for AuthMethod {
 }
 
 /// Credentials container — zeroized on drop for security.
+///
+/// Holds the credentials needed for authentication. This struct supports multiple
+/// authentication schemes including password, NTLM hash, AES keys, Kerberos ticket cache,
+/// and certificates.
+///
+/// # Examples
+/// ```
+/// use nxc_auth::Credentials;
+///
+/// let pwd_cred = Credentials::password("admin", "P@ssw0rd123!", Some("CORP"));
+/// let hash_cred = Credentials::nt_hash("admin", "8846f7eaee8fb117ad06bdd830b7586c", Some("CORP"));
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize, Zeroize, Default)]
 #[zeroize(drop)]
 pub struct Credentials {
@@ -178,6 +190,16 @@ impl Credentials {
 // ─── Auth Result Types ──────────────────────────────────────────
 
 /// Result of an authentication attempt.
+///
+/// Contains the status of the authentication attempt along with descriptive messages.
+///
+/// # Examples
+/// ```
+/// use nxc_auth::AuthResult;
+///
+/// let success = AuthResult::success(true); // Administrator access
+/// let failure = AuthResult::failure("Logon failure", Some("STATUS_LOGON_FAILURE"));
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthResult {
     pub success: bool,
@@ -222,8 +244,12 @@ impl fmt::Display for AuthResult {
 }
 
 /// Opaque authenticated session handle.
+///
+/// Contains the session key and administrator status after successful authentication.
 pub struct AuthSession {
+    /// The session key established during authentication.
     pub session_key: Vec<u8>,
+    /// Indicates whether the session has administrative privileges.
     pub is_admin: bool,
 }
 

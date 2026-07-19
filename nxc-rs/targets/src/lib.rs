@@ -66,10 +66,12 @@ pub struct Target {
 }
 
 impl Target {
+    /// Creates a new `Target` from an `IpAddr`.
     pub fn new(ip: IpAddr) -> Self {
         Self { addr: TargetAddr::Ip(ip), hostname: None, port: None }
     }
 
+    /// Creates a new `Target` from a hostname string.
     pub fn from_hostname(hostname: &str) -> Self {
         Self {
             addr: TargetAddr::Hostname(hostname.to_string()),
@@ -276,6 +278,15 @@ pub struct ExecutionEngine {
 }
 
 impl ExecutionEngine {
+    /// Creates a new `ExecutionEngine` with the specified options.
+    ///
+    /// # Examples
+    /// ```
+    /// use nxc_targets::{ExecutionEngine, ExecutionOpts};
+    ///
+    /// let opts = ExecutionOpts::default();
+    /// let engine = ExecutionEngine::new(opts);
+    /// ```
     pub fn new(opts: ExecutionOpts) -> Self {
         let manager =
             ConnectionManager::new().with_timeout_manager(nxc_resilience::TimeoutManager {
@@ -286,6 +297,7 @@ impl ExecutionEngine {
         Self { opts, db: None, manager: Arc::new(manager), module_registry: Arc::new(nxc_modules::ModuleRegistry::new()) }
     }
 
+    /// Attaches an `NxcDb` instance to the execution engine for result tracking.
     pub fn with_db(mut self, db: Arc<NxcDb>) -> Self {
         self.db = Some(db);
         self
@@ -300,14 +312,17 @@ impl ExecutionEngine {
         self
     }
 
+    /// Returns a reference to the active execution options.
     pub fn opts(&self) -> &ExecutionOpts {
         &self.opts
     }
 
+    /// Returns a shared reference to the internal connection manager.
     pub fn manager(&self) -> &Arc<ConnectionManager> {
         &self.manager
     }
 
+    /// Returns a mutable reference to the internal connection manager.
     pub fn manager_mut(&mut self) -> &mut Arc<ConnectionManager> {
         &mut self.manager
     }

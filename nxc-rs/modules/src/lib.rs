@@ -209,6 +209,28 @@ pub struct ModuleResult {
 // ─── NxcModule Trait ────────────────────────────────────────────
 
 /// Trait for nxc modules (secretsdump, bloodhound, kerberoast, etc.).
+///
+/// Implementors of this trait define post-exploitation or reconnaissance actions
+/// that can be executed over established connections.
+///
+/// # Examples
+/// ```
+/// use nxc_modules::{NxcModule, ModuleOption, ModuleOptions, ModuleResult};
+/// use async_trait::async_trait;
+/// use nxc_protocols::NxcSession;
+/// use anyhow::Result;
+///
+/// struct MyModule;
+/// #[async_trait]
+/// impl NxcModule for MyModule {
+///     fn name(&self) -> &'static str { "mymodule" }
+///     fn description(&self) -> &'static str { "A test module" }
+///     fn supported_protocols(&self) -> &[&str] { &["smb"] }
+///     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions) -> Result<ModuleResult> {
+///         Ok(ModuleResult::default())
+///     }
+/// }
+/// ```
 #[async_trait]
 pub trait NxcModule: Send + Sync {
     /// Module name (e.g. "secretsdump", "bloodhound").
@@ -262,6 +284,15 @@ macro_rules! register_module {
 /// Use [`get`](Self::get) to look up a module by name, or
 /// [`list`](Self::list) to enumerate modules (optionally filtered
 /// by protocol).
+///
+/// # Examples
+/// ```
+/// use nxc_modules::ModuleRegistry;
+///
+/// let registry = ModuleRegistry::new();
+/// let count = registry.count();
+/// println!("Loaded {} modules", count);
+/// ```
 pub struct ModuleRegistry {
     modules: HashMap<String, Box<dyn NxcModule>>,
 }

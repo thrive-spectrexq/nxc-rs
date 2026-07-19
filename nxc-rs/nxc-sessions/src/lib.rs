@@ -15,24 +15,58 @@ use uuid::Uuid;
 pub type SessionId = String;
 
 /// Core structure for a serialized session.
+///
+/// # Examples
+/// ```
+/// use nxc_sessions::SessionRecord;
+///
+/// let record = SessionRecord {
+///     id: "session-123".to_string(),
+///     protocol: "smb".to_string(),
+///     target: "192.168.1.100".to_string(),
+///     username: Some("admin".to_string()),
+///     domain: Some("WORKGROUP".to_string()),
+///     state_data: vec![],
+///     created_at: 0,
+///     last_accessed: 0,
+///     linked_sessions: vec![],
+/// };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionRecord {
+    /// The unique identifier for the session.
     pub id: SessionId,
+    /// The protocol used by the session (e.g., "smb", "ssh").
     pub protocol: String,
+    /// The target host or IP address.
     pub target: String,
+    /// The username used for authentication, if any.
     pub username: Option<String>,
+    /// The domain used for authentication, if any.
     pub domain: Option<String>,
+    /// Protocol-specific state data.
     pub state_data: Vec<u8>,
+    /// Timestamp when the session was created (Unix epoch seconds).
     pub created_at: i64,
+    /// Timestamp when the session was last accessed (Unix epoch seconds).
     pub last_accessed: i64,
+    /// A list of session IDs linked to this session.
     pub linked_sessions: Vec<SessionId>,
 }
 
+/// A trait defining the core operations for a session cache.
+///
+/// Implementors of this trait are responsible for providing storage,
+/// retrieval, and linkage of session records.
 #[async_trait::async_trait]
 pub trait SessionCache: Send + Sync {
+    /// Retrieves a session by its unique ID.
     async fn get_session(&self, id: &str) -> Result<Option<SessionRecord>>;
+    /// Stores a new session record or updates an existing one.
     async fn store_session(&self, record: SessionRecord) -> Result<()>;
+    /// Links a child session to a parent session.
     async fn link_sessions(&self, parent_id: &str, child_id: &str) -> Result<()>;
+    /// Retrieves all child sessions linked to a specific parent session.
     async fn get_linked_sessions(&self, parent_id: &str) -> Result<Vec<SessionRecord>>;
 }
 
@@ -97,6 +131,15 @@ impl SessionManager {
         });
     }
 
+    /// Generate a new unique session identifier.
+    ///
+    /// # Examples
+    /// ```
+    /// use nxc_sessions::SessionManager;
+    ///
+    /// let id = SessionManager::generate_id();
+    /// assert_eq!(id.len(), 36); // UUID v4 string length
+    /// ```
     pub fn generate_id() -> SessionId {
         Uuid::new_v4().to_string()
     }
