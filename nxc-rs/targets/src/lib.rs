@@ -355,6 +355,7 @@ impl ExecutionEngine {
         let mut join_handles: Vec<JoinHandle<ExecutionResult>> = Vec::new();
         let db = self.db.clone();
         let manager = self.manager.clone();
+        let module_registry = Arc::new(nxc_modules::ModuleRegistry::new());
 
         for target in targets {
             let target_str = target.ip_string();
@@ -443,6 +444,7 @@ impl ExecutionEngine {
                 let user_fails_clone = user_fails.clone();
                 let host_fails_clone = host_fails.clone();
                 let host_succeeded_clone = host_succeeded.clone();
+                let module_registry_clone = module_registry.clone();
 
                 let handle = tokio::spawn(async move {
                     let start_time = std::time::Instant::now();
@@ -561,10 +563,14 @@ impl ExecutionEngine {
                                                 host_id: Some(h_id),
                                                 created_at: now,
                                             }) {
-                                                let _ = db_p.add_auth_result(h_id, Some(cred_id), &proto_name, "Success", a_p.admin);
+                                                if let Err(e) = db_p.add_auth_result(h_id, Some(cred_id), &proto_name, "Success", a_p.admin) {
+                                                    tracing::warn!("Failed to add auth result: {}", e);
+                                                }
                                             }
                                         } else {
-                                            let _ = db_p.add_auth_result(h_id, None, &proto_name, "Failure", false);
+                                            if let Err(e) = db_p.add_auth_result(h_id, None, &proto_name, "Failure", false) {
+                                                tracing::warn!("Failed to add auth result: {}", e);
+                                            }
                                         }
                                         Ok(Some(h_id))
                                     }).await;
@@ -575,7 +581,7 @@ impl ExecutionEngine {
                                 // Execute modules if requested
                                 let mut module_data = std::collections::HashMap::new();
                                 if auth_res.success && !opts_clone.modules.is_empty() {
-                                    let registry = nxc_modules::ModuleRegistry::new();
+                                    let registry = module_registry_clone.as_ref();
                                     let active_protocol = protocol_clone.name();
                                     for module_name in &opts_clone.modules {
                                         if let Some(module) = registry.get(module_name) {
@@ -603,10 +609,10 @@ impl ExecutionEngine {
                                                             let m_creds = mod_res.credentials.clone();
                                                             let h_id = host_id;
 
-                                                            let _ = tokio::task::spawn_blocking(move || {
+                                                            if let Err(e) = tokio::task::spawn_blocking(move || {
                                                                 let now = Utc::now().timestamp();
                                                                 for m_cred in m_creds {
-                                                                    let _ = db_p.upsert_credential(
+                                                                    if let Err(err) = db_p.upsert_credential(
                                                                         &Credential {
                                                                             id: None,
                                                                             workspace: db_p
@@ -623,9 +629,13 @@ impl ExecutionEngine {
                                                                             host_id: h_id,
                                                                             created_at: now,
                                                                         },
-                                                                    );
+                                                                    ) {
+                                                                        tracing::warn!("Failed to upsert credential from module: {}", err);
+                                                                    }
                                                                 }
-                                                            }).await;
+                                                            }).await {
+                                                                tracing::error!("Failed to spawn blocking task for module credentials: {}", e);
+                                                            }
                                                         }
                                                     } else {
                                                         final_message.push_str(&format!(

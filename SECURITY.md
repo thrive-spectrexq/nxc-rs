@@ -6,8 +6,9 @@ We only support the latest version of NetExec-RS. For older versions, we recomme
 
 | Version | Supported          |
 | ------- | ------------------ |
-| v0.1.x  | :white_check_mark: |
-| < v0.1  | :x:                |
+| v0.4.x  | :white_check_mark: |
+| v0.3.x  | :x:                |
+| < v0.3  | :x:                |
 
 ## Reporting a Vulnerability
 

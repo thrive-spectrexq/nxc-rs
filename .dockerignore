@@ -1,0 +1,51 @@
+# Build artifacts
+target/
+*.pdb
+
+# Version control
+.git/
+.gitignore
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Agent configs (not needed in builds)
+.agents/
+.claude/
+.codex/
+.gemini/
+
+# Documentation (not needed in builds)
+*.md
+!README.md
+docs/
+LICENSE
+
+# CI/CD configs
+.github/
+.devcontainer/
+
+# Dev/test files
+tests/
+modules/*.rhai
+Formula/
+nxc.db
+
+# Install scripts
+install.sh
+install.ps1
+
+# Config files
+clippy.toml
+rustfmt.toml
+deny.toml
+rust-toolchain.toml

@@ -56,4 +56,4 @@ tracing-appender = "0.2.5"
 rand.workspace = true
 
 [features]
-opcua-support = []
+opcua-support = ["nxc-protocols/opcua-support"]

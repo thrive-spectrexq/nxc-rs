@@ -1,6 +1,6 @@
 # ◈ NetExec-RS (nxc-rs) ◈
 
-[![Rust](https://img.shields.io/badge/rustc-1.94.0+-orange.svg?style=flat-square)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/rustc-1.88.0+-orange.svg?style=flat-square)](https://www.rust-lang.org/)
 [![Release](https://img.shields.io/github/v/release/thrive-spectrexq/nxc-rs?color=blue&style=flat-square)](https://github.com/thrive-spectrexq/nxc-rs/releases)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/thrive-spectrexq/nxc-rs/build-binaries.yml?branch=master&style=flat-square)](https://github.com/thrive-spectrexq/nxc-rs/actions)
 [![License](https://img.shields.io/badge/license-BSD--2--Clause-blue.svg?style=flat-square)](LICENSE)
@@ -97,7 +97,7 @@ iex (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercont
 
 ### Build from Source
 
-Requires Rust 1.94.0+
+Requires Rust 1.88.0+
 
 ```bash
 git clone https://github.com/thrive-spectrexq/nxc-rs.git

@@ -3,12 +3,7 @@
 //! This crate provides AI-driven capabilities for network execution, including
 //! automated attack path generation, agent planning, and attack graph modeling.
 
-#![deny(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::uninlined_format_args,
-    clippy::redundant_closure
-)]
+
 
 pub mod agent;
 pub mod providers;

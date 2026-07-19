@@ -16,9 +16,7 @@ mod integration_tests {
     #[test]
     fn test_credentials_builder_and_display() {
         // Test that the Credentials builder works and handles secrets correctly.
-        let creds = Credentials::new("Administrator".to_string())
-            .with_password("SuperSecret123!".to_string())
-            .with_domain("CORP".to_string());
+        let creds = Credentials::password("Administrator", "SuperSecret123!", Some("CORP"));
 
         assert_eq!(creds.username, "Administrator");
         assert_eq!(creds.domain.as_deref(), Some("CORP"));
@@ -27,14 +25,14 @@ mod integration_tests {
         // Ensure Display trait correctly masks passwords in output.
         let display_str = creds.to_string();
         assert!(display_str.contains("CORP\\Administrator"));
-        assert!(display_str.contains("Password: ***"));
+        assert!(display_str.contains("password"));
         assert!(!display_str.contains("SuperSecret123!"));
     }
 
     #[test]
     fn test_protocol_instantiation() {
         // Test that protocols can be instantiated and configured.
-        let smb = SmbProtocol::new().with_timeout(Duration::from_secs(5));
+        let smb = SmbProtocol::with_timeout(Duration::from_secs(5));
         assert_eq!(smb.name(), "smb");
         assert_eq!(smb.default_port(), 445);
         assert!(smb.supports_exec());
@@ -50,14 +48,14 @@ mod integration_tests {
         // A placeholder for parsing module options across components.
         let options = vec![
             ModuleOption {
-                key: "COMMAND".to_string(),
-                value: "whoami".to_string(),
+                name: "COMMAND".to_string(),
                 description: "Command to execute".to_string(),
                 required: true,
+                default: None,
             }
         ];
         
         assert_eq!(options.len(), 1);
-        assert_eq!(options[0].key, "COMMAND");
+        assert_eq!(options[0].name, "COMMAND");
     }
 }

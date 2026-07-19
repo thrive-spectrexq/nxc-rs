@@ -6,6 +6,10 @@ on:
       - 'v*'  # Push events to matching v*, i.e. v1.0, v20.15.10
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build_release:
     name: Build release on ${{ matrix.os }}
