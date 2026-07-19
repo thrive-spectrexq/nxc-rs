@@ -5,7 +5,7 @@
 //! the connection logic and preparing for execution commands.
 
 use crate::{CommandOutput, NxcProtocol, NxcSession};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine as _};
 use nxc_auth::{kerberos::KerberosClient, AuthResult, Credentials};

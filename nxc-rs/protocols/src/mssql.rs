@@ -4,7 +4,7 @@
 //! Replicates NetExec capability for DB enum and query execution.
 
 use crate::{CommandOutput, NxcProtocol, NxcSession};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use nxc_auth::{kerberos::KerberosClient, AuthResult, Credentials};
 use std::time::Duration;
