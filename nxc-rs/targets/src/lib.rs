@@ -719,10 +719,8 @@ async fn persist_result_to_db(
                     tracing::warn!("Failed to add auth result: {}", e);
                 }
             }
-        } else {
-            if let Err(e) = db.add_auth_result(h_id, None, &proto_name, "Failure", false) {
-                tracing::warn!("Failed to add auth result: {}", e);
-            }
+        } else if let Err(e) = db.add_auth_result(h_id, None, &proto_name, "Failure", false) {
+            tracing::warn!("Failed to add auth result: {}", e);
         }
         Ok(Some(h_id))
     })

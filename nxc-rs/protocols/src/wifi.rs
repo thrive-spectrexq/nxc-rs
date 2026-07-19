@@ -170,8 +170,7 @@ impl WifiProtocol {
                             }
                         }
 
-                        dumped_credentials
-                            .push_str(&format!("{profile_name:<30} : {password}\n"));
+                        dumped_credentials.push_str(&format!("{profile_name:<30} : {password}\n"));
                     }
                 }
             }
