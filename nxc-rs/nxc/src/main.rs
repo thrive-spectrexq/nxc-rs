@@ -252,6 +252,7 @@ async fn main() -> Result<()> {
     }
 
     let verify_ssl = sub_matches.try_get_one::<bool>("verify-ssl").unwrap_or(None).copied().unwrap_or(false);
+    let explicit_port = sub_matches.try_get_one::<u16>("port").unwrap_or(None).copied();
 
     let exec_opts = ExecutionOpts {
         threads,
@@ -267,6 +268,7 @@ async fn main() -> Result<()> {
         gfail_limit: sub_matches.try_get_one::<u32>("gfail-limit").unwrap_or(None).copied(),
         ufail_limit: sub_matches.try_get_one::<u32>("ufail-limit").unwrap_or(None).copied(),
         fail_limit: sub_matches.try_get_one::<u32>("fail-limit").unwrap_or(None).copied(),
+        port: explicit_port,
     };
 
     // ── Setup Database ──
@@ -375,7 +377,7 @@ async fn main() -> Result<()> {
     }
 
     // ── Display results ──
-    let port = sub_matches.try_get_one::<u16>("port").unwrap_or(None).copied().unwrap_or_else(|| {
+    let port = explicit_port.unwrap_or_else(|| {
         protocol_name.parse::<Protocol>().map(|p| p.default_port()).unwrap_or(0)
     });
 

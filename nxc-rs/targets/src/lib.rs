@@ -231,6 +231,8 @@ pub struct ExecutionOpts {
     pub ufail_limit: Option<u32>,
     /// Max failed login attempts per host before skipping that host.
     pub fail_limit: Option<u32>,
+    /// Custom port to connect to.
+    pub port: Option<u16>,
 }
 
 impl Default for ExecutionOpts {
@@ -249,6 +251,7 @@ impl Default for ExecutionOpts {
             gfail_limit: None,
             ufail_limit: None,
             fail_limit: None,
+            port: None,
         }
     }
 }
@@ -549,7 +552,7 @@ async fn execute_single_target(ctx: TargetTaskContext) -> ExecutionResult {
     let result = tokio::time::timeout(ctx.opts.timeout, async {
         let target_str = ctx.target.display();
         let target_ip = ctx.target.ip_string();
-        let port = ctx.protocol.default_port();
+        let port = ctx.opts.port.unwrap_or_else(|| ctx.protocol.default_port());
         let proxy = ctx.opts.proxy.as_deref();
 
         let mut session = match ctx
