@@ -225,6 +225,16 @@ pub trait NxcModule: Send + Sync {
         vec![]
     }
 
+    /// Validate module options against defined requirements.
+    fn validate_options(&self, opts: &ModuleOptions) -> Result<()> {
+        for opt in self.options() {
+            if opt.required && !opts.contains_key(&opt.name) {
+                return Err(anyhow::anyhow!("Missing required option: {}", opt.name));
+            }
+        }
+        Ok(())
+    }
+
     /// Execute the module against an authenticated session.
     async fn run(&self, session: &mut dyn NxcSession, opts: &ModuleOptions)
         -> Result<ModuleResult>;
@@ -639,6 +649,93 @@ mod tests {
         assert_eq!(opts.get_u16("INVALID", 80), 80);
         // Default on missing
         assert_eq!(opts.get_u16("MISSING", 8080), 8080);
+    }
+
+    struct MockSession;
+
+    impl nxc_protocols::NxcSession for MockSession {
+        fn protocol(&self) -> &'static str {
+            "mock"
+        }
+        fn target(&self) -> &str {
+            "127.0.0.1"
+        }
+        fn is_admin(&self) -> bool {
+            true
+        }
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+            self
+        }
+    }
+
+    struct ValidatedMockModule {
+        name: &'static str,
+    }
+
+    #[async_trait]
+    impl NxcModule for ValidatedMockModule {
+        fn name(&self) -> &'static str {
+            self.name
+        }
+
+        fn description(&self) -> &'static str {
+            "A mock module for testing option validation."
+        }
+
+        fn supported_protocols(&self) -> &[&str] {
+            &["mock"]
+        }
+
+        fn options(&self) -> Vec<ModuleOption> {
+            vec![
+                ModuleOption {
+                    name: "REQUIRED_OPT".to_string(),
+                    description: "A required option".to_string(),
+                    required: true,
+                    default: None,
+                },
+                ModuleOption {
+                    name: "OPTIONAL_OPT".to_string(),
+                    description: "An optional option".to_string(),
+                    required: false,
+                    default: None,
+                },
+            ]
+        }
+
+        async fn run(
+            &self,
+            _session: &mut dyn nxc_protocols::NxcSession,
+            _opts: &ModuleOptions,
+        ) -> Result<ModuleResult> {
+            Ok(ModuleResult {
+                success: true,
+                output: "Success".to_string(),
+                ..Default::default()
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn test_module_options_validation_and_run() {
+        let module = ValidatedMockModule { name: "validated_mock" };
+
+        // Missing required option
+        let mut opts = ModuleOptions::new();
+        assert!(module.validate_options(&opts).is_err());
+
+        // Has required option
+        opts.insert("REQUIRED_OPT".to_string(), "value".to_string());
+        assert!(module.validate_options(&opts).is_ok());
+
+        // Test run
+        let mut session = MockSession;
+        let result = module.run(&mut session, &opts).await.unwrap();
+        assert!(result.success);
+        assert_eq!(result.output, "Success");
     }
 }
 

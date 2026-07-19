@@ -367,6 +367,72 @@ impl From<std::net::AddrParseError> for ProtocolError {
     }
 }
 
+impl From<std::io::Error> for SmbError {
+    fn from(err: std::io::Error) -> Self {
+        Self::ConnectionFailed(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for LdapError {
+    fn from(err: std::io::Error) -> Self {
+        Self::ConnectionFailed(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for SshError {
+    fn from(err: std::io::Error) -> Self {
+        Self::ConnectionFailed(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for WinRmError {
+    fn from(err: std::io::Error) -> Self {
+        Self::ConnectionFailed(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for MssqlError {
+    fn from(err: std::io::Error) -> Self {
+        Self::ConnectionFailed(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for FtpError {
+    fn from(err: std::io::Error) -> Self {
+        Self::ConnectionFailed(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for RdpError {
+    fn from(err: std::io::Error) -> Self {
+        Self::ConnectionFailed(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for VncError {
+    fn from(err: std::io::Error) -> Self {
+        Self::ConnectionFailed(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for RedisError {
+    fn from(err: std::io::Error) -> Self {
+        Self::ConnectionFailed(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for DockerError {
+    fn from(err: std::io::Error) -> Self {
+        Self::ConnectionFailed(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for KubeError {
+    fn from(err: std::io::Error) -> Self {
+        Self::ConnectionFailed(err.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -662,5 +728,16 @@ mod tests {
         assert_eq!(KubeError::ExecutionFailed("crash".into()).to_string(), "Execution failed: crash");
         assert_eq!(KubeError::ApiError("404".into()).to_string(), "API error: 404");
         assert_eq!(KubeError::Unknown("unknown".into()).to_string(), "Unknown Kubernetes error: unknown");
+    }
+
+    #[test]
+    fn from_io_error_for_protocol_enums() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::ConnectionRefused, "refused");
+        let smb_err: SmbError = io_err.into();
+        assert!(matches!(smb_err, SmbError::ConnectionFailed(msg) if msg == "refused"));
+
+        let io_err2 = std::io::Error::new(std::io::ErrorKind::TimedOut, "timeout");
+        let ssh_err: SshError = io_err2.into();
+        assert!(matches!(ssh_err, SshError::ConnectionFailed(msg) if msg == "timeout"));
     }
 }
