@@ -98,7 +98,6 @@ impl ScopedTimer {
     }
 
     /// Get the elapsed time.
-
     pub fn _elapsed(&self) -> std::time::Duration {
         self.start.elapsed()
     }

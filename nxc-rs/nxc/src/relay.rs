@@ -53,7 +53,6 @@ impl RelayServer {
     }
 
     /// Create a capture-only relay on the given address.
-
     pub fn _capture_only(bind_addr: &str) -> Self {
         Self::new(RelayConfig {
             bind_addr: bind_addr.to_string(),
@@ -63,7 +62,6 @@ impl RelayServer {
     }
 
     /// Get all captured hashes so far.
-
     pub async fn _captured_hashes(&self) -> Vec<CapturedHash> {
         self.captured.lock().await.clone()
     }
