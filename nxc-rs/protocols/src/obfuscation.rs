@@ -3,7 +3,7 @@
 //! XOR-based and AES-based obfuscation to hide common IOC strings from static analysis.
 //! Supports single-byte XOR, multi-byte XOR keys, and AES-128-ECB encrypted strings.
 
-use aes::cipher::{BlockCipherDecrypt, BlockCipherEncrypt, KeyInit, Block};
+use aes::cipher::{Block, BlockCipherDecrypt, BlockCipherEncrypt, KeyInit};
 use aes::Aes128;
 
 // ─── Single-byte XOR ────────────────────────────────────────────

@@ -60,7 +60,7 @@ impl NxcModule for ShadowCredentials {
         let target = opts.get("TARGET").ok_or_else(|| anyhow::anyhow!("TARGET is required"))?;
 
         tracing::info!("shadow_credentials: {} on target {}", action, target);
-        
+
         // Simulating shadow credentials attack logic
         let output = format!(
             "Successfully executed action '{action}' for target '{target}' regarding msDS-KeyCredentialLink."

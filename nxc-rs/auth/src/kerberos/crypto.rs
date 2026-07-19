@@ -1,5 +1,5 @@
 use anyhow::Result;
-use hmac::{Hmac, Mac, KeyInit as HmacKeyInit};
+use hmac::{Hmac, KeyInit as HmacKeyInit, Mac};
 use md4::{Digest as Md4Digest, Md4};
 use md5::Md5;
 
@@ -12,7 +12,7 @@ type HmacSha1 = Hmac<Sha1>;
 
 use aes::Aes256;
 use cbc::cipher::block_padding::NoPadding;
-use cbc::cipher::{KeyIvInit, BlockModeDecrypt, BlockModeEncrypt};
+use cbc::cipher::{BlockModeDecrypt, BlockModeEncrypt, KeyIvInit};
 
 use serde::{Deserialize, Serialize};
 
@@ -55,7 +55,7 @@ pub fn string2key_aes(password: &str, salt: &str, is_aes256: bool) -> Vec<u8> {
 /// AES-CTS DK (Derive Key) function (RFC 3962 §5.1)
 /// DK(base_key, well_known_constant)
 fn derive_key_aes(base_key: &[u8], _constant: &[u8], is_aes256: bool) -> Vec<u8> {
-    use aes::cipher::{BlockCipherEncrypt, KeyInit, Block};
+    use aes::cipher::{Block, BlockCipherEncrypt, KeyInit};
 
     let key_len = if is_aes256 { 32 } else { 16 };
 
@@ -65,8 +65,8 @@ fn derive_key_aes(base_key: &[u8], _constant: &[u8], is_aes256: bool) -> Vec<u8>
     // n-fold("kerberos", 16) = 0x6b65726265726f73 0x7b5b544c4b59524c (calculated via standard n-fold)
     // Let's use the precalculated n-fold("kerberos", 16)
     let folded_kerberos: [u8; 16] = [
-        0x6b, 0x65, 0x72, 0x62, 0x65, 0x72, 0x6f, 0x73,
-        0x7b, 0x5b, 0x54, 0x4c, 0x4b, 0x59, 0x52, 0x4c
+        0x6b, 0x65, 0x72, 0x62, 0x65, 0x72, 0x6f, 0x73, 0x7b, 0x5b, 0x54, 0x4c, 0x4b, 0x59, 0x52,
+        0x4c,
     ];
 
     let mut result = Vec::with_capacity(key_len);
@@ -115,8 +115,9 @@ pub fn decrypt_rc4_hmac(key: &[u8], key_usage: u32, ciphertext: &[u8]) -> Result
     let k3 = hmac2.finalize().into_bytes();
 
     // 4. Decrypt data using RC4(K3)
-    let k3_array: &[u8; 16] =
-        k3[..16].try_into().map_err(|_| anyhow::anyhow!("CryptoError: k3 array try_into failed"))?;
+    let k3_array: &[u8; 16] = k3[..16]
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("CryptoError: k3 array try_into failed"))?;
     let mut rc4 =
         Rc4::new_from_slice(k3_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {e}"))?;
     let mut decrypted = enc_data.to_vec();
@@ -172,8 +173,9 @@ pub fn encrypt_rc4_hmac(key: &[u8], key_usage: u32, plaintext: &[u8]) -> Result<
     let k3 = hmac3.finalize().into_bytes();
 
     // 6. Encrypt data with RC4(K3)
-    let k3_array: &[u8; 16] =
-        k3[..16].try_into().map_err(|_| anyhow::anyhow!("CryptoError: k3 array try_into failed"))?;
+    let k3_array: &[u8; 16] = k3[..16]
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("CryptoError: k3 array try_into failed"))?;
     let mut rc4_key =
         Rc4::new_from_slice(k3_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {e}"))?;
     rc4_key.apply_keystream(&mut data);
@@ -209,8 +211,8 @@ pub fn decrypt_aes(
     let checksum = &ciphertext[enc_len..];
 
     // 2. Verify HMAC-SHA1-96
-    let mut hmac =
-        <HmacSha1 as HmacKeyInit>::new_from_slice(key).map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
+    let mut hmac = <HmacSha1 as HmacKeyInit>::new_from_slice(key)
+        .map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
     hmac.update(&key_usage.to_be_bytes()); // Simplified usage derivation
     hmac.update(enc_data);
     let full_mac = hmac.finalize().into_bytes();
@@ -275,8 +277,8 @@ pub fn encrypt_aes(
     };
 
     // Checksum: HMAC-SHA1-96(key, usage, enc_data)
-    let mut hmac =
-        <HmacSha1 as HmacKeyInit>::new_from_slice(key).map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
+    let mut hmac = <HmacSha1 as HmacKeyInit>::new_from_slice(key)
+        .map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
     hmac.update(&key_usage.to_be_bytes());
     hmac.update(&enc_data);
     let full_mac = hmac.finalize().into_bytes();

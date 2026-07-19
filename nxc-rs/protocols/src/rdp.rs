@@ -326,15 +326,10 @@ mod tests {
 
     #[test]
     fn test_rdp_session() {
-        let sess = RdpSession {
-            target: "10.0.0.5".to_string(),
-            port: 3389,
-            is_nla: true,
-            admin: false,
-        };
+        let sess =
+            RdpSession { target: "10.0.0.5".to_string(), port: 3389, is_nla: true, admin: false };
         assert_eq!(sess.protocol(), "rdp");
         assert_eq!(sess.target(), "10.0.0.5");
         assert!(!sess.is_admin());
     }
 }
-

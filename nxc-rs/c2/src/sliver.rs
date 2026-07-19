@@ -29,13 +29,23 @@ impl C2Backend for SliverBackend {
         // Stub: Implement listing sessions logic here
         Ok(vec![])
     }
-    
-    async fn upload_file(&self, _session_id: &str, _local_path: &str, _remote_path: &str) -> anyhow::Result<()> {
+
+    async fn upload_file(
+        &self,
+        _session_id: &str,
+        _local_path: &str,
+        _remote_path: &str,
+    ) -> anyhow::Result<()> {
         // Stub
         Ok(())
     }
-    
-    async fn download_file(&self, _session_id: &str, _remote_path: &str, _local_path: &str) -> anyhow::Result<()> {
+
+    async fn download_file(
+        &self,
+        _session_id: &str,
+        _remote_path: &str,
+        _local_path: &str,
+    ) -> anyhow::Result<()> {
         // Stub
         Ok(())
     }

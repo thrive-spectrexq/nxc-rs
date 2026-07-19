@@ -33,10 +33,7 @@ async fn test_circuit_breaker_state_transitions() {
 
     // Record success in HalfOpen
     let _ = breaker
-        .call_with_classifier(
-            || async { Ok::<(), anyhow::Error>(()) },
-            is_connection_failure,
-        )
+        .call_with_classifier(|| async { Ok::<(), anyhow::Error>(()) }, is_connection_failure)
         .await;
 
     // Should be closed now

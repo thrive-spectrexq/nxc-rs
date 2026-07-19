@@ -91,12 +91,11 @@ impl NxcModule for GoldenTicketModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let krbtgt_hash = opts.get("KRBTGT_HASH")
-            .ok_or_else(|| anyhow::anyhow!("KRBTGT_HASH is required"))?;
-        let domain = opts.get("DOMAIN")
-            .ok_or_else(|| anyhow::anyhow!("DOMAIN is required"))?;
-        let domain_sid = opts.get("DOMAIN_SID")
-            .ok_or_else(|| anyhow::anyhow!("DOMAIN_SID is required"))?;
+        let krbtgt_hash =
+            opts.get("KRBTGT_HASH").ok_or_else(|| anyhow::anyhow!("KRBTGT_HASH is required"))?;
+        let domain = opts.get("DOMAIN").ok_or_else(|| anyhow::anyhow!("DOMAIN is required"))?;
+        let domain_sid =
+            opts.get("DOMAIN_SID").ok_or_else(|| anyhow::anyhow!("DOMAIN_SID is required"))?;
         let user = opts.get("USER").map(String::as_str).unwrap_or("Administrator");
         let user_id = opts.get("USER_ID").map(String::as_str).unwrap_or("500");
         let groups = opts.get("GROUPS").map(String::as_str).unwrap_or("513,512,520,518,519");
@@ -105,7 +104,10 @@ impl NxcModule for GoldenTicketModule {
         let target = session.target().to_string();
         tracing::info!(
             "golden_ticket: Forging TGT for {}@{} (RID: {}) against {}",
-            user, domain, user_id, target
+            user,
+            domain,
+            user_id,
+            target
         );
 
         // Step 1: Validate krbtgt hash format

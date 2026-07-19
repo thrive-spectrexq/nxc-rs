@@ -432,9 +432,8 @@ pub fn export_pdf(path: &str, report: &Report) -> Result<()> {
     let mut pdf = PdfWriter::new();
 
     // 1 – Font (Helvetica, a built-in base-14 font)
-    let font_obj = pdf.add_object(
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec(),
-    );
+    let font_obj =
+        pdf.add_object(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec());
 
     // 2 – Content stream
     let stream = build_text_stream(&summary_lines, 9.0, 11.0);
@@ -451,9 +450,7 @@ pub fn export_pdf(path: &str, report: &Report) -> Result<()> {
     let page_obj = pdf.add_object(page_dict.into_bytes());
 
     // 4 – Pages
-    let pages_dict = format!(
-        "<< /Type /Pages /Kids [{page_obj} 0 R] /Count 1 >>",
-    );
+    let pages_dict = format!("<< /Type /Pages /Kids [{page_obj} 0 R] /Count 1 >>",);
     let pages_obj = pdf.add_object(pages_dict.into_bytes());
 
     // Fix page /Parent to point to pages_obj
@@ -463,9 +460,7 @@ pub fn export_pdf(path: &str, report: &Report) -> Result<()> {
     pdf.objects[page_obj - 1] = fixed_page.into_bytes();
 
     // 5 – Catalog
-    let catalog_dict = format!(
-        "<< /Type /Catalog /Pages {pages_obj} 0 R >>",
-    );
+    let catalog_dict = format!("<< /Type /Catalog /Pages {pages_obj} 0 R >>",);
     let catalog_obj = pdf.add_object(catalog_dict.into_bytes());
 
     let bytes = pdf.finish(pages_obj, catalog_obj);

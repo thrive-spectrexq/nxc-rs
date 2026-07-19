@@ -104,8 +104,9 @@ impl NxcModule for TokenImpersonationModule {
                 )
             }
             "impersonate" => {
-                let user = token_user
-                    .ok_or_else(|| anyhow::anyhow!("TOKEN_USER is required for impersonate action"))?;
+                let user = token_user.ok_or_else(|| {
+                    anyhow::anyhow!("TOKEN_USER is required for impersonate action")
+                })?;
 
                 // Step 1: Find token for specified user
                 tracing::debug!("token_impersonation: Searching for token: {user}");
@@ -140,7 +141,9 @@ impl NxcModule for TokenImpersonationModule {
                 )
             }
             _ => {
-                return Err(anyhow::anyhow!("Unknown ACTION '{action}'. Use: list, impersonate, revert"));
+                return Err(anyhow::anyhow!(
+                    "Unknown ACTION '{action}'. Use: list, impersonate, revert"
+                ));
             }
         };
 

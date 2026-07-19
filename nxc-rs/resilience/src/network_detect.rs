@@ -13,15 +13,12 @@ pub struct NetworkConditionDetector {
 
 impl NetworkConditionDetector {
     pub fn new(failure_threshold: u32, cooldown: Duration) -> Self {
-        Self {
-            subnet_failures: DashMap::new(),
-            failure_threshold,
-            cooldown,
-        }
+        Self { subnet_failures: DashMap::new(), failure_threshold, cooldown }
     }
 
     pub fn record_failure(&self, subnet: &str) {
-        let mut entry = self.subnet_failures.entry(subnet.to_string()).or_insert((0, Instant::now()));
+        let mut entry =
+            self.subnet_failures.entry(subnet.to_string()).or_insert((0, Instant::now()));
         entry.0 += 1;
         entry.1 = Instant::now();
     }

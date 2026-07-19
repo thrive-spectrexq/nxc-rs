@@ -7,10 +7,10 @@
 #[cfg(test)]
 mod integration_tests {
     use nxc_auth::Credentials;
+    use nxc_modules::{ModuleOption, NxcModule};
     use nxc_protocols::smb::SmbProtocol;
     use nxc_protocols::winrm::WinrmProtocol;
     use nxc_protocols::NxcProtocol;
-    use nxc_modules::{NxcModule, ModuleOption};
     use std::time::Duration;
 
     #[test]
@@ -21,7 +21,7 @@ mod integration_tests {
         assert_eq!(creds.username, "Administrator");
         assert_eq!(creds.domain.as_deref(), Some("CORP"));
         assert_eq!(creds.password.as_deref(), Some("SuperSecret123!"));
-        
+
         // Ensure Display trait correctly masks passwords in output.
         let display_str = creds.to_string();
         assert!(display_str.contains("CORP\\Administrator"));
@@ -46,15 +46,13 @@ mod integration_tests {
     #[test]
     fn test_module_options_parsing() {
         // A placeholder for parsing module options across components.
-        let options = vec![
-            ModuleOption {
-                name: "COMMAND".to_string(),
-                description: "Command to execute".to_string(),
-                required: true,
-                default: None,
-            }
-        ];
-        
+        let options = vec![ModuleOption {
+            name: "COMMAND".to_string(),
+            description: "Command to execute".to_string(),
+            required: true,
+            default: None,
+        }];
+
         assert_eq!(options.len(), 1);
         assert_eq!(options[0].name, "COMMAND");
     }

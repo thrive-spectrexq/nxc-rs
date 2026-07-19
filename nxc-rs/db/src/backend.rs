@@ -66,7 +66,13 @@ pub trait DatabaseBackend: Send + Sync {
     // Credentials
     async fn add_credential(&self, cred: &Credential) -> Result<i64>;
     async fn upsert_credential(&self, cred: &Credential) -> Result<i64>;
-    async fn search_credentials(&self, workspace: &str, domain: Option<&str>, source: Option<&str>, admin_only: bool) -> Result<Vec<Credential>>;
+    async fn search_credentials(
+        &self,
+        workspace: &str,
+        domain: Option<&str>,
+        source: Option<&str>,
+        admin_only: bool,
+    ) -> Result<Vec<Credential>>;
     async fn delete_credential(&self, cred_id: i64) -> Result<usize>;
 
     // Auth Results

@@ -239,9 +239,7 @@ impl NfsProtocol {
             if pos + 4 > body.len() {
                 break;
             }
-            let len = u32::from_be_bytes(
-                body[pos..pos + 4].try_into().unwrap_or([0; 4]),
-            ) as usize;
+            let len = u32::from_be_bytes(body[pos..pos + 4].try_into().unwrap_or([0; 4])) as usize;
             pos += 4;
             let aligned_len = (len + 3) & !3;
             if pos + aligned_len > body.len() {
@@ -261,11 +259,8 @@ impl NfsProtocol {
                 if pos + 4 > body.len() {
                     break;
                 }
-                let h_len = u32::from_be_bytes(
-                    body[pos..pos + 4]
-                        .try_into()
-                        .unwrap_or([0; 4]),
-                ) as usize;
+                let h_len =
+                    u32::from_be_bytes(body[pos..pos + 4].try_into().unwrap_or([0; 4])) as usize;
                 pos += 4;
                 pos += (h_len + 3) & !3;
                 if pos + 4 > body.len() {
@@ -305,9 +300,7 @@ impl NfsProtocol {
         let mut resp = vec![0; 28];
         stream.read_exact(&mut resp).await?;
 
-        let port = u32::from_be_bytes(
-            resp[24..28].try_into().unwrap_or([0; 4]),
-        ) as u16;
+        let port = u32::from_be_bytes(resp[24..28].try_into().unwrap_or([0; 4])) as u16;
         Ok(port)
     }
 }

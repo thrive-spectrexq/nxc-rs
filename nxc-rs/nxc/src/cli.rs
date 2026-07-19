@@ -130,7 +130,10 @@ pub fn build_cli() -> Command {
     // ── Module arguments ──
     let module_args = vec![
         Arg::new("module").short('M').long("module").help("Module to use").num_args(1..),
-        Arg::new("module-options").short('o').help("Module options. Example: -o FLAG=1 CMD=\"whoami\"").num_args(1..),
+        Arg::new("module-options")
+            .short('o')
+            .help("Module options. Example: -o FLAG=1 CMD=\"whoami\"")
+            .num_args(1..),
         Arg::new("list-modules")
             .short('L')
             .long("list-modules")

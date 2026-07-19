@@ -38,7 +38,8 @@ impl NxcModule for PassTheTicket {
         vec![
             ModuleOption {
                 name: "TICKET".to_string(),
-                description: "Path to the Kerberos ticket file or base64 encoded ticket string".to_string(),
+                description: "Path to the Kerberos ticket file or base64 encoded ticket string"
+                    .to_string(),
                 required: true,
                 default: None,
             },
@@ -60,13 +61,9 @@ impl NxcModule for PassTheTicket {
         let format = opts.get("FORMAT").map(String::as_str).unwrap_or("ccache");
 
         tracing::info!("pass_the_ticket: Injecting {} ticket...", format);
-        
+
         // Simulating the ticket injection and validation
-        let ticket_preview = if ticket.len() > 10 {
-            &ticket[..10]
-        } else {
-            ticket
-        };
+        let ticket_preview = if ticket.len() > 10 { &ticket[..10] } else { ticket };
 
         let output = format!(
             "Successfully injected {format} ticket (preview: {ticket_preview}...) into session context."

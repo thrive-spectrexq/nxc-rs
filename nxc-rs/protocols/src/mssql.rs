@@ -104,8 +104,14 @@ impl NxcProtocol for MssqlProtocol {
                     proxy: proxy.map(std::string::ToString::to_string),
                 }))
             }
-            Ok(Err(e)) => Err(crate::errors::MssqlError::ConnectionFailed(format!("Connection refused or unreachable: {e}")).into()),
-            Err(_) => Err(crate::errors::MssqlError::ConnectionFailed(format!("Connection timeout to {addr}")).into()),
+            Ok(Err(e)) => Err(crate::errors::MssqlError::ConnectionFailed(format!(
+                "Connection refused or unreachable: {e}"
+            ))
+            .into()),
+            Err(_) => Err(crate::errors::MssqlError::ConnectionFailed(format!(
+                "Connection timeout to {addr}"
+            ))
+            .into()),
         }
     }
 
@@ -144,10 +150,8 @@ impl NxcProtocol for MssqlProtocol {
         if let Some(ref domain) = creds.domain {
             debug!("MSSQL: Using Windows auth for {}\\{}", domain, username);
             #[cfg(any(feature = "winauth", feature = "integrated-auth-gssapi"))]
-            config.authentication(AuthMethod::sql_server(
-                format!("{domain}\\{username}"),
-                &password,
-            ));
+            config
+                .authentication(AuthMethod::sql_server(format!("{domain}\\{username}"), &password));
             #[cfg(not(any(feature = "winauth", feature = "integrated-auth-gssapi")))]
             config
                 .authentication(AuthMethod::sql_server(format!("{domain}\\{username}"), &password));
@@ -212,8 +216,9 @@ impl NxcProtocol for MssqlProtocol {
             .downcast_ref::<MssqlSession>()
             .ok_or_else(|| crate::errors::MssqlError::Unknown("Invalid session type".into()))?;
 
-        let creds =
-            mssql_sess.credentials.as_ref().ok_or_else(|| crate::errors::MssqlError::AuthFailed("Session not authenticated".into()))?;
+        let creds = mssql_sess.credentials.as_ref().ok_or_else(|| {
+            crate::errors::MssqlError::AuthFailed("Session not authenticated".into())
+        })?;
         let mut config = Config::new();
         config.host(&mssql_sess.target);
         config.port(mssql_sess.port);
@@ -290,8 +295,9 @@ impl MssqlProtocol {
         session: &MssqlSession,
         sql: &str,
     ) -> Result<Vec<serde_json::Value>> {
-        let creds =
-            session.credentials.as_ref().ok_or_else(|| crate::errors::MssqlError::AuthFailed("Session not authenticated".into()))?;
+        let creds = session.credentials.as_ref().ok_or_else(|| {
+            crate::errors::MssqlError::AuthFailed("Session not authenticated".into())
+        })?;
         let mut config = Config::new();
         config.host(&session.target);
         config.port(session.port);

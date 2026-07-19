@@ -41,7 +41,8 @@ impl KerberosClient {
     /// Perform a TCP send/receive to the KDC (port 88)
     async fn _send_tcp_req(&self, payload: &[u8]) -> Result<Vec<u8>> {
         let addr = format!("{}:88", &self.kdc_ip);
-        let mut stream = tokio::time::timeout(Duration::from_secs(5), TcpStream::connect(&addr)).await??;
+        let mut stream =
+            tokio::time::timeout(Duration::from_secs(5), TcpStream::connect(&addr)).await??;
 
         // 4 byte length header for Kerberos over TCP
         let len_bytes = (payload.len() as u32).to_be_bytes();
@@ -50,7 +51,8 @@ impl KerberosClient {
 
         // Receive length header
         let mut resp_len_buf = [0u8; 4];
-        tokio::time::timeout(Duration::from_secs(5), stream.read_exact(&mut resp_len_buf)).await??;
+        tokio::time::timeout(Duration::from_secs(5), stream.read_exact(&mut resp_len_buf))
+            .await??;
         let resp_len = u32::from_be_bytes(resp_len_buf) as usize;
 
         if resp_len > 10 * 1024 * 1024 {

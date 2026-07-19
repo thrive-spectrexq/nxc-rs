@@ -269,14 +269,13 @@ impl NxcDb {
         let conn = pool.get()?;
         run_migrations(&conn)?;
 
-        Ok(Self {
-            pool,
-            workspace: workspace.to_string(),
-        })
+        Ok(Self { pool, workspace: workspace.to_string() })
     }
 
     /// Get a database connection from the pool.
-    pub fn get_connection(&self) -> Result<r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>> {
+    pub fn get_connection(
+        &self,
+    ) -> Result<r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>> {
         Ok(self.pool.get()?)
     }
 

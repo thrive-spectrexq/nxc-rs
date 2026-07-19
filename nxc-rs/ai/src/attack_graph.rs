@@ -27,10 +27,7 @@ pub struct AttackGraph {
 impl AttackGraph {
     /// Creates a new, empty `AttackGraph`.
     pub fn new() -> Self {
-        Self {
-            nodes: Vec::new(),
-            edges: Vec::new(),
-        }
+        Self { nodes: Vec::new(), edges: Vec::new() }
     }
 
     /// Adds a new node to the attack graph.

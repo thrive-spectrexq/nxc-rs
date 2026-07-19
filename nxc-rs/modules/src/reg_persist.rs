@@ -82,14 +82,11 @@ impl NxcModule for RegPersistModule {
         let action = opts.get("ACTION").map(String::as_str).unwrap_or("add");
         let method = opts.get("METHOD").map(String::as_str).unwrap_or("run_key");
         let name = opts.get("NAME").map(String::as_str).unwrap_or("WindowsUpdate");
-        let payload = opts.get("PAYLOAD")
-            .ok_or_else(|| anyhow::anyhow!("PAYLOAD is required"))?;
+        let payload = opts.get("PAYLOAD").ok_or_else(|| anyhow::anyhow!("PAYLOAD is required"))?;
         let hive = opts.get("HIVE").map(String::as_str).unwrap_or("HKLM");
 
         let target = session.target().to_string();
-        tracing::info!(
-            "reg_persist: {action} persistence ({method}) on {target} via {hive}"
-        );
+        tracing::info!("reg_persist: {action} persistence ({method}) on {target} via {hive}");
 
         let reg_path = match method {
             "run_once" => format!("{hive}\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce"),

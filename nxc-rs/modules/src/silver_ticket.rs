@@ -85,14 +85,12 @@ impl NxcModule for SilverTicketModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let service_hash = opts.get("SERVICE_HASH")
-            .ok_or_else(|| anyhow::anyhow!("SERVICE_HASH is required"))?;
-        let domain = opts.get("DOMAIN")
-            .ok_or_else(|| anyhow::anyhow!("DOMAIN is required"))?;
-        let domain_sid = opts.get("DOMAIN_SID")
-            .ok_or_else(|| anyhow::anyhow!("DOMAIN_SID is required"))?;
-        let spn = opts.get("SPN")
-            .ok_or_else(|| anyhow::anyhow!("SPN is required"))?;
+        let service_hash =
+            opts.get("SERVICE_HASH").ok_or_else(|| anyhow::anyhow!("SERVICE_HASH is required"))?;
+        let domain = opts.get("DOMAIN").ok_or_else(|| anyhow::anyhow!("DOMAIN is required"))?;
+        let domain_sid =
+            opts.get("DOMAIN_SID").ok_or_else(|| anyhow::anyhow!("DOMAIN_SID is required"))?;
+        let spn = opts.get("SPN").ok_or_else(|| anyhow::anyhow!("SPN is required"))?;
         let user = opts.get("USER").map(String::as_str).unwrap_or("Administrator");
         let output = opts.get("OUTPUT").map(String::as_str).unwrap_or("silver.ccache");
 

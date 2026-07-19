@@ -9,11 +9,7 @@ pub struct MockSession {
 
 impl MockSession {
     pub fn new(protocol: &'static str, target: &str, is_admin: bool) -> Self {
-        Self {
-            protocol_name: protocol,
-            target_host: target.to_string(),
-            is_admin_flag: is_admin,
-        }
+        Self { protocol_name: protocol, target_host: target.to_string(), is_admin_flag: is_admin }
     }
 }
 

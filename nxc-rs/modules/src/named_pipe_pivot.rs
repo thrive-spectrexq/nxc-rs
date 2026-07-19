@@ -74,10 +74,10 @@ impl NxcModule for NamedPipePivotModule {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let pipe_name = opts.get("PIPE_NAME").map(String::as_str).unwrap_or("nxcpivot");
-        let forward_host = opts.get("FORWARD_HOST")
-            .ok_or_else(|| anyhow::anyhow!("FORWARD_HOST is required"))?;
-        let forward_port = opts.get("FORWARD_PORT")
-            .ok_or_else(|| anyhow::anyhow!("FORWARD_PORT is required"))?;
+        let forward_host =
+            opts.get("FORWARD_HOST").ok_or_else(|| anyhow::anyhow!("FORWARD_HOST is required"))?;
+        let forward_port =
+            opts.get("FORWARD_PORT").ok_or_else(|| anyhow::anyhow!("FORWARD_PORT is required"))?;
         let action = opts.get("ACTION").map(String::as_str).unwrap_or("create");
 
         let target = session.target().to_string();
@@ -96,9 +96,7 @@ impl NxcModule for NamedPipePivotModule {
                 tracing::debug!("named_pipe_pivot: Creating pipe: {pipe_path}");
 
                 // Step 3: Configure forwarding to internal host
-                tracing::debug!(
-                    "named_pipe_pivot: Forwarding to {forward_host}:{forward_port}"
-                );
+                tracing::debug!("named_pipe_pivot: Forwarding to {forward_host}:{forward_port}");
 
                 // Step 4: Start relay
                 tracing::debug!("named_pipe_pivot: Starting relay thread");
@@ -129,7 +127,9 @@ impl NxcModule for NamedPipePivotModule {
                 )
             }
             _ => {
-                return Err(anyhow::anyhow!("Unknown ACTION '{action}'. Use: create, destroy, status"));
+                return Err(anyhow::anyhow!(
+                    "Unknown ACTION '{action}'. Use: create, destroy, status"
+                ));
             }
         };
 

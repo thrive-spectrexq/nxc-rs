@@ -114,7 +114,7 @@ impl CircuitBreaker {
 
     /// Execute an async operation through the circuit breaker, with a custom error classifier.
     /// The classifier should return `true` if the error should be counted as a circuit failure
-    /// (e.g., a network timeout), or `false` if it should be ignored by the circuit breaker 
+    /// (e.g., a network timeout), or `false` if it should be ignored by the circuit breaker
     /// (e.g., an authentication failure).
     pub async fn call_with_classifier<F, Fut, T, C>(&self, operation: F, classifier: C) -> Result<T>
     where

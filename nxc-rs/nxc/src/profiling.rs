@@ -14,7 +14,6 @@ pub struct MemorySnapshot {
     /// Virtual memory size in bytes (if available).
     pub vms_bytes: Option<u64>,
     /// Timestamp of the snapshot.
-
     pub _timestamp: std::time::Instant,
 }
 

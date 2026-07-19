@@ -53,7 +53,8 @@ impl DatabaseBackend for NxcDb {
             let mut db_mut = db.clone();
             db_mut.set_workspace(&ws);
             db_mut.search_credentials(dom.as_deref(), src.as_deref(), admin_only)
-        }).await?
+        })
+        .await?
     }
 
     async fn delete_credential(&self, cred_id: i64) -> Result<usize> {
@@ -64,7 +65,10 @@ impl DatabaseBackend for NxcDb {
     async fn add_auth_result(&self, res: &AuthResultEntry) -> Result<i64> {
         let db = self.clone();
         let r = res.clone();
-        spawn_blocking(move || db.add_auth_result(r.host_id, r.credential_id, &r.protocol, &r.status, r.admin)).await?
+        spawn_blocking(move || {
+            db.add_auth_result(r.host_id, r.credential_id, &r.protocol, &r.status, r.admin)
+        })
+        .await?
     }
 
     async fn add_loot(&self, loot: &Loot) -> Result<i64> {
@@ -91,7 +95,8 @@ impl DatabaseBackend for NxcDb {
             let mut db_mut = db;
             db_mut.set_workspace(&ws);
             db_mut.export_workspace()
-        }).await?
+        })
+        .await?
     }
 
     async fn get_stats(&self, workspace: &str) -> Result<Stats> {

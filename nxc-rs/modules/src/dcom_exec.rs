@@ -44,7 +44,9 @@ impl NxcModule for DcomExec {
             },
             ModuleOption {
                 name: "METHOD".to_string(),
-                description: "DCOM object to use (MMC20.Application, ShellWindows, ShellBrowserWindow)".to_string(),
+                description:
+                    "DCOM object to use (MMC20.Application, ShellWindows, ShellBrowserWindow)"
+                        .to_string(),
                 required: false,
                 default: Some("MMC20.Application".to_string()),
             },
@@ -60,7 +62,7 @@ impl NxcModule for DcomExec {
         let method = opts.get("METHOD").map(String::as_str).unwrap_or("MMC20.Application");
 
         tracing::info!("dcom_exec: Executing command via {} - {}", method, command);
-        
+
         // Simulating DCOM execution logic
         let output = format!(
             "Executed command '{command}' successfully via DCOM object '{method}'. \nNote: Output retrieval via DCOM is often blind or requires writing to a temp file."

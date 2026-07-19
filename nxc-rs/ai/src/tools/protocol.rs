@@ -111,11 +111,15 @@ impl NxcTool for ProtocolTool {
             Protocol::Vnc => Arc::new(nxc_protocols::vnc::VncProtocol::new()),
             Protocol::Nfs => Arc::new(nxc_protocols::nfs::NfsProtocol::new()),
             Protocol::Adb => Arc::new(nxc_protocols::adb::AdbProtocol::new()),
-            Protocol::Network => Arc::new(nxc_protocols::network::NetworkProtocol::new(false, None, false, false, false, false, false)),
+            Protocol::Network => Arc::new(nxc_protocols::network::NetworkProtocol::new(
+                false, None, false, false, false, false, false,
+            )),
             #[cfg(feature = "opcua-support")]
             Protocol::OpcUa => Arc::new(nxc_protocols::opcua::OpcUaProtocol::new()),
             #[cfg(not(feature = "opcua-support"))]
-            Protocol::OpcUa => anyhow::bail!("OPC-UA support is not enabled. Recompile with the 'opcua-support' feature."),
+            Protocol::OpcUa => anyhow::bail!(
+                "OPC-UA support is not enabled. Recompile with the 'opcua-support' feature."
+            ),
             Protocol::Mqtt => Arc::new(nxc_protocols::mqtt::MqttProtocol::new()),
             Protocol::Modbus => Arc::new(nxc_protocols::modbus::ModbusProtocol::new()),
             Protocol::Exchange => Arc::new(nxc_protocols::exchange::ExchangeProtocol::new()),

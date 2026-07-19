@@ -8,9 +8,9 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use std::time::Duration;
-use tracing::{debug, info};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
+use tracing::{debug, info};
 
 // ─── Modbus Session ───────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ impl NxcProtocol for ModbusProtocol {
     }
 
     fn supports_exec(&self) -> bool {
-        false 
+        false
     }
 
     fn supported_modules(&self) -> &[&str] {
@@ -86,10 +86,7 @@ impl NxcProtocol for ModbusProtocol {
         match timeout(self.timeout, TcpStream::connect((target, port))).await {
             Ok(Ok(_conn)) => {
                 info!("Modbus: Connected to {}:{}", target, port);
-                Ok(Box::new(ModbusSession {
-                    target: target.to_string(),
-                    port,
-                }))
+                Ok(Box::new(ModbusSession { target: target.to_string(), port }))
             }
             Ok(Err(e)) => Err(anyhow!("Connection failed: {e}")),
             Err(_) => Err(anyhow!("Connection timeout to {target}:{port}")),

@@ -80,11 +80,16 @@ impl WinrmProtocol {
             Client::builder().timeout(self.timeout).danger_accept_invalid_certs(!self.verify_ssl); // lgtm[rust/disabled-certificate-check] Configurable certificate verification
 
         if let Some(p) = proxy_str {
-            let proxy = reqwest::Proxy::all(p).map_err(|e| crate::errors::WinRmError::ConnectionFailed(format!("Invalid proxy URL: {e}")))?;
+            let proxy = reqwest::Proxy::all(p).map_err(|e| {
+                crate::errors::WinRmError::ConnectionFailed(format!("Invalid proxy URL: {e}"))
+            })?;
             builder = builder.proxy(proxy);
         }
 
-        builder.build().map_err(|e| crate::errors::WinRmError::ConnectionFailed(format!("Failed to build HTTP client: {e}")).into())
+        builder.build().map_err(|e| {
+            crate::errors::WinRmError::ConnectionFailed(format!("Failed to build HTTP client: {e}"))
+                .into()
+        })
     }
 }
 
@@ -138,7 +143,12 @@ impl NxcProtocol for WinrmProtocol {
 
         let response = match request.send().await {
             Ok(resp) => resp,
-            Err(e) => return Err(crate::errors::WinRmError::ConnectionFailed(format!("Connection failed to WinRM service: {e}")).into()),
+            Err(e) => {
+                return Err(crate::errors::WinRmError::ConnectionFailed(format!(
+                    "Connection failed to WinRM service: {e}"
+                ))
+                .into())
+            }
         };
 
         debug!("WinRM: Received response code: {}", response.status());
@@ -187,7 +197,11 @@ impl NxcProtocol for WinrmProtocol {
                 client: Some(client),
             }))
         } else {
-            Err(crate::errors::WinRmError::Unknown(format!("Failed to get NTLM challenge from target. Status: {}", response.status())).into())
+            Err(crate::errors::WinRmError::Unknown(format!(
+                "Failed to get NTLM challenge from target. Status: {}",
+                response.status()
+            ))
+            .into())
         }
     }
 
@@ -292,9 +306,9 @@ impl NxcProtocol for WinrmProtocol {
         }
         let resp = req.body(create_soap).send().await?;
         let body = resp.text().await?;
-        let shell_id = self
-            .extract_xml_tag(&body, "rsp:ShellId")
-            .ok_or_else(|| crate::errors::WinRmError::ExecutionFailed("Failed to extract ShellId".into()))?;
+        let shell_id = self.extract_xml_tag(&body, "rsp:ShellId").ok_or_else(|| {
+            crate::errors::WinRmError::ExecutionFailed("Failed to extract ShellId".into())
+        })?;
 
         // 2. Run Command
         let command_soap = self.build_command_soap(&shell_id, &final_cmd);
@@ -304,9 +318,9 @@ impl NxcProtocol for WinrmProtocol {
         }
         let resp = req.body(command_soap).send().await?;
         let body = resp.text().await?;
-        let command_id = self
-            .extract_xml_tag(&body, "rsp:CommandId")
-            .ok_or_else(|| crate::errors::WinRmError::ExecutionFailed("Failed to extract CommandId".into()))?;
+        let command_id = self.extract_xml_tag(&body, "rsp:CommandId").ok_or_else(|| {
+            crate::errors::WinRmError::ExecutionFailed("Failed to extract CommandId".into())
+        })?;
 
         // 3. Receive Output (Poll)
         let mut stdout = String::new();
@@ -329,8 +343,12 @@ impl NxcProtocol for WinrmProtocol {
                     if let Some(end_pos) = body[tag_content_start..].find("</rsp:Stream>") {
                         let content = body[tag_content_start..tag_content_start + end_pos].trim();
                         if !content.is_empty() {
-                            if let Ok(decoded) = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, content) {
-                                let is_stderr = body[abs_start..tag_content_start].contains("Name=\"stderr\"");
+                            if let Ok(decoded) = base64::Engine::decode(
+                                &base64::engine::general_purpose::STANDARD,
+                                content,
+                            ) {
+                                let is_stderr =
+                                    body[abs_start..tag_content_start].contains("Name=\"stderr\"");
                                 if is_stderr {
                                     stderr.push_str(&String::from_utf8_lossy(&decoded));
                                 } else {
@@ -570,7 +588,7 @@ $k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
         // This is a stub for WS-Trust authentication (e.g., using ADFS or Azure AD SAML tokens).
         // A full implementation would craft a WS-Trust RST (RequestSecurityToken), send it to the STS,
         // retrieve the SAML assertion, and inject it into the WinRM SOAP header.
-        
+
         let token = creds.password.as_deref().unwrap_or("");
         if !token.starts_with("<saml:Assertion") {
             return Ok(AuthResult::failure("Valid SAML token required for WS-Trust auth", None));
@@ -584,14 +602,14 @@ $k32::VirtualProtect($asb, [uint32]5, $p, [ref]$p);
             .post(&url)
             .header("Content-Type", "application/soap+xml;charset=UTF-8")
             // Normally the SAML assertion goes into the SOAP Security header of the payload
-            .body(self.build_create_shell_soap()) 
+            .body(self.build_create_shell_soap())
             .send()
             .await?;
 
         if probe_resp.status().is_success() {
             debug!("WinRM: WS-Trust Auth successful for {}", creds.username);
             // In a real implementation, we'd store the signed SOAP headers or token references
-            winrm_sess.auth_header = None; 
+            winrm_sess.auth_header = None;
             Ok(AuthResult::success(true))
         } else {
             Ok(AuthResult::failure(
@@ -609,9 +627,8 @@ mod tests {
 
     #[test]
     fn test_winrm_protocol_config() {
-        let proto = WinrmProtocol::new()
-            .with_timeout(Duration::from_secs(42))
-            .with_verify_ssl(true);
+        let proto =
+            WinrmProtocol::new().with_timeout(Duration::from_secs(42)).with_verify_ssl(true);
         assert_eq!(proto.timeout, Duration::from_secs(42));
         assert!(proto.verify_ssl);
     }
@@ -661,4 +678,3 @@ mod tests {
         assert!(bypassed.contains("whoami\""));
     }
 }
-

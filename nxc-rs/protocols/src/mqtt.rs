@@ -8,9 +8,9 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use std::time::Duration;
-use tracing::{debug, info};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
+use tracing::{debug, info};
 
 // ─── MQTT Session ────────────────────────────────────────────────
 
@@ -70,7 +70,7 @@ impl NxcProtocol for MqttProtocol {
     }
 
     fn supports_exec(&self) -> bool {
-        false 
+        false
     }
 
     fn supported_modules(&self) -> &[&str] {
@@ -91,7 +91,7 @@ impl NxcProtocol for MqttProtocol {
                 Ok(Box::new(MqttSession {
                     target: target.to_string(),
                     port,
-                    authenticated: false, 
+                    authenticated: false,
                     credentials: None,
                 }))
             }
@@ -120,7 +120,7 @@ impl NxcProtocol for MqttProtocol {
         // Mock authentication process
         debug!("MQTT: Attempting auth for user: {}", creds.username);
         mqtt_sess.credentials = Some(creds.clone());
-        mqtt_sess.authenticated = true; 
+        mqtt_sess.authenticated = true;
         Ok(AuthResult::success(true))
     }
 

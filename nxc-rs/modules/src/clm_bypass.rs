@@ -44,7 +44,8 @@ impl NxcModule for ClmBypassModule {
         vec![
             ModuleOption {
                 name: "METHOD".to_string(),
-                description: "Bypass method: installutil, msbuild, custom_runspace, cim_session".to_string(),
+                description: "Bypass method: installutil, msbuild, custom_runspace, cim_session"
+                    .to_string(),
                 required: false,
                 default: Some("custom_runspace".to_string()),
             },

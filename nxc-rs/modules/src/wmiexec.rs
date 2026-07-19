@@ -78,7 +78,8 @@ impl NxcModule for WmiExecModule {
         tracing::debug!("wmiexec: Connecting to WMI namespace on {}", target);
 
         // Step 2: Wrap command to redirect output to temp file
-        let temp_file = format!("\\\\{target}\\{output_share}\\Temp\\nxc_wmi_{}.txt", std::process::id());
+        let temp_file =
+            format!("\\\\{target}\\{output_share}\\Temp\\nxc_wmi_{}.txt", std::process::id());
         let wrapped_cmd = format!("cmd.exe /Q /c {cmd} > {temp_file} 2>&1");
         tracing::debug!("wmiexec: Wrapped command: {wrapped_cmd}");
 

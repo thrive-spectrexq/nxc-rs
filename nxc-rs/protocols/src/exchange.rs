@@ -7,9 +7,9 @@ use crate::{CommandOutput, NxcProtocol, NxcSession};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
+use reqwest::Client;
 use std::time::Duration;
 use tracing::{debug, info};
-use reqwest::Client;
 
 // ─── Exchange Session ──────────────────────────────────────────────
 
@@ -70,7 +70,7 @@ impl NxcProtocol for ExchangeProtocol {
     }
 
     fn supports_exec(&self) -> bool {
-        false 
+        false
     }
 
     fn supported_modules(&self) -> &[&str] {
@@ -84,15 +84,13 @@ impl NxcProtocol for ExchangeProtocol {
         _proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
         debug!("Exchange: Connecting to {}:{}", target, port);
-        
+
         let use_ssl = port == 443 || port == 8443;
         let scheme = if use_ssl { "https" } else { "http" };
         let url = format!("{scheme}://{target}:{port}/EWS/Exchange.asmx");
 
-        let client = Client::builder()
-            .timeout(self.timeout)
-            .danger_accept_invalid_certs(true)
-            .build()?;
+        let client =
+            Client::builder().timeout(self.timeout).danger_accept_invalid_certs(true).build()?;
 
         let resp = client.get(&url).send().await;
 
@@ -133,23 +131,18 @@ impl NxcProtocol for ExchangeProtocol {
         let port = exchange_sess.port;
         let url = format!("{scheme}://{target}:{port}/EWS/Exchange.asmx");
 
-        let client = Client::builder()
-            .timeout(self.timeout)
-            .danger_accept_invalid_certs(true)
-            .build()?;
+        let client =
+            Client::builder().timeout(self.timeout).danger_accept_invalid_certs(true).build()?;
 
         // Perform basic auth attempt
         let password = creds.password.as_deref().unwrap_or_default();
-        let resp = client.get(&url)
-            .basic_auth(&creds.username, Some(password))
-            .send()
-            .await;
+        let resp = client.get(&url).basic_auth(&creds.username, Some(password)).send().await;
 
         match resp {
             Ok(r) if r.status().is_success() || r.status().is_server_error() => {
                 debug!("Exchange: Auth successful for user: {}", creds.username);
                 exchange_sess.credentials = Some(creds.clone());
-                exchange_sess.authenticated = true; 
+                exchange_sess.authenticated = true;
                 Ok(AuthResult::success(false))
             }
             Ok(r) => {

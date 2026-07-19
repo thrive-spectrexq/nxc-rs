@@ -104,13 +104,10 @@ impl NxcModule for WebAuthBrute {
 
         for u in &default_users {
             for p in &default_passwords {
-                let permit = match sem
-                    .clone()
-                    .acquire_owned()
-                    .await {
-                Ok(p) => p,
-                Err(_) => break,
-            };
+                let permit = match sem.clone().acquire_owned().await {
+                    Ok(p) => p,
+                    Err(_) => break,
+                };
                 let client = http_sess.client.clone();
                 let username = u.to_string();
                 let password = p.to_string();

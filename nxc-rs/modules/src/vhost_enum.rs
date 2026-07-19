@@ -145,10 +145,7 @@ impl NxcModule for VhostEnum {
         let mut tasks = Vec::new();
 
         for sub in subdomains {
-            let permit = match sem
-                .clone()
-                .acquire_owned()
-                .await {
+            let permit = match sem.clone().acquire_owned().await {
                 Ok(p) => p,
                 Err(_) => break,
             };

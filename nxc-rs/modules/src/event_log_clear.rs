@@ -43,7 +43,8 @@ impl NxcModule for EventLogClearModule {
         vec![
             ModuleOption {
                 name: "LOG".to_string(),
-                description: "Log channel to clear: Security, System, Application, or 'all'".to_string(),
+                description: "Log channel to clear: Security, System, Application, or 'all'"
+                    .to_string(),
                 required: false,
                 default: Some("all".to_string()),
             },
@@ -68,7 +69,13 @@ impl NxcModule for EventLogClearModule {
         tracing::info!("event_log_clear: Clearing '{log_target}' logs on {target} via {method}");
 
         let logs_to_clear: Vec<&str> = if log_target.to_lowercase() == "all" {
-            vec!["Security", "System", "Application", "Windows PowerShell", "Microsoft-Windows-Sysmon/Operational"]
+            vec![
+                "Security",
+                "System",
+                "Application",
+                "Windows PowerShell",
+                "Microsoft-Windows-Sysmon/Operational",
+            ]
         } else {
             vec![log_target]
         };
@@ -97,15 +104,12 @@ impl NxcModule for EventLogClearModule {
         }
 
         let logs_count = logs_to_clear.len();
-        let cleared_str = cleared.iter()
-            .map(|l| format!("  [+] Cleared: {l}\n"))
-            .collect::<String>();
+        let cleared_str =
+            cleared.iter().map(|l| format!("  [+] Cleared: {l}\n")).collect::<String>();
         let failed_str = if failed.is_empty() {
             String::new()
         } else {
-            failed.iter()
-                .map(|l| format!("  [-] Failed: {l}\n"))
-                .collect::<String>()
+            failed.iter().map(|l| format!("  [-] Failed: {l}\n")).collect::<String>()
         };
 
         let output_text = format!(

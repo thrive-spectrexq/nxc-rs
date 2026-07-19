@@ -128,10 +128,10 @@ pub mod web_fuzzer;
 pub mod web_vuln;
 pub mod whoami;
 pub mod wifi_recon;
+pub mod winrm_exec;
 pub mod wmi_enum;
 pub mod wmi_persist;
 pub mod wmiexec;
-pub mod winrm_exec;
 pub mod zerologon;
 
 use anyhow::Result;
@@ -163,10 +163,10 @@ pub type ModuleOptions = HashMap<String, String>;
 pub trait ModuleOptionsExt {
     /// Get a string option, falling back to a default value.
     fn get_string(&self, key: &str, default: &str) -> String;
-    
+
     /// Get a boolean option, falling back to a default value.
     fn get_bool(&self, key: &str, default: bool) -> bool;
-    
+
     /// Get an unsigned 16-bit integer option, falling back to a default value.
     fn get_u16(&self, key: &str, default: u16) -> u16;
 }
@@ -188,9 +188,7 @@ impl ModuleOptionsExt for ModuleOptions {
     }
 
     fn get_u16(&self, key: &str, default: u16) -> u16 {
-        self.get(key)
-            .and_then(|v| v.parse::<u16>().ok())
-            .unwrap_or(default)
+        self.get(key).and_then(|v| v.parse::<u16>().ok()).unwrap_or(default)
     }
 }
 
@@ -437,7 +435,11 @@ impl ModuleRegistry {
         register_module!(modules, "sccm", sccm::Sccm::new());
         register_module!(modules, "add_computer", add_computer::AddComputer::new());
         register_module!(modules, "shadowcoerce", shadowcoerce::ShadowCoerce::new());
-        register_module!(modules, "shadow_credentials", shadow_credentials::ShadowCredentials::new());
+        register_module!(
+            modules,
+            "shadow_credentials",
+            shadow_credentials::ShadowCredentials::new()
+        );
 
         // ─── Phase 2: LDAP/AD Enumeration (14 modules) ─────────────
         register_module!(modules, "daclread", daclread::DaclRead::new());
@@ -511,8 +513,16 @@ impl ModuleRegistry {
         register_module!(modules, "reg_persist", reg_persist::RegPersistModule::new());
         register_module!(modules, "clm_bypass", clm_bypass::ClmBypassModule::new());
         register_module!(modules, "ppid_spoof", ppid_spoof::PpidSpoofModule::new());
-        register_module!(modules, "token_impersonation", token_impersonation::TokenImpersonationModule::new());
-        register_module!(modules, "named_pipe_pivot", named_pipe_pivot::NamedPipePivotModule::new());
+        register_module!(
+            modules,
+            "token_impersonation",
+            token_impersonation::TokenImpersonationModule::new()
+        );
+        register_module!(
+            modules,
+            "named_pipe_pivot",
+            named_pipe_pivot::NamedPipePivotModule::new()
+        );
         register_module!(modules, "event_log_clear", event_log_clear::EventLogClearModule::new());
 
         Self { modules }
@@ -544,11 +554,8 @@ impl ModuleRegistry {
 
     /// Returns all unique protocol names across every registered module.
     pub fn protocols(&self) -> Vec<&str> {
-        let mut protos: Vec<&str> = self
-            .modules
-            .values()
-            .flat_map(|m| m.supported_protocols().iter().copied())
-            .collect();
+        let mut protos: Vec<&str> =
+            self.modules.values().flat_map(|m| m.supported_protocols().iter().copied()).collect();
         protos.sort_unstable();
         protos.dedup();
         protos
@@ -597,9 +604,7 @@ mod tests {
 
     #[test]
     fn test_module_registry_registration_and_retrieval() {
-        let mut registry = ModuleRegistry {
-            modules: HashMap::new(),
-        };
+        let mut registry = ModuleRegistry { modules: HashMap::new() };
 
         // Register a module
         let mock_module = Box::new(MockModule::new("mock_test", vec!["smb"]));
@@ -616,9 +621,7 @@ mod tests {
 
     #[test]
     fn test_module_registry_non_existent() {
-        let registry = ModuleRegistry {
-            modules: HashMap::new(),
-        };
+        let registry = ModuleRegistry { modules: HashMap::new() };
 
         // Error handling for non-existent modules
         let retrieved = registry.get("does_not_exist");
@@ -627,9 +630,7 @@ mod tests {
 
     #[test]
     fn test_module_registry_case_sensitivity() {
-        let mut registry = ModuleRegistry {
-            modules: HashMap::new(),
-        };
+        let mut registry = ModuleRegistry { modules: HashMap::new() };
 
         registry.register(Box::new(MockModule::new("CaseSensitive", vec!["ldap"])));
 
@@ -742,11 +743,7 @@ mod tests {
             _session: &mut dyn nxc_protocols::NxcSession,
             _opts: &ModuleOptions,
         ) -> Result<ModuleResult> {
-            Ok(ModuleResult {
-                success: true,
-                output: "Success".to_string(),
-                ..Default::default()
-            })
+            Ok(ModuleResult { success: true, output: "Success".to_string(), ..Default::default() })
         }
     }
 
@@ -769,4 +766,3 @@ mod tests {
         assert_eq!(result.output, "Success");
     }
 }
-

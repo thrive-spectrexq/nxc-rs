@@ -8,10 +8,10 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use std::time::Duration;
-use tracing::{debug, info};
-use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 use tokio::time::timeout;
+use tracing::{debug, info};
 
 // ─── Telnet Session ───────────────────────────────────────────────
 
@@ -71,7 +71,7 @@ impl NxcProtocol for TelnetProtocol {
     }
 
     fn supports_exec(&self) -> bool {
-        true 
+        true
     }
 
     fn supported_modules(&self) -> &[&str] {
@@ -92,7 +92,7 @@ impl NxcProtocol for TelnetProtocol {
                 Ok(Box::new(TelnetSession {
                     target: target.to_string(),
                     port,
-                    authenticated: false, 
+                    authenticated: false,
                     credentials: None,
                 }))
             }
@@ -119,29 +119,31 @@ impl NxcProtocol for TelnetProtocol {
         }
 
         debug!("Telnet: Attempting auth for user: {}", creds.username);
-        
+
         let mut conn = TcpStream::connect((telnet_sess.target.as_str(), telnet_sess.port)).await?;
-        
+
         // Very basic mock Telnet auth sequence
         let mut buf = [0u8; 1024];
         let _ = timeout(self.timeout, conn.read(&mut buf)).await;
-        
+
         let username = &creds.username;
         let login_str = format!("{username}\r\n");
         conn.write_all(login_str.as_bytes()).await?;
         let _ = timeout(self.timeout, conn.read(&mut buf)).await;
-        
+
         let password = creds.password.as_deref().unwrap_or_default();
         let pwd_str = format!("{password}\r\n");
         conn.write_all(pwd_str.as_bytes()).await?;
         let _ = timeout(self.timeout, conn.read(&mut buf)).await;
 
         let response = String::from_utf8_lossy(&buf);
-        if response.to_lowercase().contains("login incorrect") || response.to_lowercase().contains("invalid") {
+        if response.to_lowercase().contains("login incorrect")
+            || response.to_lowercase().contains("invalid")
+        {
             Ok(AuthResult::failure("Login incorrect", None))
         } else {
             telnet_sess.credentials = Some(creds.clone());
-            telnet_sess.authenticated = true; 
+            telnet_sess.authenticated = true;
             Ok(AuthResult::success(true))
         }
     }
@@ -160,11 +162,11 @@ impl NxcProtocol for TelnetProtocol {
         }
 
         let mut conn = TcpStream::connect((telnet_sess.target.as_str(), telnet_sess.port)).await?;
-        
+
         // Send command and read output
         let cmd_str = format!("{cmd}\r\n");
         conn.write_all(cmd_str.as_bytes()).await?;
-        
+
         let mut buf = [0u8; 4096];
         let n = match timeout(self.timeout, conn.read(&mut buf)).await {
             Ok(Ok(n)) => n,

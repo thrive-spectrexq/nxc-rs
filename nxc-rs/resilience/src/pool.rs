@@ -167,7 +167,7 @@ impl<C: Send + 'static> ConnectionPool<C> {
 
         pool.push_back(PooledEntry {
             connection: checked_out.connection,
-            created_at: checked_out.created_at,  // preserve original birth time
+            created_at: checked_out.created_at, // preserve original birth time
             last_used: Instant::now(),
         });
 
@@ -230,10 +230,8 @@ mod tests {
         assert_eq!(pool.idle_count().await, 1);
 
         // Should reuse instead of creating new
-        let checked_out = pool
-            .get_or_create(|| async { Ok("should_not_create".to_string()) })
-            .await
-            .unwrap();
+        let checked_out =
+            pool.get_or_create(|| async { Ok("should_not_create".to_string()) }).await.unwrap();
 
         assert_eq!(checked_out.connection, "cached_conn");
         assert_eq!(pool.idle_count().await, 0);
@@ -292,23 +290,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_return_checked_out_preserves_created_at() {
-        let pool: ConnectionPool<String> =
-            ConnectionPool::new(5, Duration::from_secs(60)).with_max_lifetime(Duration::from_millis(150));
+        let pool: ConnectionPool<String> = ConnectionPool::new(5, Duration::from_secs(60))
+            .with_max_lifetime(Duration::from_millis(150));
 
         // Check out a fresh connection
-        let checked_out =
-            pool.get_or_create(|| async { Ok("conn".to_string()) }).await.unwrap();
+        let checked_out = pool.get_or_create(|| async { Ok("conn".to_string()) }).await.unwrap();
 
         let original_created_at = checked_out.created_at;
 
         // Return it and immediately get it back
         pool.return_checked_out(checked_out).await;
-        let second =
-            pool.get_or_create(|| async { Ok("new_conn".to_string()) }).await.unwrap();
+        let second = pool.get_or_create(|| async { Ok("new_conn".to_string()) }).await.unwrap();
 
         // The creation time should be preserved, not reset to now
         assert_eq!(second.connection, "conn");
-        assert!(second.created_at.elapsed() < original_created_at.elapsed() + Duration::from_millis(5));
+        assert!(
+            second.created_at.elapsed() < original_created_at.elapsed() + Duration::from_millis(5)
+        );
 
         // Wait for max lifetime to expire, then verify eviction
         tokio::time::sleep(Duration::from_millis(200)).await;

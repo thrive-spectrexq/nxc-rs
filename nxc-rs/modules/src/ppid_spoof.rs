@@ -49,7 +49,9 @@ impl NxcModule for PpidSpoofModule {
             },
             ModuleOption {
                 name: "PPID_TARGET".to_string(),
-                description: "Name of the process to use as parent (e.g. explorer.exe, svchost.exe)".to_string(),
+                description:
+                    "Name of the process to use as parent (e.g. explorer.exe, svchost.exe)"
+                        .to_string(),
                 required: false,
                 default: Some("explorer.exe".to_string()),
             },

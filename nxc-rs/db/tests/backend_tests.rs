@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used)]
 
-use nxc_db::{backend::*, HostInfo, Credential, AuthResultEntry, NxcDb};
+use nxc_db::{backend::*, AuthResultEntry, Credential, HostInfo, NxcDb};
 use tempfile::tempdir;
 
 async fn setup_db() -> (Box<dyn DatabaseBackend>, tempfile::TempDir) {
@@ -84,20 +84,23 @@ async fn test_credentials_crud() {
 #[tokio::test]
 async fn test_auth_results() {
     let (db, _dir) = setup_db().await;
-    let host_id = db.upsert_host(&HostInfo {
-        id: None,
-        workspace: "default".to_string(),
-        ip: "10.0.0.3".to_string(),
-        hostname: None,
-        domain: None,
-        os: None,
-        os_version: None,
-        smb_signing: None,
-        signing_required: None,
-        is_dc: false,
-        first_seen: 0,
-        last_seen: 0,
-    }).await.unwrap();
+    let host_id = db
+        .upsert_host(&HostInfo {
+            id: None,
+            workspace: "default".to_string(),
+            ip: "10.0.0.3".to_string(),
+            hostname: None,
+            domain: None,
+            os: None,
+            os_version: None,
+            smb_signing: None,
+            signing_required: None,
+            is_dc: false,
+            first_seen: 0,
+            last_seen: 0,
+        })
+        .await
+        .unwrap();
 
     let res = AuthResultEntry {
         id: None,
@@ -119,20 +122,23 @@ async fn test_auth_results() {
 #[tokio::test]
 async fn test_vulnerabilities_and_attack_chains() {
     let (db, _dir) = setup_db().await;
-    let host_id = db.upsert_host(&HostInfo {
-        id: None,
-        workspace: "default".to_string(),
-        ip: "10.0.0.4".to_string(),
-        hostname: None,
-        domain: None,
-        os: None,
-        os_version: None,
-        smb_signing: None,
-        signing_required: None,
-        is_dc: false,
-        first_seen: 0,
-        last_seen: 0,
-    }).await.unwrap();
+    let host_id = db
+        .upsert_host(&HostInfo {
+            id: None,
+            workspace: "default".to_string(),
+            ip: "10.0.0.4".to_string(),
+            hostname: None,
+            domain: None,
+            os: None,
+            os_version: None,
+            smb_signing: None,
+            signing_required: None,
+            is_dc: false,
+            first_seen: 0,
+            last_seen: 0,
+        })
+        .await
+        .unwrap();
 
     let vuln = Vulnerability {
         id: None,

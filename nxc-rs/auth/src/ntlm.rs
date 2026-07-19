@@ -12,7 +12,7 @@
 // framework to communicate with legacy Windows environments.
 
 use anyhow::Result;
-use hmac::{Hmac, Mac, KeyInit as HmacKeyInit};
+use hmac::{Hmac, KeyInit as HmacKeyInit, Mac};
 use md4::{Digest, Md4};
 use md5::Md5;
 use rc4::cipher::StreamCipher;
@@ -312,9 +312,9 @@ impl NtlmAuthenticator {
         let (exported_session_key, encrypted_random_session_key) =
             if negotiate_flags & NTLMSSP_NEGOTIATE_KEY_EXCH != 0 {
                 let exported_key: [u8; 16] = rand::random();
-                let key_array: &[u8; 16] = session_base_key[..16]
-                    .try_into()
-                    .map_err(|_| anyhow::anyhow!("CryptoError: key derivation slice wrong length"))?;
+                let key_array: &[u8; 16] = session_base_key[..16].try_into().map_err(|_| {
+                    anyhow::anyhow!("CryptoError: key derivation slice wrong length")
+                })?;
                 let mut rc4_key = Rc4::new_from_slice(key_array)
                     .map_err(|e| anyhow::anyhow!("RC4 init fail: {e}"))?;
                 let mut encrypted = exported_key;
@@ -493,8 +493,8 @@ impl NtlmSessionSecurity {
         let sealing_key = self.client_sealing_key();
 
         // HMAC-MD5(SigningKey, SeqNum + Message)
-        let mut hmac =
-            <HmacMd5 as HmacKeyInit>::new_from_slice(&signing_key).expect("MD5 accepts any key length");
+        let mut hmac = <HmacMd5 as HmacKeyInit>::new_from_slice(&signing_key)
+            .expect("MD5 accepts any key length");
         hmac.update(&seq_num.to_le_bytes());
         hmac.update(message);
         let mac = hmac.finalize().into_bytes();
@@ -530,8 +530,8 @@ pub fn calculate_nt_hash(password: &str) -> [u8; 16] {
 /// Calculate NTLMv2 hash: HMAC-MD5(NT_Hash, UPPERCASE(user) + UPPERCASE(domain)).
 #[allow(clippy::expect_used)]
 pub fn calculate_v2_hash(username: &str, domain: &str, nt_hash: &[u8; 16]) -> [u8; 16] {
-    let mut hmac = <HmacMd5 as HmacKeyInit>::new_from_slice(nt_hash)
-        .expect("MD5 accepts any key length");
+    let mut hmac =
+        <HmacMd5 as HmacKeyInit>::new_from_slice(nt_hash).expect("MD5 accepts any key length");
     let identity = format!("{}{}", username.to_uppercase(), domain.to_uppercase());
     let utf16: Vec<u16> = identity.encode_utf16().collect();
     let bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
@@ -542,7 +542,7 @@ pub fn calculate_v2_hash(username: &str, domain: &str, nt_hash: &[u8; 16]) -> [u
 /// Calculate LM hash from a password (DES of "KGS!@#$%" with password key).
 #[allow(clippy::expect_used)]
 pub fn calculate_lm_hash(password: &str) -> [u8; 16] {
-    use des::cipher::{BlockCipherEncrypt, KeyInit, Block};
+    use des::cipher::{Block, BlockCipherEncrypt, KeyInit};
     use des::Des;
 
     // SECURITY: The "KGS!@#$%" magic string and DES algorithm are MANDATORY

@@ -41,14 +41,12 @@ impl NxcModule for SkeletonKeyModule {
     }
 
     fn options(&self) -> Vec<ModuleOption> {
-        vec![
-            ModuleOption {
-                name: "PASSWORD".to_string(),
-                description: "Master skeleton password (default: mimikatz)".to_string(),
-                required: false,
-                default: Some("mimikatz".to_string()),
-            },
-        ]
+        vec![ModuleOption {
+            name: "PASSWORD".to_string(),
+            description: "Master skeleton password (default: mimikatz)".to_string(),
+            required: false,
+            default: Some("mimikatz".to_string()),
+        }]
     }
 
     async fn run(

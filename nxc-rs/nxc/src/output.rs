@@ -15,7 +15,6 @@ pub struct NxcOutput {
     pub hostname: String,
 }
 
-
 impl NxcOutput {
     pub fn new(protocol: &str, host: &str, port: u16, hostname: Option<&str>) -> Self {
         Self {
@@ -98,7 +97,6 @@ impl fmt::Display for NxcOutput {
 
 /// Global-level output (not tied to a specific connection).
 pub struct NxcGlobalOutput;
-
 
 impl NxcGlobalOutput {
     pub fn banner(version: &str, codename: &str) {

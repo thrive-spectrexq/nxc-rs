@@ -1,9 +1,7 @@
 //! Session management for nxc-rs
-//! 
-//! Handles caching, storing, and tracking of network execution sessions 
+//!
+//! Handles caching, storing, and tracking of network execution sessions
 //! across different protocols and targets.
-
-
 
 use anyhow::Result;
 use dashmap::DashMap;
@@ -72,10 +70,8 @@ pub trait SessionCache: Send + Sync {
 
 /// Returns the current time in seconds since the UNIX epoch.
 fn current_time_secs() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
+        as i64
 }
 
 /// An in-memory distributed session cache implementation.
@@ -83,7 +79,7 @@ fn current_time_secs() -> i64 {
 /// # TTL Mechanism
 /// The `SessionManager` implements a Time-To-Live (TTL) mechanism to prevent memory leaks.
 /// Each `SessionRecord` has a `last_accessed` timestamp that is updated whenever the session
-/// is read or modified. A background Tokio task runs periodically to remove sessions that 
+/// is read or modified. A background Tokio task runs periodically to remove sessions that
 /// have not been accessed within the configured TTL duration. You can also manually trigger
 /// a cleanup using the `cleanup_expired` method.
 #[derive(Clone)]
@@ -103,9 +99,9 @@ impl SessionManager {
     pub fn with_ttl(ttl: std::time::Duration) -> Self {
         let cache = Arc::new(DashMap::new());
         let cache_clone = Arc::clone(&cache);
-        
+
         let manager = Self { cache, ttl };
-        
+
         // Spawn cleanup task
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
@@ -113,9 +109,7 @@ impl SessionManager {
                 interval.tick().await;
                 let now = current_time_secs();
                 let ttl_secs = ttl.as_secs() as i64;
-                cache_clone.retain(|_, record| {
-                    (now - record.last_accessed) < ttl_secs
-                });
+                cache_clone.retain(|_, record| (now - record.last_accessed) < ttl_secs);
             }
         });
 
@@ -126,9 +120,7 @@ impl SessionManager {
     pub fn cleanup_expired(&self) {
         let now = current_time_secs();
         let ttl_secs = self.ttl.as_secs() as i64;
-        self.cache.retain(|_, record| {
-            (now - record.last_accessed) < ttl_secs
-        });
+        self.cache.retain(|_, record| (now - record.last_accessed) < ttl_secs);
     }
 
     /// Generate a new unique session identifier.
@@ -183,7 +175,7 @@ impl SessionCache for SessionManager {
             Some(mut p) => {
                 p.last_accessed = current_time_secs();
                 p.clone()
-            },
+            }
             None => return Ok(vec![]),
         };
 
@@ -257,7 +249,7 @@ mod tests {
 
         // Modify the record's last_accessed to be in the past
         record.last_accessed = current_time_secs() - 10;
-        
+
         // Insert directly to bypass `store_session` which updates `last_accessed`
         manager.cache.insert(id.clone(), record);
 
@@ -267,4 +259,3 @@ mod tests {
         assert!(retrieved.is_none());
     }
 }
-

@@ -61,11 +61,9 @@ impl NxcModule for WinRmExec {
 
         let shell = if use_ps { "PowerShell" } else { "CMD" };
         tracing::info!("winrm_exec: Executing via WinRM {} - {}", shell, command);
-        
+
         // Simulating WinRM execution logic
-        let output = format!(
-            "[{shell}] Executed command '{command}' successfully via WinRM."
-        );
+        let output = format!("[{shell}] Executed command '{command}' successfully via WinRM.");
 
         Ok(ModuleResult {
             credentials: vec![],

@@ -56,13 +56,7 @@ impl WifiProtocol {
         profiles: bool,
         dump: bool,
     ) -> Self {
-        Self {
-            scan,
-            connect,
-            devices,
-            profiles,
-            dump,
-        }
+        Self { scan, connect, devices, profiles, dump }
     }
 
     /// Perform a WiFi scan using `netsh wlan show networks mode=bssid` (Windows)
@@ -103,10 +97,7 @@ impl WifiProtocol {
 
     /// Perform a device sweep using `arp -a`
     async fn sweep_devices(&self) -> Result<String> {
-        let output = tokio::process::Command::new("arp")
-            .args(["-a"])
-            .output()
-            .await?;
+        let output = tokio::process::Command::new("arp").args(["-a"]).output().await?;
 
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
@@ -208,13 +199,15 @@ impl NxcProtocol for WifiProtocol {
         &["wifi_recon"]
     }
 
-    async fn connect(&self, target: &str, _port: u16, _proxy: Option<&str>) -> Result<Box<dyn NxcSession>> {
+    async fn connect(
+        &self,
+        target: &str,
+        _port: u16,
+        _proxy: Option<&str>,
+    ) -> Result<Box<dyn NxcSession>> {
         // Since `wifi` actions generally interact with the host interface rather than
         // a remote TCP port, `connect` merely instantiates the session.
-        Ok(Box::new(WifiSession {
-            target: target.to_string(),
-            admin: false,
-        }))
+        Ok(Box::new(WifiSession { target: target.to_string(), admin: false }))
     }
 
     async fn authenticate(

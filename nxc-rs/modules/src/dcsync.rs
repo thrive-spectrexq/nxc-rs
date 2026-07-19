@@ -44,7 +44,8 @@ impl NxcModule for DcSyncModule {
         vec![
             ModuleOption {
                 name: "TARGET_USER".to_string(),
-                description: "Specific user to sync (e.g. krbtgt, Administrator). Omit for all.".to_string(),
+                description: "Specific user to sync (e.g. krbtgt, Administrator). Omit for all."
+                    .to_string(),
                 required: false,
                 default: None,
             },
@@ -69,9 +70,8 @@ impl NxcModule for DcSyncModule {
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
         let target_user = opts.get("TARGET_USER");
-        let just_ntlm = opts.get("JUST_DC_NTLM")
-            .map(|s| s.to_lowercase() == "true")
-            .unwrap_or(false);
+        let just_ntlm =
+            opts.get("JUST_DC_NTLM").map(|s| s.to_lowercase() == "true").unwrap_or(false);
         let output = opts.get("OUTPUT").map(String::as_str).unwrap_or("dcsync_hashes.txt");
 
         let target = session.target().to_string();
@@ -84,9 +84,8 @@ impl NxcModule for DcSyncModule {
         tracing::debug!("dcsync: Retrieving DC info via DSGetDomainControllerInfo");
 
         // Step 3: DRSGetNCChanges — replication request
-        let sync_target = target_user
-            .map(|u| format!("user '{u}'"))
-            .unwrap_or_else(|| "ALL users".to_string());
+        let sync_target =
+            target_user.map(|u| format!("user '{u}'")).unwrap_or_else(|| "ALL users".to_string());
         tracing::debug!("dcsync: Requesting replication for {sync_target}");
 
         // Step 4: Parse replicated data and extract hashes

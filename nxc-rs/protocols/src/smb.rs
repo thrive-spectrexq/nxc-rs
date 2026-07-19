@@ -272,7 +272,7 @@ impl SmbProtocol {
             "lsarpc", "samr", "svcctl", "epmapper", "atsvc", "browser", "spoolss", "netlogon",
             "srvsvc", "wkssvc", "winreg", "drsuapi", "eventlog",
         ];
-        
+
         if let Ok(tree_id) = self.tree_connect(session, "IPC$").await {
             // Some Windows versions allow listing \PIPE\*
             if let Ok(entries) = self.list_directory(session, "IPC$", "*").await {
@@ -284,7 +284,9 @@ impl SmbProtocol {
             if pipes.is_empty() {
                 for pipe in common_pipes.iter() {
                     // Try to open the pipe
-                    if let Ok(fid) = self.create_file(session, tree_id, pipe, 0x00000001, 0x0012019f).await {
+                    if let Ok(fid) =
+                        self.create_file(session, tree_id, pipe, 0x00000001, 0x0012019f).await
+                    {
                         pipes.push(pipe.to_string());
                         let _ = self.close_file(session, tree_id, &fid).await;
                     }
@@ -1202,23 +1204,32 @@ impl SmbProtocol {
         // 1. Open SC Manager
         let sc_req = svcctl::build_open_sc_manager(&session.target);
         let rpc_req = DcerpcRequest::new(svcctl::OPEN_SC_MANAGER, sc_req);
-        let resp = self.call_rpc(session, "svcctl", PacketType::Request, 2, rpc_req.to_bytes()).await?;
+        let resp =
+            self.call_rpc(session, "svcctl", PacketType::Request, 2, rpc_req.to_bytes()).await?;
         let mut sc_handle = [0u8; 20];
         if resp.len() >= 44 {
             sc_handle.copy_from_slice(&resp[24..44]);
         } else {
-            return Err(anyhow::anyhow!("Invalid response length for OpenSCManager: {}", resp.len()));
+            return Err(anyhow::anyhow!(
+                "Invalid response length for OpenSCManager: {}",
+                resp.len()
+            ));
         }
 
         // 2. Create Service
-        let create_req = svcctl::build_create_service(&sc_handle, &service_name, &service_name, &full_cmd);
+        let create_req =
+            svcctl::build_create_service(&sc_handle, &service_name, &service_name, &full_cmd);
         let rpc_req2 = DcerpcRequest::new(svcctl::CREATE_SERVICE, create_req);
-        let resp2 = self.call_rpc(session, "svcctl", PacketType::Request, 3, rpc_req2.to_bytes()).await?;
+        let resp2 =
+            self.call_rpc(session, "svcctl", PacketType::Request, 3, rpc_req2.to_bytes()).await?;
         let mut svc_handle = [0u8; 20];
         if resp2.len() >= 44 {
             svc_handle.copy_from_slice(&resp2[24..44]);
         } else {
-            return Err(anyhow::anyhow!("Invalid response length for CreateService: {}", resp2.len()));
+            return Err(anyhow::anyhow!(
+                "Invalid response length for CreateService: {}",
+                resp2.len()
+            ));
         }
 
         // 3. Start Service
@@ -1233,7 +1244,10 @@ impl SmbProtocol {
 
         // Wait for execution and read file
         tokio::time::sleep(Duration::from_secs(2)).await;
-        let output = self.download_file(session, "C$", &tmp_file.replace("C:\\", "")).await.unwrap_or_default();
+        let output = self
+            .download_file(session, "C$", &tmp_file.replace("C:\\", ""))
+            .await
+            .unwrap_or_default();
 
         // Cleanup
         let _ = self.delete_file(session, "C$", &tmp_file.replace("C:\\", "")).await;

@@ -93,7 +93,11 @@ impl LdapProtocol {
         loop {
             let req = ldap.with_search_options(ldap3::SearchOptions::new());
             let rs = req
-                .with_controls(vec![ldap3::controls::PagedResults { size: 1000, cookie: cookie.clone().unwrap_or_default() }.into()])
+                .with_controls(vec![ldap3::controls::PagedResults {
+                    size: 1000,
+                    cookie: cookie.clone().unwrap_or_default(),
+                }
+                .into()])
                 .search(base_dn, scope, filter, attrs.clone())
                 .await?;
             let (rs_entries, rs_res) = rs.success()?;
@@ -104,7 +108,9 @@ impl LdapProtocol {
 
             // The ldap3 crate's Control parser is currently unstable across minor versions for direct extraction.
             // In a production codebase, this would parse the specific 1.2.840.113556.1.4.319 OID via `rasn`
-            let paged_results = rs_res.ctrls.into_iter()
+            let paged_results = rs_res
+                .ctrls
+                .into_iter()
                 .find(|c| format!("{:?}", c.0).contains("1.2.840.113556.1.4.319"));
 
             if let Some(pr) = paged_results {
@@ -311,7 +317,9 @@ impl NxcProtocol for LdapProtocol {
             let _tcp_stream = runtime.block_on(async {
                 crate::connection::connect(&target_clone, port, proxy_owned.as_deref())
                     .await
-                    .map_err(|e| crate::errors::LdapError::ConnectionFailed(format!("Connection error: {e}")))
+                    .map_err(|e| {
+                        crate::errors::LdapError::ConnectionFailed(format!("Connection error: {e}"))
+                    })
             })?;
 
             Ok(LdapSession {
@@ -412,10 +420,7 @@ impl LdapProtocol {
 
         let krb5_oid = rasn::types::ObjectIdentifier::new(vec![1, 2, 840, 113554, 1, 2, 2])
             .context("Failed to construct KRB5 OID")?;
-        let token = InitialContextToken {
-            oid: krb5_oid,
-            inner: rasn::types::Any::new(ap_req),
-        };
+        let token = InitialContextToken { oid: krb5_oid, inner: rasn::types::Any::new(ap_req) };
         let gssapi_token = rasn::der::encode(&token).context("Failed to encode GSSAPI token")?;
 
         let url = self.build_url(&ldap_session.target, ldap_session.port);
@@ -432,7 +437,8 @@ impl LdapProtocol {
         // Perform SASL GSSAPI bind using ldap3 crate
         // The ldap3 crate lacks native SASL GSSAPI, so we use sasl_external_bind as a placeholder
         // that won't cause compile errors, while noting the GSSAPI integration point.
-        let _gssapi_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &gssapi_token);
+        let _gssapi_b64 =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &gssapi_token);
         match ldap.sasl_external_bind().await {
             Ok(_) => {} // Success (using external bind as placeholder for GSSAPI since ldap3 lacks direct SASL GSSAPI)
             Err(e) => return Ok(AuthResult::failure(&format!("SASL Bind Error: {e}"), None)),

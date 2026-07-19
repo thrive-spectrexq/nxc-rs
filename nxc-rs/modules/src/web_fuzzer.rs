@@ -146,10 +146,7 @@ impl NxcModule for WebFuzzer {
         let mut tasks = Vec::new();
 
         for path in target_paths {
-            let permit = match sem
-                .clone()
-                .acquire_owned()
-                .await {
+            let permit = match sem.clone().acquire_owned().await {
                 Ok(p) => p,
                 Err(_) => break,
             };

@@ -8,8 +8,6 @@ use md5::{Digest, Md5};
 use nt_hive::{Hive, KeyNode, KeyValue};
 use rc4::{KeyInit, Rc4, StreamCipher};
 
-
-
 /// Registry Secret Extractor
 pub struct RegistrySecrets;
 

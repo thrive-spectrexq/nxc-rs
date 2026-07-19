@@ -60,7 +60,7 @@ impl NxcModule for LdapQuery {
         let attributes = opts.get("ATTRIBUTES").map(String::as_str).unwrap_or("*");
 
         tracing::info!("ldap_query: Running query {} for attrs {}", query, attributes);
-        
+
         // Simulating custom LDAP query execution
         let output = format!(
             "Executed custom LDAP query '{query}' and retrieved '{attributes}' attributes."

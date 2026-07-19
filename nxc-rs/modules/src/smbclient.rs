@@ -89,15 +89,11 @@ impl NxcModule for SmbClientModule {
             }
             "get" => {
                 tracing::debug!("smbclient: Downloading {} -> {}", remote_path, local_path);
-                format!(
-                    "[+] Downloaded \\\\{target}\\{share}\\{remote_path} -> {local_path}"
-                )
+                format!("[+] Downloaded \\\\{target}\\{share}\\{remote_path} -> {local_path}")
             }
             "put" => {
                 tracing::debug!("smbclient: Uploading {} -> {}", local_path, remote_path);
-                format!(
-                    "[+] Uploaded {local_path} -> \\\\{target}\\{share}\\{remote_path}"
-                )
+                format!("[+] Uploaded {local_path} -> \\\\{target}\\{share}\\{remote_path}")
             }
             "cat" => {
                 tracing::debug!("smbclient: Reading file {}", remote_path);
@@ -107,12 +103,12 @@ impl NxcModule for SmbClientModule {
             }
             "rm" => {
                 tracing::debug!("smbclient: Deleting {}", remote_path);
-                format!(
-                    "[+] Deleted \\\\{target}\\{share}\\{remote_path}"
-                )
+                format!("[+] Deleted \\\\{target}\\{share}\\{remote_path}")
             }
             _ => {
-                return Err(anyhow::anyhow!("Unknown ACTION '{action}'. Use: ls, get, put, cat, rm"));
+                return Err(anyhow::anyhow!(
+                    "Unknown ACTION '{action}'. Use: ls, get, put, cat, rm"
+                ));
             }
         };
 

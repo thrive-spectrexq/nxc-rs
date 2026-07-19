@@ -187,8 +187,8 @@ fn parse_cidr(spec: &str) -> Result<Vec<Target>> {
 
 /// Parse dash range (e.g. 192.168.1.1-254).
 fn parse_range(spec: &str) -> Result<Vec<Target>> {
-    let dash_pos = spec.rfind('-')
-        .ok_or_else(|| anyhow::anyhow!("Invalid range format: missing dash"))?;
+    let dash_pos =
+        spec.rfind('-').ok_or_else(|| anyhow::anyhow!("Invalid range format: missing dash"))?;
     let base = &spec[..dash_pos];
     let end_octet: u8 = spec[dash_pos + 1..].parse()?;
 
@@ -294,7 +294,12 @@ impl ExecutionEngine {
                 ..Default::default()
             });
 
-        Self { opts, db: None, manager: Arc::new(manager), module_registry: Arc::new(nxc_modules::ModuleRegistry::new()) }
+        Self {
+            opts,
+            db: None,
+            manager: Arc::new(manager),
+            module_registry: Arc::new(nxc_modules::ModuleRegistry::new()),
+        }
     }
 
     /// Attaches an `NxcDb` instance to the execution engine for result tracking.
@@ -448,7 +453,13 @@ impl ExecutionEngine {
                     semaphore.clone().acquire_owned().await.map_err(|_| {
                         anyhow::anyhow!("Execution engine semaphore closed unexpectedly")
                     });
-                let permit = match permit { Ok(p) => p, Err(e) => { tracing::error!("{e}"); continue; } };
+                let permit = match permit {
+                    Ok(p) => p,
+                    Err(e) => {
+                        tracing::error!("{e}");
+                        continue;
+                    }
+                };
                 let ctx = TargetTaskContext {
                     protocol: protocol.clone(),
                     target: target.clone(),
@@ -541,7 +552,8 @@ async fn execute_single_target(ctx: TargetTaskContext) -> ExecutionResult {
         let port = ctx.protocol.default_port();
         let proxy = ctx.opts.proxy.as_deref();
 
-        let mut session = match ctx.manager
+        let mut session = match ctx
+            .manager
             .call(&target_ip, || {
                 let p = ctx.protocol.clone();
                 let t = target_str.clone();
@@ -570,7 +582,7 @@ async fn execute_single_target(ctx: TargetTaskContext) -> ExecutionResult {
                 if auth_res.success {
                     ctx.host_succeeded.store(true, Ordering::Relaxed);
                 }
-                
+
                 let mut host_id = None;
                 if let Some(ref db_instance) = ctx.db {
                     host_id = persist_result_to_db(
@@ -579,21 +591,24 @@ async fn execute_single_target(ctx: TargetTaskContext) -> ExecutionResult {
                         ctx.cred.clone(),
                         auth_res.clone(),
                         ctx.protocol.name().to_string(),
-                    ).await;
+                    )
+                    .await;
                 }
 
-                let (module_message, module_data) = if auth_res.success && !ctx.opts.modules.is_empty() {
-                    execute_modules(
-                        session.as_mut(),
-                        &ctx.opts,
-                        ctx.protocol.name(),
-                        &ctx.module_registry,
-                        ctx.db.clone(),
-                        host_id,
-                    ).await
-                } else {
-                    (String::new(), HashMap::new())
-                };
+                let (module_message, module_data) =
+                    if auth_res.success && !ctx.opts.modules.is_empty() {
+                        execute_modules(
+                            session.as_mut(),
+                            &ctx.opts,
+                            ctx.protocol.name(),
+                            &ctx.module_registry,
+                            ctx.db.clone(),
+                            host_id,
+                        )
+                        .await
+                    } else {
+                        (String::new(), HashMap::new())
+                    };
 
                 let mut final_message = auth_res.message.clone();
                 final_message.push_str(&module_message);
@@ -632,7 +647,8 @@ async fn execute_single_target(ctx: TargetTaskContext) -> ExecutionResult {
                 }
             }
         }
-    }).await;
+    })
+    .await;
 
     drop(ctx.permit);
     if let Some(ref p) = ctx.pb {
@@ -697,7 +713,9 @@ async fn persist_result_to_db(
                 host_id: Some(h_id),
                 created_at: now,
             }) {
-                if let Err(e) = db.add_auth_result(h_id, Some(cred_id), &proto_name, "Success", auth_res.admin) {
+                if let Err(e) =
+                    db.add_auth_result(h_id, Some(cred_id), &proto_name, "Success", auth_res.admin)
+                {
                     tracing::warn!("Failed to add auth result: {}", e);
                 }
             }
@@ -707,7 +725,11 @@ async fn persist_result_to_db(
             }
         }
         Ok(Some(h_id))
-    }).await.ok().and_then(Result::ok).flatten()
+    })
+    .await
+    .ok()
+    .and_then(Result::ok)
+    .flatten()
 }
 
 /// Executes requested modules against the authenticated session and persists discovered credentials.
@@ -727,20 +749,20 @@ async fn execute_modules(
     for module_name in &opts.modules {
         if let Some(module) = module_registry.get(module_name) {
             if !module.supported_protocols().contains(&protocol_name) {
-                tracing::error!("Module '{}' requires one of {:?}, but current protocol is '{}'. Skipping.", module_name, module.supported_protocols(), protocol_name);
+                tracing::error!(
+                    "Module '{}' requires one of {:?}, but current protocol is '{}'. Skipping.",
+                    module_name,
+                    module.supported_protocols(),
+                    protocol_name
+                );
                 continue;
             }
             match module.run(session, &opts.module_opts).await {
                 Ok(mod_res) => {
                     if mod_res.success {
-                        final_message.push_str(&format!(
-                            " | Module {}: {}",
-                            module_name, mod_res.output
-                        ));
-                        module_data.insert(
-                            module_name.clone(),
-                            mod_res.data,
-                        );
+                        final_message
+                            .push_str(&format!(" | Module {}: {}", module_name, mod_res.output));
+                        module_data.insert(module_name.clone(), mod_res.data);
 
                         if let Some(ref db_instance) = db {
                             let db_p = db_instance.clone();
@@ -752,27 +774,33 @@ async fn execute_modules(
                             if let Err(e) = tokio::task::spawn_blocking(move || {
                                 let now = Utc::now().timestamp();
                                 for m_cred in m_creds {
-                                    if let Err(err) = db_p.upsert_credential(
-                                        &Credential {
-                                            id: None,
-                                            workspace: db_p.current_workspace().to_string(),
-                                            domain: m_cred.domain.clone(),
-                                            username: m_cred.username.clone(),
-                                            password: m_cred.password.clone(),
-                                            nt_hash: m_cred.nt_hash.clone(),
-                                            lm_hash: m_cred.lm_hash.clone(),
-                                            aes_128: m_cred.aes_128_key.clone(),
-                                            aes_256: m_cred.aes_256_key.clone(),
-                                            source: Some(format!("{p_name}:{m_name}")),
-                                            host_id: h_id,
-                                            created_at: now,
-                                        },
-                                    ) {
-                                        tracing::warn!("Failed to upsert credential from module: {}", err);
+                                    if let Err(err) = db_p.upsert_credential(&Credential {
+                                        id: None,
+                                        workspace: db_p.current_workspace().to_string(),
+                                        domain: m_cred.domain.clone(),
+                                        username: m_cred.username.clone(),
+                                        password: m_cred.password.clone(),
+                                        nt_hash: m_cred.nt_hash.clone(),
+                                        lm_hash: m_cred.lm_hash.clone(),
+                                        aes_128: m_cred.aes_128_key.clone(),
+                                        aes_256: m_cred.aes_256_key.clone(),
+                                        source: Some(format!("{p_name}:{m_name}")),
+                                        host_id: h_id,
+                                        created_at: now,
+                                    }) {
+                                        tracing::warn!(
+                                            "Failed to upsert credential from module: {}",
+                                            err
+                                        );
                                     }
                                 }
-                            }).await {
-                                tracing::error!("Failed to spawn blocking task for module credentials: {}", e);
+                            })
+                            .await
+                            {
+                                tracing::error!(
+                                    "Failed to spawn blocking task for module credentials: {}",
+                                    e
+                                );
                             }
                         }
                     } else {
@@ -783,21 +811,16 @@ async fn execute_modules(
                     }
                 }
                 Err(e) => {
-                    final_message.push_str(&format!(
-                        " | Module {module_name} Error: {e}"
-                    ));
+                    final_message.push_str(&format!(" | Module {module_name} Error: {e}"));
                 }
             }
         } else {
-            final_message.push_str(&format!(
-                " | Module {module_name} not found"
-            ));
+            final_message.push_str(&format!(" | Module {module_name} not found"));
         }
     }
 
     (final_message, module_data)
 }
-
 
 // ─── Tests ──────────────────────────────────────────────────────
 
@@ -886,10 +909,10 @@ mod tests {
         writeln!(file, "10.0.0.0/30").unwrap(); // 2 IPs: .1, .2
         writeln!(file, "# A comment").unwrap();
         writeln!(file, "localhost").unwrap();
-        
+
         let path = file.path().to_str().unwrap();
         let targets = parse_targets(path).unwrap();
-        
+
         assert_eq!(targets.len(), 4); // 1 + 2 + 1
         assert_eq!(targets[0].ip_string(), "192.168.1.10");
         assert_eq!(targets[1].ip_string(), "10.0.0.1");
@@ -966,7 +989,8 @@ mod tests {
                 _session: &mut dyn NxcSession,
                 creds: &Credentials,
             ) -> Result<AuthResult> {
-                if creds.password.as_deref() == Some("DUMMY_PASSWORD") { // lgtm[rust/hard-coded-cryptographic-value] Test data
+                if creds.password.as_deref() == Some("DUMMY_PASSWORD") {
+                    // lgtm[rust/hard-coded-cryptographic-value] Test data
                     Ok(AuthResult::success(creds.username == "admin"))
                 } else {
                     Ok(AuthResult::failure("Bad password", None))
@@ -999,13 +1023,12 @@ mod tests {
         let engine = ExecutionEngine::new(opts);
         let smb_proto: Arc<dyn nxc_protocols::NxcProtocol> = Arc::new(MockProtocol);
 
-        let targets =
-            vec![
-                Target::new("192.168.1.10".parse().unwrap()),
-                Target::new("192.168.1.11".parse().unwrap()),
-                Target::new("192.168.1.12".parse().unwrap()),
-                Target::new("192.168.1.99".parse().unwrap()), // Mocks connection failure
-            ];
+        let targets = vec![
+            Target::new("192.168.1.10".parse().unwrap()),
+            Target::new("192.168.1.11".parse().unwrap()),
+            Target::new("192.168.1.12".parse().unwrap()),
+            Target::new("192.168.1.99".parse().unwrap()), // Mocks connection failure
+        ];
 
         let creds = vec![
             Credentials::password("admin", "wrong", None),
@@ -1104,9 +1127,7 @@ mod tests {
             }
         }
 
-        let targets = vec![Target::new(
-            "127.0.0.1".parse().unwrap(),
-        )];
+        let targets = vec![Target::new("127.0.0.1".parse().unwrap())];
         let creds = vec![Credentials::password("admin", "pass", None)];
 
         engine.run(Arc::new(MockProto), targets, creds).await;

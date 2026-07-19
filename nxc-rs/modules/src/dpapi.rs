@@ -59,28 +59,39 @@ impl NxcModule for Dpapi {
         use nxc_protocols::rpc::{lsarpc, DcerpcBind, DcerpcRequest, PacketType, UUID_LSARPC};
         let protocol = nxc_protocols::smb::SmbProtocol::new();
         let bind = DcerpcBind::new(UUID_LSARPC, 0, 0);
-        let _resp = protocol.call_rpc(smb_session, "lsarpc", PacketType::Bind, 1, bind.to_bytes()).await?;
+        let _resp =
+            protocol.call_rpc(smb_session, "lsarpc", PacketType::Bind, 1, bind.to_bytes()).await?;
 
         // 2. Bind to MS-LSAD (Local Security Authority)
         let lsar_open_req = lsarpc::build_lsar_open_policy2(&smb_session.target);
         let rpc_req = DcerpcRequest::new(lsarpc::LSAR_OPEN_POLICY2, lsar_open_req);
-        let resp = protocol.call_rpc(smb_session, "lsarpc", PacketType::Request, 2, rpc_req.to_bytes()).await?;
+        let resp = protocol
+            .call_rpc(smb_session, "lsarpc", PacketType::Request, 2, rpc_req.to_bytes())
+            .await?;
 
         let mut h_policy = [0u8; 20];
         if resp.len() >= 44 {
             h_policy.copy_from_slice(&resp[24..44]);
         } else {
-            return Err(anyhow::anyhow!("Invalid response length for LsarOpenPolicy2: {}", resp.len()));
+            return Err(anyhow::anyhow!(
+                "Invalid response length for LsarOpenPolicy2: {}",
+                resp.len()
+            ));
         }
 
         // 3. Call LsarEnumerateSecrets (Opnum 14) or LsarOpenSecret (Opnum 28)
         let lsar_enum_req = lsarpc::build_lsar_enumerate_secrets(&h_policy);
         let rpc_req2 = DcerpcRequest::new(lsarpc::LSAR_ENUMERATE_SECRETS, lsar_enum_req);
-        let resp2 = protocol.call_rpc(smb_session, "lsarpc", PacketType::Request, 3, rpc_req2.to_bytes()).await?;
+        let resp2 = protocol
+            .call_rpc(smb_session, "lsarpc", PacketType::Request, 3, rpc_req2.to_bytes())
+            .await?;
 
         Ok(ModuleResult {
             success: true,
-            output: format!("[+] Enumerated LSA Secrets (DPAPI Master Key bounds). Response Length: {}", resp2.len()),
+            output: format!(
+                "[+] Enumerated LSA Secrets (DPAPI Master Key bounds). Response Length: {}",
+                resp2.len()
+            ),
             data: serde_json::json!({"master_key_bounds_len": resp2.len()}),
             credentials: vec![],
         })
