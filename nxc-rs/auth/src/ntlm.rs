@@ -487,21 +487,22 @@ impl NtlmSessionSecurity {
     }
 
     /// Compute an NTLM message signature (MAC) for signing.
+    #[allow(clippy::expect_used)]
     pub fn compute_signature(&self, seq_num: u32, message: &[u8]) -> Vec<u8> {
         let signing_key = self.client_signing_key();
         let sealing_key = self.client_sealing_key();
 
         // HMAC-MD5(SigningKey, SeqNum + Message)
         let mut hmac =
-            <HmacMd5 as HmacKeyInit>::new_from_slice(&signing_key).unwrap_or_else(|_| unreachable!());
+            <HmacMd5 as HmacKeyInit>::new_from_slice(&signing_key).expect("MD5 accepts any key length");
         hmac.update(&seq_num.to_le_bytes());
         hmac.update(message);
         let mac = hmac.finalize().into_bytes();
 
         // Encrypt first 8 bytes of HMAC with RC4(SealingKey)
         let key_array: &[u8; 16] =
-            sealing_key[..16].try_into().unwrap_or_else(|_| unreachable!());
-        let mut rc4 = Rc4::new_from_slice(key_array).unwrap_or_else(|_| unreachable!());
+            sealing_key[..16].try_into().expect("sealing_key is >= 16 bytes");
+        let mut rc4 = Rc4::new_from_slice(key_array).expect("RC4 accepts 16 byte keys");
         let mut encrypted_mac = [0u8; 8];
         encrypted_mac.copy_from_slice(&mac[..8]);
         rc4.apply_keystream(&mut encrypted_mac);
@@ -527,9 +528,10 @@ pub fn calculate_nt_hash(password: &str) -> [u8; 16] {
 }
 
 /// Calculate NTLMv2 hash: HMAC-MD5(NT_Hash, UPPERCASE(user) + UPPERCASE(domain)).
+#[allow(clippy::expect_used)]
 pub fn calculate_v2_hash(username: &str, domain: &str, nt_hash: &[u8; 16]) -> [u8; 16] {
     let mut hmac = <HmacMd5 as HmacKeyInit>::new_from_slice(nt_hash)
-        .unwrap_or_else(|_| unreachable!());
+        .expect("MD5 accepts any key length");
     let identity = format!("{}{}", username.to_uppercase(), domain.to_uppercase());
     let utf16: Vec<u16> = identity.encode_utf16().collect();
     let bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
@@ -538,6 +540,7 @@ pub fn calculate_v2_hash(username: &str, domain: &str, nt_hash: &[u8; 16]) -> [u
 }
 
 /// Calculate LM hash from a password (DES of "KGS!@#$%" with password key).
+#[allow(clippy::expect_used)]
 pub fn calculate_lm_hash(password: &str) -> [u8; 16] {
     use des::cipher::{BlockCipherEncrypt, KeyInit, Block};
     use des::Des;
@@ -556,8 +559,8 @@ pub fn calculate_lm_hash(password: &str) -> [u8; 16] {
     let key1 = des_key_from_7(&pass_bytes[0..7]);
     let key2 = des_key_from_7(&pass_bytes[7..14]);
 
-    let cipher1 = Des::new_from_slice(&key1).unwrap_or_else(|_| unreachable!());
-    let cipher2 = Des::new_from_slice(&key2).unwrap_or_else(|_| unreachable!());
+    let cipher1 = Des::new_from_slice(&key1).expect("DES accepts 8 byte keys");
+    let cipher2 = Des::new_from_slice(&key2).expect("DES accepts 8 byte keys");
 
     let mut block1 = Block::<Des>::from(*magic);
     let mut block2 = Block::<Des>::from(*magic);
