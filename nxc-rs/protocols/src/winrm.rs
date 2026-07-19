@@ -80,11 +80,11 @@ impl WinrmProtocol {
             Client::builder().timeout(self.timeout).danger_accept_invalid_certs(!self.verify_ssl); // lgtm[rust/disabled-certificate-check] Configurable certificate verification
 
         if let Some(p) = proxy_str {
-            let proxy = reqwest::Proxy::all(p).map_err(|e| anyhow!("Invalid proxy URL: {e}"))?;
+            let proxy = reqwest::Proxy::all(p).map_err(|e| crate::errors::WinRmError::ConnectionFailed(format!("Invalid proxy URL: {e}")))?;
             builder = builder.proxy(proxy);
         }
 
-        builder.build().map_err(|e| anyhow!("Failed to build HTTP client: {e}"))
+        builder.build().map_err(|e| crate::errors::WinRmError::ConnectionFailed(format!("Failed to build HTTP client: {e}")).into())
     }
 }
 
@@ -138,7 +138,7 @@ impl NxcProtocol for WinrmProtocol {
 
         let response = match request.send().await {
             Ok(resp) => resp,
-            Err(e) => return Err(anyhow!("Connection failed to WinRM service: {e}")),
+            Err(e) => return Err(crate::errors::WinRmError::ConnectionFailed(format!("Connection failed to WinRM service: {e}")).into()),
         };
 
         debug!("WinRM: Received response code: {}", response.status());
@@ -187,7 +187,7 @@ impl NxcProtocol for WinrmProtocol {
                 client: Some(client),
             }))
         } else {
-            Err(anyhow!("Failed to get NTLM challenge from target. Status: {}", response.status()))
+            Err(crate::errors::WinRmError::Unknown(format!("Failed to get NTLM challenge from target. Status: {}", response.status())).into())
         }
     }
 
@@ -199,7 +199,7 @@ impl NxcProtocol for WinrmProtocol {
         let winrm_sess = session
             .as_any_mut()
             .downcast_mut::<WinrmSession>()
-            .ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
+            .ok_or_else(|| crate::errors::WinRmError::Unknown("Invalid session type".into()))?;
         let url = self.build_url(&winrm_sess.target, winrm_sess.port);
         let client = match &winrm_sess.client {
             Some(c) => c.clone(),
@@ -236,7 +236,7 @@ impl NxcProtocol for WinrmProtocol {
         let t2_base64 = www_auth
             .strip_prefix("Negotiate ")
             .or(www_auth.strip_prefix("NTLM "))
-            .ok_or_else(|| anyhow!("No NTLM challenge found"))?;
+            .ok_or_else(|| crate::errors::WinRmError::Unknown("No NTLM challenge found".into()))?;
         let t2_msg = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, t2_base64)?;
 
         let challenge = auth.parse_type2(&t2_msg)?;
@@ -269,7 +269,7 @@ impl NxcProtocol for WinrmProtocol {
         let winrm_sess = session
             .as_any()
             .downcast_ref::<WinrmSession>()
-            .ok_or_else(|| anyhow::anyhow!("Invalid session type"))?;
+            .ok_or_else(|| crate::errors::WinRmError::Unknown("Invalid session type".into()))?;
         let url = &winrm_sess.endpoint;
         let client = match &winrm_sess.client {
             Some(c) => c.clone(),
@@ -294,7 +294,7 @@ impl NxcProtocol for WinrmProtocol {
         let body = resp.text().await?;
         let shell_id = self
             .extract_xml_tag(&body, "rsp:ShellId")
-            .ok_or_else(|| anyhow!("Failed to extract ShellId"))?;
+            .ok_or_else(|| crate::errors::WinRmError::ExecutionFailed("Failed to extract ShellId".into()))?;
 
         // 2. Run Command
         let command_soap = self.build_command_soap(&shell_id, &final_cmd);
@@ -306,7 +306,7 @@ impl NxcProtocol for WinrmProtocol {
         let body = resp.text().await?;
         let command_id = self
             .extract_xml_tag(&body, "rsp:CommandId")
-            .ok_or_else(|| anyhow!("Failed to extract CommandId"))?;
+            .ok_or_else(|| crate::errors::WinRmError::ExecutionFailed("Failed to extract CommandId".into()))?;
 
         // 3. Receive Output (Poll)
         let mut stdout = String::new();

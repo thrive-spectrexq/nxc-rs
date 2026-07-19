@@ -548,7 +548,119 @@ mod tests {
     fn display_includes_protocol_prefix() {
         let err: ProtocolError = FtpError::AuthFailed("530".into()).into();
         let msg = err.to_string();
-        assert!(msg.contains("FTP"), "expected 'FTP' in: {msg}");
-        assert!(msg.contains("530"), "expected '530' in: {msg}");
+        assert!(msg.contains("FTP Error:"), "expected 'FTP Error:' in: {msg}");
+        assert!(msg.contains("Authentication failed: 530"), "expected inner error string in: {msg}");
+    }
+
+    #[test]
+    fn smb_error_formatting() {
+        assert_eq!(SmbError::AuthFailed("bad pw".into()).to_string(), "Authentication failed: bad pw");
+        assert_eq!(SmbError::ConnectionFailed("timeout".into()).to_string(), "Connection failed: timeout");
+        assert_eq!(SmbError::AccessDenied("share".into()).to_string(), "Share access denied: share");
+        assert_eq!(SmbError::ProtocolError("invalid packet".into()).to_string(), "Protocol error: invalid packet");
+        assert_eq!(SmbError::ExecutionFailed("crash".into()).to_string(), "Execution failed: crash");
+        assert_eq!(SmbError::Unsupported("feature".into()).to_string(), "Unsupported feature: feature");
+        assert_eq!(SmbError::Unknown("unknown".into()).to_string(), "Unknown SMB error: unknown");
+        
+        let proto: ProtocolError = SmbError::AuthFailed("bad pw".into()).into();
+        assert_eq!(proto.to_string(), "SMB Error: Authentication failed: bad pw");
+    }
+
+    #[test]
+    fn ldap_error_formatting() {
+        assert_eq!(LdapError::BindFailed("invalid creds".into()).to_string(), "Bind failed: invalid creds");
+        assert_eq!(LdapError::ConnectionFailed("timeout".into()).to_string(), "Connection failed: timeout");
+        assert_eq!(LdapError::SearchFailed("bad query".into()).to_string(), "Search query failed: bad query");
+        assert_eq!(LdapError::ProtocolError("invalid response".into()).to_string(), "Protocol error: invalid response");
+        assert_eq!(LdapError::Unknown("unknown".into()).to_string(), "Unknown LDAP error: unknown");
+        
+        let proto: ProtocolError = LdapError::BindFailed("invalid creds".into()).into();
+        assert_eq!(proto.to_string(), "LDAP Error: Bind failed: invalid creds");
+    }
+
+    #[test]
+    fn ssh_error_formatting() {
+        assert_eq!(SshError::AuthFailed("bad key".into()).to_string(), "Authentication failed: bad key");
+        assert_eq!(SshError::ConnectionFailed("timeout".into()).to_string(), "Connection failed: timeout");
+        assert_eq!(SshError::ExecutionFailed("crash".into()).to_string(), "Command execution failed: crash");
+        assert_eq!(SshError::KeyExchangeFailed("bad algo".into()).to_string(), "Key exchange failed: bad algo");
+        assert_eq!(SshError::Unknown("unknown".into()).to_string(), "Unknown SSH error: unknown");
+        
+        let proto: ProtocolError = SshError::AuthFailed("bad key".into()).into();
+        assert_eq!(proto.to_string(), "SSH Error: Authentication failed: bad key");
+    }
+
+    #[test]
+    fn winrm_error_formatting() {
+        assert_eq!(WinRmError::AuthFailed("bad token".into()).to_string(), "Authentication failed: bad token");
+        assert_eq!(WinRmError::ConnectionFailed("timeout".into()).to_string(), "Connection failed: timeout");
+        assert_eq!(WinRmError::ExecutionFailed("crash".into()).to_string(), "Execution failed: crash");
+        assert_eq!(WinRmError::Unknown("unknown".into()).to_string(), "Unknown WinRM error: unknown");
+        
+        let proto: ProtocolError = WinRmError::AuthFailed("bad token".into()).into();
+        assert_eq!(proto.to_string(), "WinRM Error: Authentication failed: bad token");
+    }
+
+    #[test]
+    fn mssql_error_formatting() {
+        assert_eq!(MssqlError::AuthFailed("bad user".into()).to_string(), "Authentication failed: bad user");
+        assert_eq!(MssqlError::ConnectionFailed("timeout".into()).to_string(), "Connection failed: timeout");
+        assert_eq!(MssqlError::QueryFailed("syntax".into()).to_string(), "Query failed: syntax");
+        assert_eq!(MssqlError::Unknown("unknown".into()).to_string(), "Unknown MSSQL error: unknown");
+        
+        let proto: ProtocolError = MssqlError::AuthFailed("bad user".into()).into();
+        assert_eq!(proto.to_string(), "MSSQL Error: Authentication failed: bad user");
+    }
+
+    #[test]
+    fn ftp_error_formatting() {
+        assert_eq!(FtpError::AuthFailed("530".into()).to_string(), "Authentication failed: 530");
+        assert_eq!(FtpError::ConnectionFailed("refused".into()).to_string(), "Connection failed: refused");
+        assert_eq!(FtpError::TransferFailed("aborted".into()).to_string(), "Transfer failed: aborted");
+        assert_eq!(FtpError::ProtocolError("bad code".into()).to_string(), "Protocol error: bad code");
+        assert_eq!(FtpError::Unknown("unknown".into()).to_string(), "Unknown FTP error: unknown");
+    }
+
+    #[test]
+    fn rdp_error_formatting() {
+        assert_eq!(RdpError::AuthFailed("nla".into()).to_string(), "Authentication failed: nla");
+        assert_eq!(RdpError::ConnectionFailed("refused".into()).to_string(), "Connection failed: refused");
+        assert_eq!(RdpError::NegotiationFailed("tls".into()).to_string(), "Negotiation failed: tls");
+        assert_eq!(RdpError::ProtocolError("bad packet".into()).to_string(), "Protocol error: bad packet");
+        assert_eq!(RdpError::Unknown("unknown".into()).to_string(), "Unknown RDP error: unknown");
+    }
+
+    #[test]
+    fn vnc_error_formatting() {
+        assert_eq!(VncError::AuthFailed("bad pw".into()).to_string(), "Authentication failed: bad pw");
+        assert_eq!(VncError::ConnectionFailed("refused".into()).to_string(), "Connection failed: refused");
+        assert_eq!(VncError::HandshakeFailed("version".into()).to_string(), "Handshake failed: version");
+        assert_eq!(VncError::Unknown("unknown".into()).to_string(), "Unknown VNC error: unknown");
+    }
+
+    #[test]
+    fn redis_error_formatting() {
+        assert_eq!(RedisError::AuthFailed("noauth".into()).to_string(), "Authentication failed: noauth");
+        assert_eq!(RedisError::ConnectionFailed("refused".into()).to_string(), "Connection failed: refused");
+        assert_eq!(RedisError::ExecutionFailed("err".into()).to_string(), "Command execution failed: err");
+        assert_eq!(RedisError::Unknown("unknown".into()).to_string(), "Unknown Redis error: unknown");
+    }
+
+    #[test]
+    fn docker_error_formatting() {
+        assert_eq!(DockerError::AuthFailed("unauth".into()).to_string(), "Authentication failed: unauth");
+        assert_eq!(DockerError::ConnectionFailed("refused".into()).to_string(), "Connection failed: refused");
+        assert_eq!(DockerError::ExecutionFailed("crash".into()).to_string(), "Execution failed: crash");
+        assert_eq!(DockerError::ApiError("404".into()).to_string(), "API error: 404");
+        assert_eq!(DockerError::Unknown("unknown".into()).to_string(), "Unknown Docker error: unknown");
+    }
+
+    #[test]
+    fn kube_error_formatting() {
+        assert_eq!(KubeError::AuthFailed("forbidden".into()).to_string(), "Authentication failed: forbidden");
+        assert_eq!(KubeError::ConnectionFailed("refused".into()).to_string(), "Connection failed: refused");
+        assert_eq!(KubeError::ExecutionFailed("crash".into()).to_string(), "Execution failed: crash");
+        assert_eq!(KubeError::ApiError("404".into()).to_string(), "API error: 404");
+        assert_eq!(KubeError::Unknown("unknown".into()).to_string(), "Unknown Kubernetes error: unknown");
     }
 }

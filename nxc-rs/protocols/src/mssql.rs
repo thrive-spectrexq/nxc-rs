@@ -104,8 +104,8 @@ impl NxcProtocol for MssqlProtocol {
                     proxy: proxy.map(std::string::ToString::to_string),
                 }))
             }
-            Ok(Err(e)) => Err(anyhow!("Connection refused or unreachable: {e}")),
-            Err(_) => Err(anyhow!("Connection timeout to {addr}")),
+            Ok(Err(e)) => Err(crate::errors::MssqlError::ConnectionFailed(format!("Connection refused or unreachable: {e}")).into()),
+            Err(_) => Err(crate::errors::MssqlError::ConnectionFailed(format!("Connection timeout to {addr}")).into()),
         }
     }
 
@@ -117,7 +117,7 @@ impl NxcProtocol for MssqlProtocol {
         let mssql_sess_mut = session
             .as_any_mut()
             .downcast_mut::<MssqlSession>()
-            .ok_or_else(|| anyhow!("Invalid session type"))?;
+            .ok_or_else(|| crate::errors::MssqlError::Unknown("Invalid session type".into()))?;
 
         if creds.username.is_empty() {
             return Ok(AuthResult::success(false));
@@ -210,10 +210,10 @@ impl NxcProtocol for MssqlProtocol {
         let mssql_sess = session
             .as_any()
             .downcast_ref::<MssqlSession>()
-            .ok_or_else(|| anyhow!("Invalid session type"))?;
+            .ok_or_else(|| crate::errors::MssqlError::Unknown("Invalid session type".into()))?;
 
         let creds =
-            mssql_sess.credentials.as_ref().ok_or_else(|| anyhow!("Session not authenticated"))?;
+            mssql_sess.credentials.as_ref().ok_or_else(|| crate::errors::MssqlError::AuthFailed("Session not authenticated".into()))?;
         let mut config = Config::new();
         config.host(&mssql_sess.target);
         config.port(mssql_sess.port);
@@ -291,7 +291,7 @@ impl MssqlProtocol {
         sql: &str,
     ) -> Result<Vec<serde_json::Value>> {
         let creds =
-            session.credentials.as_ref().ok_or_else(|| anyhow!("Session not authenticated"))?;
+            session.credentials.as_ref().ok_or_else(|| crate::errors::MssqlError::AuthFailed("Session not authenticated".into()))?;
         let mut config = Config::new();
         config.host(&session.target);
         config.port(session.port);

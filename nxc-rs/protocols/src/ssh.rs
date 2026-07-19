@@ -219,7 +219,7 @@ impl NxcProtocol for SshProtocol {
                 crate::socks::SocksProxy::connect_blocking(&p, &addr)?
             } else {
                 TcpStream::connect_timeout(
-                    &addr.parse().map_err(|e| anyhow::anyhow!("Invalid address {addr}: {e}"))?,
+                    &addr.parse().map_err(|e| crate::errors::SshError::ConnectionFailed(format!("Invalid address {addr}: {e}")))?,
                     timeout,
                 )?
             };
@@ -269,7 +269,7 @@ impl NxcProtocol for SshProtocol {
                 debug!("SSH: Authenticating {}@{}", username, addr);
 
                 let tcp = TcpStream::connect_timeout(
-                    &addr.parse().map_err(|e| anyhow::anyhow!("Invalid address: {e}"))?,
+                    &addr.parse().map_err(|e| crate::errors::SshError::ConnectionFailed(format!("Invalid address: {e}")))?,
                     timeout,
                 )?;
                 tcp.set_read_timeout(Some(timeout))?;
@@ -332,7 +332,7 @@ impl NxcProtocol for SshProtocol {
             let addr = format!("{target}:22");
 
             let tcp = TcpStream::connect_timeout(
-                &addr.parse().map_err(|e| anyhow::anyhow!("Invalid address: {e}"))?,
+                &addr.parse().map_err(|e| crate::errors::SshError::ConnectionFailed(format!("Invalid address: {e}")))?,
                 timeout,
             )?;
 
@@ -370,7 +370,7 @@ impl NxcProtocol for SshProtocol {
     ) -> Result<Vec<u8>> {
         let ssh_sess = session
             .downcast_ref::<SshSession>()
-            .ok_or_else(|| anyhow::anyhow!("Invalid session"))?;
+            .ok_or_else(|| crate::errors::SshError::Unknown("Invalid session".into()))?;
         if let Some(ref s) = ssh_sess.session {
             let sftp = s.sftp()?;
             let mut file = sftp.open(std::path::Path::new(path))?;
@@ -378,7 +378,7 @@ impl NxcProtocol for SshProtocol {
             file.read_to_end(&mut data)?;
             Ok(data)
         } else {
-            Err(anyhow::anyhow!("SSH session not initialized"))
+            Err(crate::errors::SshError::Unknown("SSH session not initialized".into()).into())
         }
     }
 
@@ -391,14 +391,14 @@ impl NxcProtocol for SshProtocol {
     ) -> Result<()> {
         let ssh_sess = session
             .downcast_ref::<SshSession>()
-            .ok_or_else(|| anyhow::anyhow!("Invalid session"))?;
+            .ok_or_else(|| crate::errors::SshError::Unknown("Invalid session".into()))?;
         if let Some(ref s) = ssh_sess.session {
             let sftp = s.sftp()?;
             let mut file = sftp.create(std::path::Path::new(path))?;
             file.write_all(data)?;
             Ok(())
         } else {
-            Err(anyhow::anyhow!("SSH session not initialized"))
+            Err(crate::errors::SshError::Unknown("SSH session not initialized".into()).into())
         }
     }
 }

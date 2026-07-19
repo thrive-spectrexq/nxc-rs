@@ -272,6 +272,7 @@ pub struct ExecutionEngine {
     opts: ExecutionOpts,
     db: Option<Arc<NxcDb>>,
     manager: Arc<ConnectionManager>,
+    module_registry: Arc<nxc_modules::ModuleRegistry>,
 }
 
 impl ExecutionEngine {
@@ -282,7 +283,7 @@ impl ExecutionEngine {
                 ..Default::default()
             });
 
-        Self { opts, db: None, manager: Arc::new(manager) }
+        Self { opts, db: None, manager: Arc::new(manager), module_registry: Arc::new(nxc_modules::ModuleRegistry::new()) }
     }
 
     pub fn with_db(mut self, db: Arc<NxcDb>) -> Self {
@@ -355,7 +356,7 @@ impl ExecutionEngine {
         let mut join_handles: Vec<JoinHandle<ExecutionResult>> = Vec::new();
         let db = self.db.clone();
         let manager = self.manager.clone();
-        let module_registry = Arc::new(nxc_modules::ModuleRegistry::new());
+        let module_registry = self.module_registry.clone();
 
         for target in targets {
             let target_str = target.ip_string();
@@ -433,289 +434,23 @@ impl ExecutionEngine {
                         anyhow::anyhow!("Execution engine semaphore closed unexpectedly")
                     });
                 let permit = match permit { Ok(p) => p, Err(e) => { tracing::error!("{e}"); continue; } };
-                let protocol_clone = protocol.clone();
-                let target_clone = target.clone();
-                let cred_clone = cred.clone();
-                let opts_clone = self.opts.clone();
-                let db_clone = db.clone();
-                let pb_clone = pb.clone();
-                let manager_clone = manager.clone();
-                let global_fails_clone = global_fails.clone();
-                let user_fails_clone = user_fails.clone();
-                let host_fails_clone = host_fails.clone();
-                let host_succeeded_clone = host_succeeded.clone();
-                let module_registry_clone = module_registry.clone();
+                let ctx = TargetTaskContext {
+                    protocol: protocol.clone(),
+                    target: target.clone(),
+                    cred: cred.clone(),
+                    opts: self.opts.clone(),
+                    db: db.clone(),
+                    pb: pb.clone(),
+                    manager: manager.clone(),
+                    global_fails: global_fails.clone(),
+                    user_fails: user_fails.clone(),
+                    host_fails: host_fails.clone(),
+                    host_succeeded: host_succeeded.clone(),
+                    module_registry: module_registry.clone(),
+                    permit,
+                };
 
-                let handle = tokio::spawn(async move {
-                    let start_time = std::time::Instant::now();
-
-                    // Check host_succeeded AFTER acquiring semaphore, right before network I/O
-                    // This handles cases where tasks were spawned concurrently before the boolean was set.
-                    if !opts_clone.continue_on_success
-                        && host_succeeded_clone.load(Ordering::Relaxed)
-                    {
-                        drop(permit);
-                        if let Some(ref p) = pb_clone {
-                            p.inc(1);
-                        }
-                        // Return empty result which will be filtered out or ignored downstream,
-                        // rather than failing the scan or returning a dummy payload.
-                        return ExecutionResult {
-                            target: target_clone.display(),
-                            protocol: protocol_clone.name().to_string(),
-                            username: cred_clone.username.clone(),
-                            success: false,
-                            admin: false,
-                            message: "Skipped (previous auth succeeded)".to_string(),
-                            duration_ms: 0,
-                            module_data: std::collections::HashMap::new(),
-                        };
-                    }
-
-                    // Apply jitter if specified (random delay in [0, jitter_ms] to stagger requests)
-                    if let Some(jitter) = opts_clone.jitter_ms {
-                        if jitter > 0 {
-                            let delay = rand::random_range(0..=jitter);
-                            tokio::time::sleep(Duration::from_millis(delay)).await;
-                        }
-                    }
-
-                    let result = tokio::time::timeout(opts_clone.timeout, async {
-                        // Attempt connection with resilience
-                        let target_str = target_clone.display();
-                        let target_ip = target_clone.ip_string();
-                        let port = protocol_clone.default_port();
-                        let proxy = opts_clone.proxy.as_deref();
-
-                        let mut session = match manager_clone
-                            .call(&target_ip, || {
-                                let p = protocol_clone.clone();
-                                let t = target_str.clone();
-                                let pr = proxy.map(std::string::ToString::to_string);
-                                async move { p.connect(&t, port, pr.as_deref()).await }
-                            })
-                            .await
-                        {
-                            Ok(s) => s,
-                            Err(e) => {
-                                return ExecutionResult {
-                                    target: target_str,
-                                    protocol: protocol_clone.name().to_string(),
-                                    username: cred_clone.username.clone(),
-                                    success: false,
-                                    admin: false,
-                                    message: format!("Connection failed: {e}"),
-                                    duration_ms: start_time.elapsed().as_millis() as u64,
-                                    module_data: std::collections::HashMap::new(),
-                                }
-                            }
-                        };
-
-                        // Attempt auth
-                        match protocol_clone
-                            .authenticate(session.as_mut(), &cred_clone)
-                            .await
-                        {
-                            Ok(auth_res) => {
-                                if auth_res.success {
-                                    host_succeeded_clone.store(true, Ordering::Relaxed);
-                                }
-                                let mut final_message = auth_res.message.clone();
-
-                                // Save to database if DB available (using spawn_blocking for synchronous SQLite)
-                                let mut host_id = None;
-                                if let Some(ref db_instance) = db_clone {
-                                    let db_p = db_instance.clone();
-                                    let t_p = target_clone.clone();
-                                    let c_p = cred_clone.clone();
-                                    let a_p = auth_res.clone();
-                                    let proto_name = protocol_clone.name().to_string();
-
-                                    let db_res = tokio::task::spawn_blocking(move || -> anyhow::Result<Option<i64>> {
-                                        let now = Utc::now().timestamp();
-                                        let h_id = db_p.upsert_host(&HostInfo {
-                                            id: None,
-                                            workspace: db_p.current_workspace().to_string(),
-                                            ip: t_p.ip_string(),
-                                            hostname: t_p.hostname.clone(),
-                                            domain: None,
-                                            os: None,
-                                            os_version: None,
-                                            smb_signing: None,
-                                            signing_required: None,
-                                            is_dc: false,
-                                            first_seen: now,
-                                            last_seen: now,
-                                        })?;
-
-                                        if a_p.success {
-                                            if let Ok(cred_id) = db_p.add_credential(&Credential {
-                                                id: None,
-                                                workspace: db_p.current_workspace().to_string(),
-                                                domain: None,
-                                                username: c_p.username.clone(),
-                                                password: c_p.password.clone(),
-                                                nt_hash: c_p.nt_hash.clone(),
-                                                lm_hash: None,
-                                                aes_128: None,
-                                                aes_256: None,
-                                                source: Some(proto_name.clone()),
-                                                host_id: Some(h_id),
-                                                created_at: now,
-                                            }) {
-                                                if let Err(e) = db_p.add_auth_result(h_id, Some(cred_id), &proto_name, "Success", a_p.admin) {
-                                                    tracing::warn!("Failed to add auth result: {}", e);
-                                                }
-                                            }
-                                        } else {
-                                            if let Err(e) = db_p.add_auth_result(h_id, None, &proto_name, "Failure", false) {
-                                                tracing::warn!("Failed to add auth result: {}", e);
-                                            }
-                                        }
-                                        Ok(Some(h_id))
-                                    }).await;
-
-                                    host_id = db_res.ok().and_then(std::result::Result::ok).flatten();
-                                }
-
-                                // Execute modules if requested
-                                let mut module_data = std::collections::HashMap::new();
-                                if auth_res.success && !opts_clone.modules.is_empty() {
-                                    let registry = module_registry_clone.as_ref();
-                                    let active_protocol = protocol_clone.name();
-                                    for module_name in &opts_clone.modules {
-                                        if let Some(module) = registry.get(module_name) {
-                                            if !module.supported_protocols().contains(&active_protocol) {
-                                                tracing::error!("Module '{}' requires one of {:?}, but current protocol is '{}'. Skipping.", module_name, module.supported_protocols(), active_protocol);
-                                                continue;
-                                            }
-                                            match module.run(session.as_mut(), &opts_clone.module_opts).await {
-                                                Ok(mod_res) => {
-                                                    if mod_res.success {
-                                                        final_message.push_str(&format!(
-                                                            " | Module {}: {}",
-                                                            module_name, mod_res.output
-                                                        ));
-                                                        module_data.insert(
-                                                            module_name.clone(),
-                                                            mod_res.data,
-                                                        );
-
-                                                        // Save module-discovered credentials to DB
-                                                        if let Some(ref db_instance) = db_clone {
-                                                            let db_p = db_instance.clone();
-                                                            let m_name = module_name.clone();
-                                                            let p_name = protocol_clone.name().to_string();
-                                                            let m_creds = mod_res.credentials.clone();
-                                                            let h_id = host_id;
-
-                                                            if let Err(e) = tokio::task::spawn_blocking(move || {
-                                                                let now = Utc::now().timestamp();
-                                                                for m_cred in m_creds {
-                                                                    if let Err(err) = db_p.upsert_credential(
-                                                                        &Credential {
-                                                                            id: None,
-                                                                            workspace: db_p
-                                                                                .current_workspace()
-                                                                                .to_string(),
-                                                                            domain: m_cred.domain.clone(),
-                                                                            username: m_cred.username.clone(),
-                                                                            password: m_cred.password.clone(),
-                                                                            nt_hash: m_cred.nt_hash.clone(),
-                                                                            lm_hash: m_cred.lm_hash.clone(),
-                                                                            aes_128: m_cred.aes_128_key.clone(),
-                                                                            aes_256: m_cred.aes_256_key.clone(),
-                                                                            source: Some(format!("{p_name}:{m_name}")),
-                                                                            host_id: h_id,
-                                                                            created_at: now,
-                                                                        },
-                                                                    ) {
-                                                                        tracing::warn!("Failed to upsert credential from module: {}", err);
-                                                                    }
-                                                                }
-                                                            }).await {
-                                                                tracing::error!("Failed to spawn blocking task for module credentials: {}", e);
-                                                            }
-                                                        }
-                                                    } else {
-                                                        final_message.push_str(&format!(
-                                                            " | Module {} Failed: {}",
-                                                            module_name, mod_res.output
-                                                        ));
-                                                    }
-                                                }
-                                                Err(e) => {
-                                                    final_message.push_str(&format!(
-                                                        " | Module {module_name} Error: {e}"
-                                                    ));
-                                                }
-                                            }
-                                        } else {
-                                            final_message.push_str(&format!(
-                                                " | Module {module_name} not found"
-                                            ));
-                                        }
-                                    }
-                                }
-
-                                ExecutionResult {
-                                    target: target_str.clone(),
-                                    protocol: protocol_clone.name().to_string(),
-                                    username: cred_clone.username.clone(),
-                                    success: auth_res.success,
-                                    admin: auth_res.admin,
-                                    message: final_message,
-                                    duration_ms: start_time.elapsed().as_millis() as u64,
-                                    module_data,
-                                }
-                            }
-                            Err(e) => {
-                                // Increment fail counters on auth error
-                                global_fails_clone.fetch_add(1, Ordering::Relaxed);
-                                user_fails_clone
-                                    .entry(cred_clone.username.clone())
-                                    .or_insert_with(|| AtomicU32::new(0))
-                                    .fetch_add(1, Ordering::Relaxed);
-                                host_fails_clone
-                                    .entry(target_str.clone())
-                                    .or_insert_with(|| AtomicU32::new(0))
-                                    .fetch_add(1, Ordering::Relaxed);
-
-                                ExecutionResult {
-                                    target: target_str,
-                                    protocol: protocol_clone.name().to_string(),
-                                    username: cred_clone.username.clone(),
-                                    success: false,
-                                    admin: false,
-                                    message: format!("Auth error: {e}"),
-                                    duration_ms: start_time.elapsed().as_millis() as u64,
-                                    module_data: HashMap::new(),
-                                }
-                            },
-                        }
-                    })
-                    .await;
-
-                    // Drop permit to allow next task
-                    drop(permit);
-                    if let Some(ref p) = pb_clone {
-                        p.inc(1);
-                    }
-
-                    match result {
-                        Ok(exec_res) => exec_res,
-                        Err(_) => ExecutionResult {
-                            target: target_clone.display(),
-                            protocol: protocol_clone.name().to_string(),
-                            username: cred_clone.username.clone(),
-                            success: false,
-                            admin: false,
-                            message: "Timeout".to_string(),
-                            duration_ms: start_time.elapsed().as_millis() as u64,
-                            module_data: std::collections::HashMap::new(),
-                        },
-                    }
-                });
+                let handle = tokio::spawn(async move { execute_single_target(ctx).await });
 
                 join_handles.push(handle);
             }
@@ -736,6 +471,319 @@ impl ExecutionEngine {
     }
 }
 
+/// Context passed to `execute_single_target`.
+struct TargetTaskContext {
+    protocol: Arc<dyn NxcProtocol>,
+    target: Target,
+    cred: Credentials,
+    opts: ExecutionOpts,
+    db: Option<Arc<NxcDb>>,
+    manager: Arc<ConnectionManager>,
+    global_fails: Arc<AtomicU32>,
+    user_fails: Arc<dashmap::DashMap<String, AtomicU32>>,
+    host_fails: Arc<dashmap::DashMap<String, AtomicU32>>,
+    host_succeeded: Arc<std::sync::atomic::AtomicBool>,
+    module_registry: Arc<nxc_modules::ModuleRegistry>,
+    pb: Option<indicatif::ProgressBar>,
+    permit: tokio::sync::OwnedSemaphorePermit,
+}
+
+/// Executes the connection, authentication, and module execution logic for a single target and credential.
+///
+/// This handles jitter, timeout enforcement, protocol interaction, and database logging.
+async fn execute_single_target(ctx: TargetTaskContext) -> ExecutionResult {
+    let start_time = std::time::Instant::now();
+
+    // Check host_succeeded AFTER acquiring semaphore, right before network I/O
+    if !ctx.opts.continue_on_success && ctx.host_succeeded.load(Ordering::Relaxed) {
+        drop(ctx.permit);
+        if let Some(ref p) = ctx.pb {
+            p.inc(1);
+        }
+        return ExecutionResult {
+            target: ctx.target.display(),
+            protocol: ctx.protocol.name().to_string(),
+            username: ctx.cred.username.clone(),
+            success: false,
+            admin: false,
+            message: "Skipped (previous auth succeeded)".to_string(),
+            duration_ms: 0,
+            module_data: HashMap::new(),
+        };
+    }
+
+    // Apply jitter if specified (random delay in [0, jitter_ms] to stagger requests)
+    if let Some(jitter) = ctx.opts.jitter_ms {
+        if jitter > 0 {
+            let delay = rand::random_range(0..=jitter);
+            tokio::time::sleep(Duration::from_millis(delay)).await;
+        }
+    }
+
+    let result = tokio::time::timeout(ctx.opts.timeout, async {
+        let target_str = ctx.target.display();
+        let target_ip = ctx.target.ip_string();
+        let port = ctx.protocol.default_port();
+        let proxy = ctx.opts.proxy.as_deref();
+
+        let mut session = match ctx.manager
+            .call(&target_ip, || {
+                let p = ctx.protocol.clone();
+                let t = target_str.clone();
+                let pr = proxy.map(ToString::to_string);
+                async move { p.connect(&t, port, pr.as_deref()).await }
+            })
+            .await
+        {
+            Ok(s) => s,
+            Err(e) => {
+                return ExecutionResult {
+                    target: target_str,
+                    protocol: ctx.protocol.name().to_string(),
+                    username: ctx.cred.username.clone(),
+                    success: false,
+                    admin: false,
+                    message: format!("Connection failed: {e}"),
+                    duration_ms: start_time.elapsed().as_millis() as u64,
+                    module_data: HashMap::new(),
+                }
+            }
+        };
+
+        match ctx.protocol.authenticate(session.as_mut(), &ctx.cred).await {
+            Ok(auth_res) => {
+                if auth_res.success {
+                    ctx.host_succeeded.store(true, Ordering::Relaxed);
+                }
+                
+                let mut host_id = None;
+                if let Some(ref db_instance) = ctx.db {
+                    host_id = persist_result_to_db(
+                        db_instance.clone(),
+                        ctx.target.clone(),
+                        ctx.cred.clone(),
+                        auth_res.clone(),
+                        ctx.protocol.name().to_string(),
+                    ).await;
+                }
+
+                let (module_message, module_data) = if auth_res.success && !ctx.opts.modules.is_empty() {
+                    execute_modules(
+                        session.as_mut(),
+                        &ctx.opts,
+                        ctx.protocol.name(),
+                        &ctx.module_registry,
+                        ctx.db.clone(),
+                        host_id,
+                    ).await
+                } else {
+                    (String::new(), HashMap::new())
+                };
+
+                let mut final_message = auth_res.message.clone();
+                final_message.push_str(&module_message);
+
+                ExecutionResult {
+                    target: target_str.clone(),
+                    protocol: ctx.protocol.name().to_string(),
+                    username: ctx.cred.username.clone(),
+                    success: auth_res.success,
+                    admin: auth_res.admin,
+                    message: final_message,
+                    duration_ms: start_time.elapsed().as_millis() as u64,
+                    module_data,
+                }
+            }
+            Err(e) => {
+                ctx.global_fails.fetch_add(1, Ordering::Relaxed);
+                ctx.user_fails
+                    .entry(ctx.cred.username.clone())
+                    .or_insert_with(|| AtomicU32::new(0))
+                    .fetch_add(1, Ordering::Relaxed);
+                ctx.host_fails
+                    .entry(target_str.clone())
+                    .or_insert_with(|| AtomicU32::new(0))
+                    .fetch_add(1, Ordering::Relaxed);
+
+                ExecutionResult {
+                    target: target_str,
+                    protocol: ctx.protocol.name().to_string(),
+                    username: ctx.cred.username.clone(),
+                    success: false,
+                    admin: false,
+                    message: format!("Auth error: {e}"),
+                    duration_ms: start_time.elapsed().as_millis() as u64,
+                    module_data: HashMap::new(),
+                }
+            }
+        }
+    }).await;
+
+    drop(ctx.permit);
+    if let Some(ref p) = ctx.pb {
+        p.inc(1);
+    }
+
+    match result {
+        Ok(exec_res) => exec_res,
+        Err(_) => ExecutionResult {
+            target: ctx.target.display(),
+            protocol: ctx.protocol.name().to_string(),
+            username: ctx.cred.username.clone(),
+            success: false,
+            admin: false,
+            message: "Timeout".to_string(),
+            duration_ms: start_time.elapsed().as_millis() as u64,
+            module_data: HashMap::new(),
+        },
+    }
+}
+
+/// Persists the authentication result and host information to the database.
+///
+/// Runs as a blocking task to avoid stalling the async runtime with SQLite operations.
+/// Returns the database ID of the host if successful.
+async fn persist_result_to_db(
+    db: Arc<NxcDb>,
+    target: Target,
+    cred: Credentials,
+    auth_res: nxc_auth::AuthResult,
+    proto_name: String,
+) -> Option<i64> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<Option<i64>> {
+        let now = Utc::now().timestamp();
+        let h_id = db.upsert_host(&HostInfo {
+            id: None,
+            workspace: db.current_workspace().to_string(),
+            ip: target.ip_string(),
+            hostname: target.hostname.clone(),
+            domain: None,
+            os: None,
+            os_version: None,
+            smb_signing: None,
+            signing_required: None,
+            is_dc: false,
+            first_seen: now,
+            last_seen: now,
+        })?;
+
+        if auth_res.success {
+            if let Ok(cred_id) = db.add_credential(&Credential {
+                id: None,
+                workspace: db.current_workspace().to_string(),
+                domain: None,
+                username: cred.username.clone(),
+                password: cred.password.clone(),
+                nt_hash: cred.nt_hash.clone(),
+                lm_hash: None,
+                aes_128: None,
+                aes_256: None,
+                source: Some(proto_name.clone()),
+                host_id: Some(h_id),
+                created_at: now,
+            }) {
+                if let Err(e) = db.add_auth_result(h_id, Some(cred_id), &proto_name, "Success", auth_res.admin) {
+                    tracing::warn!("Failed to add auth result: {}", e);
+                }
+            }
+        } else {
+            if let Err(e) = db.add_auth_result(h_id, None, &proto_name, "Failure", false) {
+                tracing::warn!("Failed to add auth result: {}", e);
+            }
+        }
+        Ok(Some(h_id))
+    }).await.ok().and_then(Result::ok).flatten()
+}
+
+/// Executes requested modules against the authenticated session and persists discovered credentials.
+///
+/// Returns the concatenated output messages and any JSON data collected from the modules.
+async fn execute_modules(
+    session: &mut dyn nxc_protocols::NxcSession,
+    opts: &ExecutionOpts,
+    protocol_name: &str,
+    module_registry: &nxc_modules::ModuleRegistry,
+    db: Option<Arc<NxcDb>>,
+    host_id: Option<i64>,
+) -> (String, HashMap<String, serde_json::Value>) {
+    let mut final_message = String::new();
+    let mut module_data = HashMap::new();
+
+    for module_name in &opts.modules {
+        if let Some(module) = module_registry.get(module_name) {
+            if !module.supported_protocols().contains(&protocol_name) {
+                tracing::error!("Module '{}' requires one of {:?}, but current protocol is '{}'. Skipping.", module_name, module.supported_protocols(), protocol_name);
+                continue;
+            }
+            match module.run(session, &opts.module_opts).await {
+                Ok(mod_res) => {
+                    if mod_res.success {
+                        final_message.push_str(&format!(
+                            " | Module {}: {}",
+                            module_name, mod_res.output
+                        ));
+                        module_data.insert(
+                            module_name.clone(),
+                            mod_res.data,
+                        );
+
+                        if let Some(ref db_instance) = db {
+                            let db_p = db_instance.clone();
+                            let m_name = module_name.clone();
+                            let p_name = protocol_name.to_string();
+                            let m_creds = mod_res.credentials.clone();
+                            let h_id = host_id;
+
+                            if let Err(e) = tokio::task::spawn_blocking(move || {
+                                let now = Utc::now().timestamp();
+                                for m_cred in m_creds {
+                                    if let Err(err) = db_p.upsert_credential(
+                                        &Credential {
+                                            id: None,
+                                            workspace: db_p.current_workspace().to_string(),
+                                            domain: m_cred.domain.clone(),
+                                            username: m_cred.username.clone(),
+                                            password: m_cred.password.clone(),
+                                            nt_hash: m_cred.nt_hash.clone(),
+                                            lm_hash: m_cred.lm_hash.clone(),
+                                            aes_128: m_cred.aes_128_key.clone(),
+                                            aes_256: m_cred.aes_256_key.clone(),
+                                            source: Some(format!("{p_name}:{m_name}")),
+                                            host_id: h_id,
+                                            created_at: now,
+                                        },
+                                    ) {
+                                        tracing::warn!("Failed to upsert credential from module: {}", err);
+                                    }
+                                }
+                            }).await {
+                                tracing::error!("Failed to spawn blocking task for module credentials: {}", e);
+                            }
+                        }
+                    } else {
+                        final_message.push_str(&format!(
+                            " | Module {} Failed: {}",
+                            module_name, mod_res.output
+                        ));
+                    }
+                }
+                Err(e) => {
+                    final_message.push_str(&format!(
+                        " | Module {module_name} Error: {e}"
+                    ));
+                }
+            }
+        } else {
+            final_message.push_str(&format!(
+                " | Module {module_name} not found"
+            ));
+        }
+    }
+
+    (final_message, module_data)
+}
+
+
 // ─── Tests ──────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -744,38 +792,99 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_single_ip() {
-        let targets = parse_targets("192.168.1.10").unwrap();
+    fn test_parse_cidr_edge_cases() {
+        // /32 should return exactly 1 IP
+        let targets = parse_targets("192.168.1.100/32").unwrap();
         assert_eq!(targets.len(), 1);
-        assert_eq!(targets[0].ip_string(), "192.168.1.10");
-    }
+        assert_eq!(targets[0].ip_string(), "192.168.1.100");
 
-    #[test]
-    fn test_parse_cidr_24() {
+        // /31 should return 2 IPs (network and broadcast included)
+        let targets = parse_targets("192.168.1.100/31").unwrap();
+        assert_eq!(targets.len(), 2);
+        assert_eq!(targets[0].ip_string(), "192.168.1.100");
+        assert_eq!(targets[1].ip_string(), "192.168.1.101");
+
+        // /24 should return 254 IPs (network and broadcast skipped)
         let targets = parse_targets("192.168.1.0/24").unwrap();
-        assert_eq!(targets.len(), 254); // .1 through .254
+        assert_eq!(targets.len(), 254);
+        assert_eq!(targets[0].ip_string(), "192.168.1.1");
+        assert_eq!(targets[253].ip_string(), "192.168.1.254");
+
+        // Invalid prefix length
+        assert!(parse_targets("192.168.1.0/33").is_err());
+
+        // Invalid IP base
+        assert!(parse_targets("256.256.256.256/24").is_err());
+        assert!(parse_targets("not_an_ip/24").is_err());
+
+        // /0 with invalid IP (prevents full allocation while hitting the err branch)
+        assert!(parse_targets("256.0.0.0/0").is_err());
     }
 
     #[test]
-    fn test_parse_range() {
+    fn test_parse_range_edge_cases() {
+        // Valid partial range
         let targets = parse_targets("192.168.1.1-10").unwrap();
         assert_eq!(targets.len(), 10);
-    }
 
-    #[test]
-    fn test_parse_range_invalid_end_before_start() {
-        let result = parse_targets("192.168.1.100-50");
+        // Valid full range (0-255)
+        let targets = parse_targets("192.168.1.0-255").unwrap();
+        assert_eq!(targets.len(), 256);
+        assert_eq!(targets[0].ip_string(), "192.168.1.0");
+        assert_eq!(targets[255].ip_string(), "192.168.1.255");
+
+        // End before start
+        let result = parse_targets("192.168.1.50-10");
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("end octet"));
+
+        // Invalid octets
+        assert!(parse_targets("192.168.1.1-256").is_err()); // 256 is out of u8 bounds
+        assert!(parse_targets("192.168.1.1-abc").is_err());
+    }
+
+    #[test]
+    fn test_parse_target_spec_edge_cases() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        // Single IPv4
+        let targets = parse_targets("192.168.1.10").unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].ip_string(), "192.168.1.10");
+
+        // Single IPv6
+        let targets = parse_targets("2001:db8::1").unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].ip_string(), "2001:db8::1");
+
+        // Hostname
+        let targets = parse_targets("dc01.corp.local").unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].ip_string(), "dc01.corp.local");
+        assert_eq!(targets[0].hostname.as_deref(), Some("dc01.corp.local"));
+
+        // File parsing
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "192.168.1.10").unwrap();
+        writeln!(file, "10.0.0.0/30").unwrap(); // 2 IPs: .1, .2
+        writeln!(file, "# A comment").unwrap();
+        writeln!(file, "localhost").unwrap();
+        
+        let path = file.path().to_str().unwrap();
+        let targets = parse_targets(path).unwrap();
+        
+        assert_eq!(targets.len(), 4); // 1 + 2 + 1
+        assert_eq!(targets[0].ip_string(), "192.168.1.10");
+        assert_eq!(targets[1].ip_string(), "10.0.0.1");
+        assert_eq!(targets[2].ip_string(), "10.0.0.2");
+        assert_eq!(targets[3].ip_string(), "localhost");
     }
 
     #[test]
     fn test_target_display() {
-        let t = Target::new(
-            "10.0.0.1".parse().unwrap(),
-        )
-        .with_hostname("dc01.corp.local");
+        let t = Target::new("10.0.0.1".parse().unwrap()).with_hostname("dc01.corp.local");
         assert_eq!(t.display(), "10.0.0.1 (dc01.corp.local)");
     }
 

@@ -154,3 +154,74 @@ impl SessionCache for SessionManager {
         Ok(linked)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    fn create_test_record(id: &str) -> SessionRecord {
+        SessionRecord {
+            id: id.to_string(),
+            protocol: "smb".to_string(),
+            target: "192.168.1.1".to_string(),
+            username: Some("admin".to_string()),
+            domain: Some("WORKGROUP".to_string()),
+            state_data: vec![1, 2, 3],
+            created_at: current_time_secs(),
+            last_accessed: current_time_secs(),
+            linked_sessions: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn test_store_and_get_session() {
+        let manager = SessionManager::new();
+        let id = SessionManager::generate_id();
+        let record = create_test_record(&id);
+
+        manager.store_session(record.clone()).await.unwrap();
+        let retrieved = manager.get_session(&id).await.unwrap().expect("Session should exist");
+
+        assert_eq!(retrieved.id, id);
+        assert_eq!(retrieved.protocol, "smb");
+    }
+
+    #[tokio::test]
+    async fn test_link_sessions() {
+        let manager = SessionManager::new();
+        let parent_id = SessionManager::generate_id();
+        let child_id = SessionManager::generate_id();
+
+        let parent_record = create_test_record(&parent_id);
+        let child_record = create_test_record(&child_id);
+
+        manager.store_session(parent_record).await.unwrap();
+        manager.store_session(child_record).await.unwrap();
+
+        manager.link_sessions(&parent_id, &child_id).await.unwrap();
+
+        let linked = manager.get_linked_sessions(&parent_id).await.unwrap();
+        assert_eq!(linked.len(), 1);
+        assert_eq!(linked[0].id, child_id);
+    }
+
+    #[tokio::test]
+    async fn test_ttl_expiration() {
+        let manager = SessionManager::with_ttl(Duration::from_secs(2));
+        let id = SessionManager::generate_id();
+        let mut record = create_test_record(&id);
+
+        // Modify the record's last_accessed to be in the past
+        record.last_accessed = current_time_secs() - 10;
+        
+        // Insert directly to bypass `store_session` which updates `last_accessed`
+        manager.cache.insert(id.clone(), record);
+
+        manager.cleanup_expired();
+
+        let retrieved = manager.get_session(&id).await.unwrap();
+        assert!(retrieved.is_none());
+    }
+}
+

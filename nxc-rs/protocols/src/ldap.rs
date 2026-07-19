@@ -311,7 +311,7 @@ impl NxcProtocol for LdapProtocol {
             let _tcp_stream = runtime.block_on(async {
                 crate::connection::connect(&target_clone, port, proxy_owned.as_deref())
                     .await
-                    .map_err(|e| anyhow::anyhow!("Connection error: {e}"))
+                    .map_err(|e| crate::errors::LdapError::ConnectionFailed(format!("Connection error: {e}")))
             })?;
 
             Ok(LdapSession {

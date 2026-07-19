@@ -457,7 +457,7 @@ async fn main() -> Result<()> {
             "xml" => reporting::export_xml(&path, &report),
             "markdown" | "md" => reporting::export_markdown(&path, &report),
             "ndjson" => reporting::export_ndjson(&path, &results),
-            _ => unreachable!(),
+            unknown => anyhow::bail!("Unknown export format: {unknown}"),
         };
 
         match res {

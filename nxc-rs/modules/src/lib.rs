@@ -513,3 +513,132 @@ impl ModuleRegistry {
         protos
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+
+    /// A mock module for testing the registry.
+    struct MockModule {
+        name: &'static str,
+        protocols: Vec<&'static str>,
+    }
+
+    impl MockModule {
+        fn new(name: &'static str, protocols: Vec<&'static str>) -> Self {
+            Self { name, protocols }
+        }
+    }
+
+    #[async_trait]
+    impl NxcModule for MockModule {
+        fn name(&self) -> &'static str {
+            self.name
+        }
+
+        fn description(&self) -> &'static str {
+            "A mock module for testing."
+        }
+
+        fn supported_protocols(&self) -> &[&str] {
+            &self.protocols
+        }
+
+        async fn run(
+            &self,
+            _session: &mut dyn nxc_protocols::NxcSession,
+            _opts: &ModuleOptions,
+        ) -> Result<ModuleResult> {
+            Ok(ModuleResult::default())
+        }
+    }
+
+    #[test]
+    fn test_module_registry_registration_and_retrieval() {
+        let mut registry = ModuleRegistry {
+            modules: HashMap::new(),
+        };
+
+        // Register a module
+        let mock_module = Box::new(MockModule::new("mock_test", vec!["smb"]));
+        registry.register(mock_module);
+
+        // Ensure it can be retrieved
+        let retrieved = registry.get("mock_test");
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().name(), "mock_test");
+
+        // Verify count
+        assert_eq!(registry.count(), 1);
+    }
+
+    #[test]
+    fn test_module_registry_non_existent() {
+        let registry = ModuleRegistry {
+            modules: HashMap::new(),
+        };
+
+        // Error handling for non-existent modules
+        let retrieved = registry.get("does_not_exist");
+        assert!(retrieved.is_none());
+    }
+
+    #[test]
+    fn test_module_registry_case_sensitivity() {
+        let mut registry = ModuleRegistry {
+            modules: HashMap::new(),
+        };
+
+        registry.register(Box::new(MockModule::new("CaseSensitive", vec!["ldap"])));
+
+        // Currently, the registry uses exact string matching.
+        assert!(registry.get("CaseSensitive").is_some());
+        assert!(registry.get("casesensitive").is_none());
+    }
+
+    #[test]
+    fn test_module_options_ext_string() {
+        let mut opts = ModuleOptions::new();
+        opts.insert("USER".to_string(), "admin".to_string());
+
+        assert_eq!(opts.get_string("USER", "guest"), "admin");
+        assert_eq!(opts.get_string("PASS", "password"), "password");
+    }
+
+    #[test]
+    fn test_module_options_ext_bool() {
+        let mut opts = ModuleOptions::new();
+        opts.insert("FORCE".to_string(), "true".to_string());
+        opts.insert("VERBOSE".to_string(), "1".to_string());
+        opts.insert("DRY_RUN".to_string(), "false".to_string());
+        opts.insert("SILENT".to_string(), "0".to_string());
+        opts.insert("YES".to_string(), "yes".to_string());
+        opts.insert("NO".to_string(), "no".to_string());
+
+        assert!(opts.get_bool("FORCE", false));
+        assert!(opts.get_bool("VERBOSE", false));
+        assert!(!opts.get_bool("DRY_RUN", true));
+        assert!(!opts.get_bool("SILENT", true));
+        assert!(opts.get_bool("YES", false));
+        assert!(!opts.get_bool("NO", true));
+
+        // Default value fallback
+        assert!(opts.get_bool("MISSING", true));
+        assert!(!opts.get_bool("MISSING", false));
+    }
+
+    #[test]
+    fn test_module_options_ext_u16() {
+        let mut opts = ModuleOptions::new();
+        opts.insert("PORT".to_string(), "445".to_string());
+        opts.insert("INVALID".to_string(), "not_a_number".to_string());
+
+        assert_eq!(opts.get_u16("PORT", 80), 445);
+        // Default on parse failure
+        assert_eq!(opts.get_u16("INVALID", 80), 80);
+        // Default on missing
+        assert_eq!(opts.get_u16("MISSING", 8080), 8080);
+    }
+}
+
