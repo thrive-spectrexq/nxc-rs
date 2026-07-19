@@ -7,7 +7,7 @@
 #[cfg(test)]
 mod integration_tests {
     use nxc_auth::Credentials;
-    use nxc_modules::{ModuleOption, NxcModule};
+    use nxc_modules::ModuleOption;
     use nxc_protocols::smb::SmbProtocol;
     use nxc_protocols::winrm::WinrmProtocol;
     use nxc_protocols::NxcProtocol;
@@ -46,7 +46,7 @@ mod integration_tests {
     #[test]
     fn test_module_options_parsing() {
         // A placeholder for parsing module options across components.
-        let options = vec![ModuleOption {
+        let options = [ModuleOption {
             name: "COMMAND".to_string(),
             description: "Command to execute".to_string(),
             required: true,
