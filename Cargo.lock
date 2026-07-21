@@ -2863,6 +2863,7 @@ dependencies = [
  "hex",
  "ldap3",
  "nxc-auth",
+ "nxc-db",
  "nxc-protocols",
  "rasn",
  "reqwest",

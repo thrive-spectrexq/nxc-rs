@@ -33,3 +33,7 @@ rasn = { workspace = true }
 
 [features]
 opcua-support = ["nxc-protocols/opcua-support"]
+
+[dev-dependencies]
+nxc-db = { path = "../db" }
+
