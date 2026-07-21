@@ -13,10 +13,7 @@ pub struct AttackNode {
 impl AttackNode {
     /// Creates a new `AttackNode`.
     pub fn new(id: impl Into<String>, node_type: impl Into<String>) -> Self {
-        Self {
-            id: id.into(),
-            node_type: node_type.into(),
-        }
+        Self { id: id.into(), node_type: node_type.into() }
     }
 }
 
@@ -33,12 +30,12 @@ pub struct AttackEdge {
 
 impl AttackEdge {
     /// Creates a new `AttackEdge`.
-    pub fn new(source: impl Into<String>, target: impl Into<String>, relationship: impl Into<String>) -> Self {
-        Self {
-            source: source.into(),
-            target: target.into(),
-            relationship: relationship.into(),
-        }
+    pub fn new(
+        source: impl Into<String>,
+        target: impl Into<String>,
+        relationship: impl Into<String>,
+    ) -> Self {
+        Self { source: source.into(), target: target.into(), relationship: relationship.into() }
     }
 }
 
@@ -52,10 +49,7 @@ pub struct AttackGraph {
 impl AttackGraph {
     /// Creates a new, empty `AttackGraph`.
     pub fn new() -> Self {
-        Self {
-            nodes: Vec::new(),
-            edges: Vec::new(),
-        }
+        Self { nodes: Vec::new(), edges: Vec::new() }
     }
 
     /// Adds a new node to the attack graph.
@@ -82,11 +76,7 @@ impl AttackGraph {
 
     /// Gets outgoing neighbors for a given node ID.
     pub fn outgoing_neighbors(&self, node_id: &str) -> Vec<&str> {
-        self.edges
-            .iter()
-            .filter(|e| e.source == node_id)
-            .map(|e| e.target.as_str())
-            .collect()
+        self.edges.iter().filter(|e| e.source == node_id).map(|e| e.target.as_str()).collect()
     }
 
     /// Finds the shortest path to Domain Admin privileges using BFS.
@@ -200,4 +190,3 @@ mod tests {
         assert!(graph.find_path_to_da().is_err());
     }
 }
-

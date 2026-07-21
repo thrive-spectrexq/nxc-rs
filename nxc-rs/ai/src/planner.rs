@@ -20,7 +20,9 @@ impl AttackPlanner {
         }
 
         let mut plan = Vec::new();
-        plan.push(format!("Reconnaissance: Port scan and service discovery on target {target_domain}"));
+        plan.push(format!(
+            "Reconnaissance: Port scan and service discovery on target {target_domain}"
+        ));
 
         let available_tools = self.tool_registry.all();
         let tool_names: Vec<&str> = available_tools.iter().map(|t| t.name()).collect();
@@ -30,21 +32,36 @@ impl AttackPlanner {
         }
 
         if tool_names.contains(&"smb_enum") || tool_names.contains(&"ldap_enum") {
-            plan.push("Enumeration: Enumerate SMB shares and Active Directory LDAP directory".to_string());
+            plan.push(
+                "Enumeration: Enumerate SMB shares and Active Directory LDAP directory".to_string(),
+            );
         }
 
         if tool_names.contains(&"kerberoast") || tool_names.contains(&"asreproast") {
-            plan.push("Credential Harvesting: Perform Kerberoasting and AS-REP roasting".to_string());
+            plan.push(
+                "Credential Harvesting: Perform Kerberoasting and AS-REP roasting".to_string(),
+            );
         }
 
         if tool_names.contains(&"execute_module") {
-            plan.push("Module Execution: Run privilege escalation and lateral movement modules".to_string());
+            plan.push(
+                "Module Execution: Run privilege escalation and lateral movement modules"
+                    .to_string(),
+            );
         }
 
         // Standard operational phases
-        plan.push("Vulnerability Analysis: Identify misconfigurations and vulnerable services".to_string());
-        plan.push("Exploitation & Credential Extraction: Extract cached hashes and plaintext credentials".to_string());
-        plan.push(format!("Privilege Escalation & Pivoting: Pivot to Domain Controller of {target_domain}"));
+        plan.push(
+            "Vulnerability Analysis: Identify misconfigurations and vulnerable services"
+                .to_string(),
+        );
+        plan.push(
+            "Exploitation & Credential Extraction: Extract cached hashes and plaintext credentials"
+                .to_string(),
+        );
+        plan.push(format!(
+            "Privilege Escalation & Pivoting: Pivot to Domain Controller of {target_domain}"
+        ));
 
         Ok(plan)
     }
@@ -75,4 +92,3 @@ mod tests {
         assert!(plan[0].contains("corp.local"));
     }
 }
-

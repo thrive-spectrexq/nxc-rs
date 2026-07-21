@@ -417,8 +417,10 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
         }
     }
 
-    let no_bruteforce = matches.try_get_one::<bool>("no-bruteforce").unwrap_or(None).copied().unwrap_or(false);
-    let use_kerberos = matches.try_get_one::<bool>("kerberos").unwrap_or(None).copied().unwrap_or(false);
+    let no_bruteforce =
+        matches.try_get_one::<bool>("no-bruteforce").unwrap_or(None).copied().unwrap_or(false);
+    let use_kerberos =
+        matches.try_get_one::<bool>("kerberos").unwrap_or(None).copied().unwrap_or(false);
 
     // If no credentials provided, use null session
     if usernames.is_empty() && passwords.is_empty() && hashes.is_empty() {

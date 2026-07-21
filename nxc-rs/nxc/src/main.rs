@@ -144,7 +144,9 @@ async fn main() -> Result<()> {
     if all_targets.is_empty() {
         if protocol_name == "network" || protocol_name == "ai" {
             // Provide a dummy target so the ExecutionEngine fires at least once
-            all_targets.push(nxc_targets::Target::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1))));
+            all_targets.push(nxc_targets::Target::new(std::net::IpAddr::V4(
+                std::net::Ipv4Addr::new(127, 0, 0, 1),
+            )));
         } else {
             NxcGlobalOutput::error("No valid targets specified");
             return Ok(());
@@ -163,8 +165,13 @@ async fn main() -> Result<()> {
     let mut shuffle = matches.get_flag("shuffle");
     let proxy = matches.get_one::<String>("proxy").cloned();
     let stealth = matches.get_flag("stealth");
-    let continue_on_success = sub_matches.try_get_one::<bool>("continue-on-success").unwrap_or(None).copied().unwrap_or(false);
-    let no_bruteforce = sub_matches.try_get_one::<bool>("no-bruteforce").unwrap_or(None).copied().unwrap_or(false);
+    let continue_on_success = sub_matches
+        .try_get_one::<bool>("continue-on-success")
+        .unwrap_or(None)
+        .copied()
+        .unwrap_or(false);
+    let no_bruteforce =
+        sub_matches.try_get_one::<bool>("no-bruteforce").unwrap_or(None).copied().unwrap_or(false);
     let profiling_enabled = matches.get_flag("profiling");
     let retries = matches.get_one::<u32>("retries").copied().unwrap_or(3);
     let cb_threshold = matches.get_one::<u32>("cb-threshold").copied().unwrap_or(5);
@@ -190,12 +197,22 @@ async fn main() -> Result<()> {
     // Map protocol-specific flags to modules safely
     match protocol_name {
         "vnc" => {
-            if sub_matches.try_get_one::<bool>("screenshot").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"screenshot".to_string()) {
+            if sub_matches
+                .try_get_one::<bool>("screenshot")
+                .unwrap_or(None)
+                .copied()
+                .unwrap_or(false)
+                && !modules.contains(&"screenshot".to_string())
+            {
                 modules.push("screenshot".to_string());
             }
         }
         "adb" => {
-            if sub_matches.try_get_one::<bool>("screenshot").unwrap_or(None).copied().unwrap_or(false)
+            if sub_matches
+                .try_get_one::<bool>("screenshot")
+                .unwrap_or(None)
+                .copied()
+                .unwrap_or(false)
                 && !modules.contains(&"adb_screenshot".to_string())
             {
                 modules.push("adb_screenshot".to_string());
@@ -205,37 +222,51 @@ async fn main() -> Result<()> {
             // rdp screenshot module pending
         }
         "ldap" => {
-            if sub_matches.try_get_one::<bool>("gmsa").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"gmsa".to_string()) {
+            if sub_matches.try_get_one::<bool>("gmsa").unwrap_or(None).copied().unwrap_or(false)
+                && !modules.contains(&"gmsa".to_string())
+            {
                 modules.push("gmsa".to_string());
             }
         }
         "redis" => {
-            if sub_matches.try_get_one::<bool>("info").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"redis_info".to_string()) {
+            if sub_matches.try_get_one::<bool>("info").unwrap_or(None).copied().unwrap_or(false)
+                && !modules.contains(&"redis_info".to_string())
+            {
                 modules.push("redis_info".to_string());
             }
         }
         "postgres" | "postgresql" => {
-            if sub_matches.try_get_one::<bool>("dbs").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"pg_enum".to_string()) {
+            if sub_matches.try_get_one::<bool>("dbs").unwrap_or(None).copied().unwrap_or(false)
+                && !modules.contains(&"pg_enum".to_string())
+            {
                 modules.push("pg_enum".to_string());
             }
         }
         "mysql" => {
-            if sub_matches.try_get_one::<bool>("dbs").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"mysql_enum".to_string()) {
+            if sub_matches.try_get_one::<bool>("dbs").unwrap_or(None).copied().unwrap_or(false)
+                && !modules.contains(&"mysql_enum".to_string())
+            {
                 modules.push("mysql_enum".to_string());
             }
         }
         "snmp" => {
-            if sub_matches.try_get_one::<bool>("enum").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"snmp_enum".to_string()) {
+            if sub_matches.try_get_one::<bool>("enum").unwrap_or(None).copied().unwrap_or(false)
+                && !modules.contains(&"snmp_enum".to_string())
+            {
                 modules.push("snmp_enum".to_string());
             }
         }
         "docker" => {
-            if sub_matches.try_get_one::<bool>("enum").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"docker_enum".to_string()) {
+            if sub_matches.try_get_one::<bool>("enum").unwrap_or(None).copied().unwrap_or(false)
+                && !modules.contains(&"docker_enum".to_string())
+            {
                 modules.push("docker_enum".to_string());
             }
         }
         "opcua" => {
-            if sub_matches.try_get_one::<bool>("enum").unwrap_or(None).copied().unwrap_or(false) && !modules.contains(&"opcua_enum".to_string()) {
+            if sub_matches.try_get_one::<bool>("enum").unwrap_or(None).copied().unwrap_or(false)
+                && !modules.contains(&"opcua_enum".to_string())
+            {
                 modules.push("opcua_enum".to_string());
             }
         }
@@ -251,7 +282,8 @@ async fn main() -> Result<()> {
         }
     }
 
-    let verify_ssl = sub_matches.try_get_one::<bool>("verify-ssl").unwrap_or(None).copied().unwrap_or(false);
+    let verify_ssl =
+        sub_matches.try_get_one::<bool>("verify-ssl").unwrap_or(None).copied().unwrap_or(false);
     let explicit_port = sub_matches.try_get_one::<u16>("port").unwrap_or(None).copied();
 
     let exec_opts = ExecutionOpts {
