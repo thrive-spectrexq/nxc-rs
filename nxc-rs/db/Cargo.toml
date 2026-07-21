@@ -2,7 +2,9 @@
 name = "nxc-db"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 description = "NetExec-RS credential database — workspace-aware host/credential/auth store"
+
 
 [lints]
 workspace = true

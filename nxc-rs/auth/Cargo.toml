@@ -2,7 +2,9 @@
 name = "nxc-auth"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 description = "NetExec-RS authentication engine — NTLM SSP, Kerberos V5, certificate auth"
+
 
 [lints]
 workspace = true

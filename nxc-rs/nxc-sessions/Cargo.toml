@@ -2,7 +2,9 @@
 name = "nxc-sessions"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 description = "Distributed session cache and orchestration engine for NetExec-RS"
+
 
 [lints]
 workspace = true

@@ -31,17 +31,21 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "BSL-1.0",
+    "bzip2-1.0.6",
     "CC0-1.0",
+    "GPL-2.0-or-later",
     "ISC",
     "MIT",
     "MIT-0",
     "MPL-2.0",
+    "NCSA",
     "OpenSSL",
     "Unicode-3.0",
     "Unlicense",
     "Zlib",
 ]
 confidence-threshold = 0.8
+
 
 [licenses.private]
 ignore = false

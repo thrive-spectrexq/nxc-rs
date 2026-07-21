@@ -2,7 +2,9 @@
 name = "nxc-protocols"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 description = "NetExec-RS protocol handlers — SMB, LDAP, WinRM, RDP, MSSQL, SSH, FTP, VNC, WMI, NFS"
+
 
 [lints]
 workspace = true

@@ -2,7 +2,9 @@
 name = "nxc-resilience"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 description = "NetExec-RS resilience primitives — retry, circuit breaker, connection pooling, caching"
+
 
 [lints]
 workspace = true
