@@ -339,7 +339,7 @@ async fn main() -> Result<()> {
 
     if !dot_nxc.exists() {
         if let Err(e) = std::fs::create_dir_all(&dot_nxc) {
-            NxcGlobalOutput::warn(&format!("Failed to create nxc directory at {:?}: {e}", dot_nxc));
+            NxcGlobalOutput::warn(&format!("Failed to create nxc directory at {dot_nxc:?}: {e}"));
         }
     }
     let db_path = dot_nxc.join("nxc.db");
