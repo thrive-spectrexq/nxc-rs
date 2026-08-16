@@ -121,29 +121,18 @@ impl Target {
 pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
     let mut spec = spec.trim();
 
+    // Check if it's a file path first (e.g. /tmp/targets.txt, ./targets.txt)
+    if std::path::Path::new(spec).is_file() && parse_cidr(spec).is_err() {
+        return parse_target_file(spec);
+    }
+
     // Strip URI scheme prefix if present (e.g. "http://", "smb://", "https://")
     if let Some(pos) = spec.find("://") {
         spec = &spec[pos + 3..];
-    }
-    // Strip trailing slash/path if present from URL format
-    if let Some(slash_pos) = spec.find('/') {
-        if !spec.contains('.') && !spec.contains(':')
-            || spec[slash_pos..].contains('/') && !spec.contains('/')
-        {
-            // keep as is for CIDR
-        } else if !spec.contains('/')
-            || (!spec[slash_pos + 1..].chars().all(|c| c.is_ascii_digit()))
-        {
-            // It has a URL path like "192.168.1.10/path" -> strip path
-            if !spec[slash_pos + 1..].chars().all(|c| c.is_ascii_digit()) {
-                spec = &spec[..slash_pos];
-            }
+        // If a URI scheme was provided, strip any following endpoint path (e.g. "http://host:8080/api" -> "host:8080")
+        if let Some(slash_pos) = spec.find('/') {
+            spec = &spec[..slash_pos];
         }
-    }
-
-    // Check if it's a file path
-    if std::path::Path::new(spec).is_file() && parse_cidr(spec).is_err() {
-        return parse_target_file(spec);
     }
 
     // Check for CIDR notation (e.g. 192.168.1.0/24)
