@@ -439,6 +439,16 @@ pub fn build_credentials(matches: &clap::ArgMatches) -> Vec<Credentials> {
         }
     }
 
+    // Deduplicate credential components while preserving order to prevent redundant attempts
+    let mut seen_users = std::collections::HashSet::new();
+    usernames.retain(|u| seen_users.insert(u.clone()));
+
+    let mut seen_pass = std::collections::HashSet::new();
+    passwords.retain(|p| seen_pass.insert(p.clone()));
+
+    let mut seen_hashes = std::collections::HashSet::new();
+    hashes.retain(|h| seen_hashes.insert(h.clone()));
+
     let no_bruteforce =
         matches.try_get_one::<bool>("no-bruteforce").unwrap_or(None).copied().unwrap_or(false);
     let use_kerberos =

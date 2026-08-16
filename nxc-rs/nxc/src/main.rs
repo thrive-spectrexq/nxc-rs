@@ -664,4 +664,25 @@ mod tests {
         assert_eq!(creds.len(), 1);
         assert_eq!(creds[0].username, "");
     }
+
+    #[test]
+    fn test_build_credentials_deduplication() {
+        let app = build_cli();
+        let matches = app.get_matches_from(vec![
+            "nxc",
+            "smb",
+            "10.0.0.1",
+            "-u",
+            "admin",
+            "admin",
+            "-p",
+            TEST_MOCK_PASS_A,
+            TEST_MOCK_PASS_A,
+        ]);
+        let (_, sub_m) = matches.subcommand().unwrap();
+        let creds = build_credentials(sub_m);
+        // Duplicate user/pass should be collapsed to 1 credential pair
+        assert_eq!(creds.len(), 1);
+        assert_eq!(creds[0].username, "admin");
+    }
 }
