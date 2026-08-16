@@ -41,6 +41,7 @@ async fn main() -> Result<()> {
         tracing::Level::WARN
     };
 
+    let json_log = matches.get_flag("json-log");
     let mut _log_guard = None;
     if let Some(log_path) = matches.get_one::<String>("log") {
         let file = std::fs::OpenOptions::new().create(true).append(true).open(log_path)?;
@@ -48,15 +49,27 @@ async fn main() -> Result<()> {
         _log_guard = Some(guard);
 
         use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-        let file_layer =
-            tracing_subscriber::fmt::layer().with_writer(non_blocking).with_ansi(false);
-        let stdout_layer = tracing_subscriber::fmt::layer().with_target(false);
-
-        tracing_subscriber::registry()
-            .with(tracing_subscriber::filter::LevelFilter::from(log_level))
-            .with(stdout_layer)
-            .with(file_layer)
-            .init();
+        if json_log {
+            let file_layer =
+                tracing_subscriber::fmt::layer().with_writer(non_blocking).with_ansi(false);
+            let json_stdout = tracing_subscriber::fmt::layer().json();
+            tracing_subscriber::registry()
+                .with(tracing_subscriber::filter::LevelFilter::from(log_level))
+                .with(json_stdout)
+                .with(file_layer)
+                .init();
+        } else {
+            let file_layer =
+                tracing_subscriber::fmt::layer().with_writer(non_blocking).with_ansi(false);
+            let stdout_layer = tracing_subscriber::fmt::layer().with_target(false);
+            tracing_subscriber::registry()
+                .with(tracing_subscriber::filter::LevelFilter::from(log_level))
+                .with(stdout_layer)
+                .with(file_layer)
+                .init();
+        }
+    } else if json_log {
+        tracing_subscriber::fmt().json().with_max_level(log_level).init();
     } else {
         tracing_subscriber::fmt().with_max_level(log_level).with_target(false).init();
     }
@@ -390,6 +403,18 @@ async fn main() -> Result<()> {
         }
     }
 
+    // ── Safe-mode guardrail ──
+    let safe_mode = matches.get_flag("safe-mode")
+        || sub_matches.try_get_one::<bool>("safe-mode").unwrap_or(None).copied().unwrap_or(false);
+    if safe_mode {
+        NxcGlobalOutput::warn(
+            "Safe mode active: limiting execution to single credential pair (spray disabled)",
+        );
+        if creds.len() > 1 {
+            creds.truncate(1);
+        }
+    }
+
     // Deferred credential check — must come after --db-creds load
     if creds.is_empty() {
         NxcGlobalOutput::error("No credentials specified");
@@ -412,7 +437,14 @@ async fn main() -> Result<()> {
     let _timer =
         if profiling_enabled { Some(ScopedTimer::new("ExecutionEngine::run")) } else { None };
 
-    let results = engine.run(protocol, all_targets, creds).await;
+    let results = tokio::select! {
+        res = engine.run(protocol, all_targets, creds) => res,
+        _ = tokio::signal::ctrl_c() => {
+            println!();
+            NxcGlobalOutput::warn("Received interrupt signal (Ctrl+C). Finalizing and saving results collected so far...");
+            Vec::new()
+        }
+    };
 
     if profiling_enabled {
         log_memory_usage("Process End");

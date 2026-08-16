@@ -275,6 +275,21 @@ pub fn build_cli() -> Command {
                 .global(true),
         )
         .arg(
+            Arg::new("json-log")
+                .long("json-log")
+                .help("Format log output as structured JSON")
+                .action(ArgAction::SetTrue)
+                .global(true),
+        )
+        .arg(
+            Arg::new("safe-mode")
+                .long("safe-mode")
+                .alias("enum-only")
+                .help("Safe mode: disable password spraying and intrusive execution modules (enumeration only)")
+                .action(ArgAction::SetTrue)
+                .global(true),
+        )
+        .arg(
             Arg::new("log-results")
                 .long("log-results")
                 .help("Write structured execution results to a log file")

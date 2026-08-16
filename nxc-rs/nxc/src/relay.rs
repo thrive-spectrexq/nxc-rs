@@ -140,6 +140,24 @@ async fn handle_http_ntlm(
             }
         }
 
+        // Health check probe endpoint
+        if request_line.starts_with("GET /health ") || request_line.starts_with("GET /status ") {
+            let body = serde_json::json!({
+                "status": "ok",
+                "service": "nxc-relay",
+                "mode": if capture_only { "capture" } else { "relay" },
+                "target": relay_target
+            })
+            .to_string();
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            writer.write_all(response.as_bytes()).await?;
+            break;
+        }
+
         match authorization {
             None => {
                 // No auth header → send 401 with NTLM challenge
