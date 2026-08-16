@@ -47,7 +47,6 @@ graph TD
 | [`nxc-db`](file:///C:/Users/frimp/Documents/nxc-rs/nxc-rs/db) | Workspace-aware SQLite storage for discovered hosts, credentials, shares, and loot. |
 | [`nxc-resilience`](file:///C:/Users/frimp/Documents/nxc-rs/nxc-rs/resilience) | Circuit breakers, exponential backoff, per-target rate limiting, and failure tracking. |
 | [`nxc-ai`](file:///C:/Users/frimp/Documents/nxc-rs/nxc-rs/ai) | LLM assistant integration for command synthesis and natural-language analysis. |
-| [`nxc-c2`](file:///C:/Users/frimp/Documents/nxc-rs/nxc-rs/c2) | Command & Control communication channels. |
 | [`nxc-sessions`](file:///C:/Users/frimp/Documents/nxc-rs/nxc-rs/nxc-sessions) | Session state serialization and management. |
 | [`nxc-tests`](file:///C:/Users/frimp/Documents/nxc-rs/nxc-rs/nxc-tests) | End-to-end integration test suites. |
 

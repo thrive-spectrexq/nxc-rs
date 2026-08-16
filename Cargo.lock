@@ -2865,18 +2865,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nxc-c2"
-version = "0.4.5"
-dependencies = [
- "anyhow",
- "async-trait",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "nxc-db"
 version = "0.4.5"
 dependencies = [

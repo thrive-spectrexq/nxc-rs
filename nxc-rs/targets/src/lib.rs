@@ -116,19 +116,37 @@ impl Target {
 
 /// Parse a target specification string into a list of targets.
 ///
-/// Supports: single IP, CIDR notation, dash ranges, hostnames, file paths.
-/// Parse a target specification string into a list of targets.
-///
-/// Supports: single IP, CIDR notation, dash ranges, hostnames, file paths.
+/// Supports: single IPv4/IPv6, CIDR notation, dash ranges, hostnames, file paths,
+/// URI prefixes (http://, smb://, etc.), and optional `:port` / `[ipv6]:port` specs.
 pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
-    let spec = spec.trim();
+    let mut spec = spec.trim();
+
+    // Strip URI scheme prefix if present (e.g. "http://", "smb://", "https://")
+    if let Some(pos) = spec.find("://") {
+        spec = &spec[pos + 3..];
+    }
+    // Strip trailing slash/path if present from URL format
+    if let Some(slash_pos) = spec.find('/') {
+        if !spec.contains('.') && !spec.contains(':')
+            || spec[slash_pos..].contains('/') && !spec.contains('/')
+        {
+            // keep as is for CIDR
+        } else if !spec.contains('/')
+            || (!spec[slash_pos + 1..].chars().all(|c| c.is_ascii_digit()))
+        {
+            // It has a URL path like "192.168.1.10/path" -> strip path
+            if !spec[slash_pos + 1..].chars().all(|c| c.is_ascii_digit()) {
+                spec = &spec[..slash_pos];
+            }
+        }
+    }
 
     // Check if it's a file path
     if std::path::Path::new(spec).is_file() && parse_cidr(spec).is_err() {
         return parse_target_file(spec);
     }
 
-    // Check for CIDR notation
+    // Check for CIDR notation (e.g. 192.168.1.0/24)
     if spec.contains('/') {
         return parse_cidr(spec);
     }
@@ -138,7 +156,40 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
         return parse_range(spec);
     }
 
-    // Try as a single IP
+    // Check for [IPv6]:port format
+    if spec.starts_with('[') {
+        if let Some(bracket_end) = spec.find(']') {
+            let ip_str = &spec[1..bracket_end];
+            let port_str = &spec[bracket_end + 1..];
+            let port =
+                if port_str.starts_with(':') { port_str[1..].parse::<u16>().ok() } else { None };
+            if let Ok(ip) = ip_str.parse::<IpAddr>() {
+                let mut target = Target::new(ip);
+                if let Some(p) = port {
+                    target = target.with_port(p);
+                }
+                return Ok(vec![target]);
+            }
+        }
+    }
+
+    // Check for hostname:port or IPv4:port
+    if let Some(colon_pos) = spec.rfind(':') {
+        // Ensure it's not an IPv6 address without brackets
+        if spec.find(':') == Some(colon_pos) {
+            let host_part = &spec[..colon_pos];
+            let port_part = &spec[colon_pos + 1..];
+            if let Ok(port) = port_part.parse::<u16>() {
+                if let Ok(ip) = host_part.parse::<IpAddr>() {
+                    return Ok(vec![Target::new(ip).with_port(port)]);
+                } else if !host_part.is_empty() {
+                    return Ok(vec![Target::from_hostname(host_part).with_port(port)]);
+                }
+            }
+        }
+    }
+
+    // Try as a single IP (IPv4 or IPv6)
     if let Ok(ip) = spec.parse::<IpAddr>() {
         return Ok(vec![Target::new(ip)]);
     }
@@ -223,7 +274,7 @@ fn parse_range(spec: &str) -> Result<Vec<Target>, TargetError> {
     if end_octet < start_octet {
         return Err(TargetError::InvalidRange {
             spec: spec.to_string(),
-            reason: format!("End octet ({end_octet}) is less than start octet ({start_octet})"),
+            reason: format!("end octet ({end_octet}) is less than start octet ({start_octet})"),
         });
     }
     for octet in start_octet..=end_octet {
@@ -860,6 +911,7 @@ async fn execute_modules(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use anyhow::Result;
 
     #[test]
     fn test_parse_cidr_edge_cases() {
@@ -1083,8 +1135,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_execution_engine_db_persistence() -> Result<()> {
-        use anyhow::Result;
+    async fn test_execution_engine_db_persistence() -> anyhow::Result<()> {
         use async_trait::async_trait;
         use nxc_auth::{AuthResult, Credentials};
         use nxc_db::NxcDb;
@@ -1173,5 +1224,23 @@ mod tests {
         assert_eq!(saved_creds[0].username, "admin");
 
         Ok(())
+    }
+
+    #[test]
+    fn test_parse_targets_uri_and_ports() {
+        let t1 = parse_targets("http://192.168.1.100:8080").unwrap();
+        assert_eq!(t1.len(), 1);
+        assert_eq!(t1[0].ip_string(), "192.168.1.100");
+        assert_eq!(t1[0].port, Some(8080));
+
+        let t2 = parse_targets("smb://dc01.corp.local:445").unwrap();
+        assert_eq!(t2.len(), 1);
+        assert_eq!(t2[0].ip_string(), "dc01.corp.local");
+        assert_eq!(t2[0].port, Some(445));
+
+        let t3 = parse_targets("[::1]:8443").unwrap();
+        assert_eq!(t3.len(), 1);
+        assert_eq!(t3[0].ip_string(), "::1");
+        assert_eq!(t3[0].port, Some(8443));
     }
 }
