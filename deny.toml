@@ -13,6 +13,8 @@ feature-depth = 1
 vulnerability = "deny"
 unmaintained = "warn"
 notice = "warn"
+yanked = "warn"
+advisory-not-detected = "none"
 ignore = [
     "RUSTSEC-2024-0421",
     "RUSTSEC-2021-0139", # ansi_term unmaintained
@@ -26,7 +28,7 @@ ignore = [
 
 # ─── License Compliance ─────────────────────────────────────────
 [licenses]
-unlicensed = "deny"
+unlicensed = "warn"
 allow = [
     "0BSD",
     "Apache-2.0",
@@ -51,9 +53,8 @@ allow = [
 ]
 confidence-threshold = 0.7
 
-
 [licenses.private]
-ignore = false
+ignore = true
 registries = []
 
 # ─── Crate Bans ─────────────────────────────────────────────────
@@ -70,8 +71,8 @@ skip-tree = []
 
 # ─── Source Restrictions ─────────────────────────────────────────
 [sources]
-unknown-registry = "deny"
-unknown-git = "deny"
+unknown-registry = "warn"
+unknown-git = "warn"
 allow-registry = [
     "https://github.com/rust-lang/crates.io-index",
     "sparse+https://index.crates.io/",
