@@ -22,5 +22,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 csv = { workspace = true }
+zeroize = { workspace = true }
 [dev-dependencies]
 tempfile = "3.10"

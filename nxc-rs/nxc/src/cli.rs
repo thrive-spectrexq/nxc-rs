@@ -255,9 +255,16 @@ pub fn build_cli() -> Command {
                 .global(true),
         )
         .arg(
+            Arg::new("insecure")
+                .long("insecure")
+                .help("Allow insecure connections when using SSL/TLS (disables certificate validation)")
+                .action(ArgAction::SetTrue)
+                .global(true),
+        )
+        .arg(
             Arg::new("verify-ssl")
                 .long("verify-ssl")
-                .help("Verify SSL certificates (default: false)")
+                .help("Verify SSL certificates (default: enabled; use --insecure to disable)")
                 .action(ArgAction::SetTrue)
                 .global(true),
         )
@@ -477,7 +484,8 @@ pub fn get_protocol_handler(
     protocol_name: &str,
     sub_matches: &clap::ArgMatches,
 ) -> Option<Arc<dyn nxc_protocols::NxcProtocol>> {
-    let verify_ssl = sub_matches.get_flag("verify-ssl");
+    let insecure = sub_matches.get_flag("insecure");
+    let verify_ssl = !insecure;
 
     match protocol_name {
         "smb" => Some(Arc::new(nxc_protocols::smb::SmbProtocol::new())),

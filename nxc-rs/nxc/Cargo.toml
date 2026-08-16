@@ -52,6 +52,8 @@ html-escape = "0.2"
 hex.workspace = true
 serde = { workspace = true, features = ["derive"] }
 csv.workspace = true
+dirs = { workspace = true }
+uuid = { workspace = true }
 tracing-appender = "0.2.5"
 rand.workspace = true
 

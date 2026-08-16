@@ -56,7 +56,7 @@ pub struct WinrmProtocol {
 
 impl WinrmProtocol {
     pub fn new() -> Self {
-        Self { timeout: Duration::from_secs(10), verify_ssl: false }
+        Self { timeout: Duration::from_secs(10), verify_ssl: true }
     }
 
     pub fn with_verify_ssl(mut self, verify: bool) -> Self {

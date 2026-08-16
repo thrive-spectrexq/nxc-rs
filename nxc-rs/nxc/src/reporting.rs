@@ -2,8 +2,9 @@ use nxc_targets::ExecutionResult;
 use serde::Serialize;
 use std::fs::File;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 #[derive(Serialize)]
 pub struct Report {
@@ -12,55 +13,134 @@ pub struct Report {
     pub results: Vec<ExecutionResult>,
 }
 
-pub fn export_json(path: &str, report: &Report) -> Result<()> {
-    let file = File::create(path)?;
-    serde_json::to_writer_pretty(file, report)?;
+/// Atomically writes content to a target file path by writing to a temporary file
+/// in the same directory and renaming it.
+pub fn atomic_write_file<F>(path: &str, write_fn: F) -> Result<()>
+where
+    F: FnOnce(&mut File) -> Result<()>,
+{
+    let target_path = Path::new(path);
+    if let Some(parent) = target_path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create parent directory for {path}"))?;
+        }
+    }
+
+    let parent_dir = target_path.parent().unwrap_or_else(|| Path::new("."));
+    let temp_name = format!(
+        ".{}.tmp.{}",
+        target_path.file_name().and_then(|n| n.to_str()).unwrap_or("export"),
+        uuid::Uuid::new_v4()
+    );
+    let tmp_path = parent_dir.join(temp_name);
+
+    {
+        let mut file = File::create(&tmp_path)
+            .with_context(|| format!("Failed to create temporary file at {tmp_path:?}"))?;
+        write_fn(&mut file)?;
+        file.flush().with_context(|| format!("Failed to flush temporary file at {tmp_path:?}"))?;
+    }
+
+    std::fs::rename(&tmp_path, target_path).with_context(|| {
+        format!("Failed to rename temporary file from {tmp_path:?} to {target_path:?}")
+    })?;
+
     Ok(())
 }
 
-pub fn export_csv(path: &str, results: &[ExecutionResult]) -> Result<()> {
-    let file = File::create(path)?;
-    let mut writer = csv::Writer::from_writer(file);
-
-    // Write header
-    writer.write_record([
-        "target",
-        "protocol",
-        "username",
-        "success",
-        "admin",
-        "message",
-        "duration_ms",
-        "module_data",
-    ])?;
-
-    for res in results {
-        let module_data_json =
-            serde_json::to_string(&res.module_data).unwrap_or_else(|_| "{}".to_string());
-        writer.write_record([
-            &res.target,
-            &res.protocol,
-            &res.username,
-            &res.success.to_string(),
-            &res.admin.to_string(),
-            &res.message,
-            &res.duration_ms.to_string(),
-            &module_data_json,
-        ])?;
+/// Sanitize a string for safe inclusion in CSV cells to prevent Formula Injection (CSV injection).
+/// If a string starts with `=`, `+`, `-`, `@`, tab, or carriage return, prepend `'`.
+pub fn sanitize_csv_field(val: &str) -> String {
+    if val.starts_with('=')
+        || val.starts_with('+')
+        || val.starts_with('-')
+        || val.starts_with('@')
+        || val.starts_with('\t')
+        || val.starts_with('\r')
+    {
+        format!("'{val}")
+    } else {
+        val.to_string()
     }
-    writer.flush()?;
-    Ok(())
+}
+
+/// Sanitize workspace names and path segments to prevent directory traversal (`..`, slashes, control chars).
+pub fn sanitize_workspace_name(name: &str) -> String {
+    let sanitized: String =
+        name.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-').collect();
+    if sanitized.is_empty() {
+        "default".to_string()
+    } else {
+        sanitized
+    }
+}
+
+/// Validate export file path to ensure it does not attempt directory traversal out of expected bounds.
+pub fn validate_export_path(path: &str) -> Result<PathBuf> {
+    let pb = PathBuf::from(path);
+    for component in pb.components() {
+        if let std::path::Component::ParentDir = component {
+            anyhow::bail!("Path traversal ('..') is not permitted in export path: {path}");
+        }
+    }
+    Ok(pb)
+}
+
+pub fn export_json(path: &str, report: &Report) -> Result<()> {
+    validate_export_path(path)?;
+    atomic_write_file(path, |file| {
+        serde_json::to_writer_pretty(file, report)?;
+        Ok(())
+    })
+}
+
+pub fn export_csv(path: &str, results: &[ExecutionResult]) -> Result<()> {
+    validate_export_path(path)?;
+    atomic_write_file(path, |file| {
+        let mut writer = csv::Writer::from_writer(file);
+
+        // Write header
+        writer.write_record([
+            "target",
+            "protocol",
+            "username",
+            "success",
+            "admin",
+            "message",
+            "duration_ms",
+            "module_data",
+        ])?;
+
+        for res in results {
+            let module_data_json =
+                serde_json::to_string(&res.module_data).unwrap_or_else(|_| "{}".to_string());
+            writer.write_record([
+                &sanitize_csv_field(&res.target),
+                &sanitize_csv_field(&res.protocol),
+                &sanitize_csv_field(&res.username),
+                &res.success.to_string(),
+                &res.admin.to_string(),
+                &sanitize_csv_field(&res.message),
+                &res.duration_ms.to_string(),
+                &sanitize_csv_field(&module_data_json),
+            ])?;
+        }
+        writer.flush()?;
+        Ok(())
+    })
 }
 
 /// Export results as newline-delimited JSON (NDJSON) for streaming/log pipelines.
 pub fn export_ndjson(path: &str, results: &[ExecutionResult]) -> Result<()> {
-    let mut file = File::create(path)?;
-    for res in results {
-        let line = serde_json::to_string(res)?;
-        writeln!(file, "{line}")?;
-    }
-    file.flush()?;
-    Ok(())
+    validate_export_path(path)?;
+    atomic_write_file(path, |file| {
+        for res in results {
+            let line = serde_json::to_string(res)?;
+            writeln!(file, "{line}")?;
+        }
+        Ok(())
+    })
 }
 
 /// Escape the five XML special characters in a string.
@@ -74,126 +154,125 @@ fn xml_escape(s: &str) -> String {
 
 /// Export results as Metasploit-compatible XML.
 pub fn export_xml(path: &str, report: &Report) -> Result<()> {
-    let mut file = File::create(path)?;
-    writeln!(file, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>")?;
-    writeln!(file, "<MetasploitV4>")?;
-    writeln!(file, "  <hosts>")?;
+    validate_export_path(path)?;
+    atomic_write_file(path, |file| {
+        writeln!(file, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>")?;
+        writeln!(file, "<MetasploitV4>")?;
+        writeln!(file, "  <hosts>")?;
 
-    // Group by target
-    let mut hosts_map: std::collections::HashMap<&str, Vec<&ExecutionResult>> =
-        std::collections::HashMap::new();
-    for res in &report.results {
-        hosts_map.entry(&res.target).or_default().push(res);
-    }
-
-    for (target, results) in hosts_map {
-        writeln!(file, "    <host>")?;
-        writeln!(file, "      <address>{}</address>", xml_escape(target))?;
-        writeln!(file, "      <services>")?;
-
-        let protocol = report.protocol.to_uppercase();
-        let port = match protocol.as_str() {
-            "SMB" => 445,
-            "SSH" => 22,
-            "LDAP" => 389,
-            "WINRM" => 5985,
-            "MSSQL" => 1433,
-            "RDP" => 3389,
-            "FTP" => 21,
-            "VNC" => 5900,
-            _ => 0,
-        };
-
-        writeln!(file, "        <service>")?;
-        writeln!(file, "          <port>{port}</port>")?;
-        writeln!(file, "          <proto>tcp</proto>")?;
-        writeln!(file, "          <name>{protocol}</name>")?;
-        writeln!(file, "          <state>open</state>")?;
-        writeln!(file, "        </service>")?;
-        writeln!(file, "      </services>")?;
-
-        writeln!(file, "      <vulns>")?;
-        for res in results {
-            if res.success {
-                writeln!(file, "        <vuln>")?;
-                writeln!(file, "          <name>{protocol} Auth bypass/credentials</name>")?;
-                writeln!(
-                    file,
-                    "          <info>Username: {} | Admin: {} | Message: {}</info>",
-                    xml_escape(&res.username),
-                    res.admin,
-                    xml_escape(&res.message),
-                )?;
-                writeln!(file, "        </vuln>")?;
-            }
+        // Group by target
+        let mut hosts_map: std::collections::HashMap<&str, Vec<&ExecutionResult>> =
+            std::collections::HashMap::new();
+        for res in &report.results {
+            hosts_map.entry(&res.target).or_default().push(res);
         }
-        writeln!(file, "      </vulns>")?;
-        writeln!(file, "    </host>")?;
-    }
 
-    writeln!(file, "  </hosts>")?;
-    writeln!(file, "</MetasploitV4>")?;
+        for (target, results) in hosts_map {
+            writeln!(file, "    <host>")?;
+            writeln!(file, "      <address>{}</address>", xml_escape(target))?;
+            writeln!(file, "      <services>")?;
 
-    file.flush()?;
-    Ok(())
+            let protocol = report.protocol.to_uppercase();
+            let port = match protocol.as_str() {
+                "SMB" => 445,
+                "SSH" => 22,
+                "LDAP" => 389,
+                "WINRM" => 5985,
+                "MSSQL" => 1433,
+                "RDP" => 3389,
+                "FTP" => 21,
+                "VNC" => 5900,
+                _ => 0,
+            };
+
+            writeln!(file, "        <service>")?;
+            writeln!(file, "          <port>{port}</port>")?;
+            writeln!(file, "          <proto>tcp</proto>")?;
+            writeln!(file, "          <name>{protocol}</name>")?;
+            writeln!(file, "          <state>open</state>")?;
+            writeln!(file, "        </service>")?;
+            writeln!(file, "      </services>")?;
+
+            writeln!(file, "      <vulns>")?;
+            for res in results {
+                if res.success {
+                    writeln!(file, "        <vuln>")?;
+                    writeln!(file, "          <name>{protocol} Auth bypass/credentials</name>")?;
+                    writeln!(
+                        file,
+                        "          <info>Username: {} | Admin: {} | Message: {}</info>",
+                        xml_escape(&res.username),
+                        res.admin,
+                        xml_escape(&res.message),
+                    )?;
+                    writeln!(file, "        </vuln>")?;
+                }
+            }
+            writeln!(file, "      </vulns>")?;
+            writeln!(file, "    </host>")?;
+        }
+
+        writeln!(file, "  </hosts>")?;
+        writeln!(file, "</MetasploitV4>")?;
+        Ok(())
+    })
 }
 
 /// Export results as a Markdown report with summary and table.
 pub fn export_markdown(path: &str, report: &Report) -> Result<()> {
-    let mut file = File::create(path)?;
+    validate_export_path(path)?;
+    atomic_write_file(path, |file| {
+        let total = report.results.len();
+        let successes = report.results.iter().filter(|r| r.success).count();
+        let admins = report.results.iter().filter(|r| r.admin).count();
+        let failures = total - successes;
 
-    let total = report.results.len();
-    let successes = report.results.iter().filter(|r| r.success).count();
-    let admins = report.results.iter().filter(|r| r.admin).count();
-    let failures = total - successes;
+        writeln!(file, "# NetExec-RS Scan Report")?;
+        writeln!(file)?;
+        writeln!(file, "- **Timestamp**: {}", report.timestamp)?;
+        writeln!(file, "- **Protocol**: {}", report.protocol.to_uppercase())?;
+        writeln!(file, "- **Total Results**: {total}")?;
+        writeln!(file, "- **Successful**: {successes}")?;
+        writeln!(file, "- **Admin Access**: {admins}")?;
+        writeln!(file, "- **Failed**: {failures}")?;
+        writeln!(file)?;
 
-    writeln!(file, "# NetExec-RS Scan Report")?;
-    writeln!(file)?;
-    writeln!(file, "- **Timestamp**: {}", report.timestamp)?;
-    writeln!(file, "- **Protocol**: {}", report.protocol.to_uppercase())?;
-    writeln!(file, "- **Total Results**: {total}")?;
-    writeln!(file, "- **Successful**: {successes}")?;
-    writeln!(file, "- **Admin Access**: {admins}")?;
-    writeln!(file, "- **Failed**: {failures}")?;
-    writeln!(file)?;
+        writeln!(file, "## Results")?;
+        writeln!(file)?;
+        writeln!(file, "| Target | Username | Success | Admin | Duration (ms) | Message |")?;
+        writeln!(file, "|--------|----------|---------|-------|---------------|---------|")?;
 
-    writeln!(file, "## Results")?;
-    writeln!(file)?;
-    writeln!(file, "| Target | Username | Success | Admin | Duration (ms) | Message |")?;
-    writeln!(file, "|--------|----------|---------|-------|---------------|---------|")?;
+        for res in &report.results {
+            let success_icon = if res.success { "✅" } else { "❌" };
+            let admin_icon = if res.admin { "👑" } else { "—" };
+            // Escape pipe characters in message
+            let msg = res.message.replace('|', "\\|");
+            writeln!(
+                file,
+                "| {} | {} | {} | {} | {} | {} |",
+                res.target, res.username, success_icon, admin_icon, res.duration_ms, msg
+            )?;
+        }
 
-    for res in &report.results {
-        let success_icon = if res.success { "✅" } else { "❌" };
-        let admin_icon = if res.admin { "👑" } else { "—" };
-        // Escape pipe characters in message
-        let msg = res.message.replace('|', "\\|");
-        writeln!(
-            file,
-            "| {} | {} | {} | {} | {} | {} |",
-            res.target, res.username, success_icon, admin_icon, res.duration_ms, msg
-        )?;
-    }
-
-    writeln!(file)?;
-    writeln!(file, "---")?;
-    writeln!(file, "*Generated by NetExec-RS*")?;
-
-    file.flush()?;
-    Ok(())
+        writeln!(file)?;
+        writeln!(file, "---")?;
+        writeln!(file, "*Generated by NetExec-RS*")?;
+        Ok(())
+    })
 }
 
 /// Export results as a styled HTML report with summary dashboard.
 pub fn export_html(path: &str, report: &Report) -> Result<()> {
-    let mut file = File::create(path)?;
+    validate_export_path(path)?;
+    atomic_write_file(path, |file| {
+        let total = report.results.len();
+        let successes = report.results.iter().filter(|r| r.success).count();
+        let admins = report.results.iter().filter(|r| r.admin).count();
+        let failures = total - successes;
 
-    let total = report.results.len();
-    let successes = report.results.iter().filter(|r| r.success).count();
-    let admins = report.results.iter().filter(|r| r.admin).count();
-    let failures = total - successes;
-
-    write!(
-        file,
-        r#"<!DOCTYPE html>
+        write!(
+            file,
+            r#"<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -252,43 +331,48 @@ pub fn export_html(path: &str, report: &Report) -> Result<()> {
 </thead>
 <tbody>
 "#,
-        protocol = report.protocol.to_uppercase(),
-        timestamp = report.timestamp,
-        total = total,
-        successes = successes,
-        admins = admins,
-        failures = failures,
-    )?;
-
-    for res in &report.results {
-        let status_badge = if res.success {
-            r#"<span class="badge badge-success">SUCCESS</span>"#
-        } else {
-            r#"<span class="badge badge-fail">FAILED</span>"#
-        };
-        let admin_badge =
-            if res.admin { r#"<span class="badge badge-admin">ADMIN</span>"# } else { "—" };
-        let msg_escaped =
-            res.message.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
-        writeln!(
-            file,
-            "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}ms</td><td>{}</td></tr>",
-            res.target, res.username, status_badge, admin_badge, res.duration_ms, msg_escaped
+            protocol = xml_escape(&report.protocol.to_uppercase()),
+            timestamp = xml_escape(&report.timestamp),
+            total = total,
+            successes = successes,
+            admins = admins,
+            failures = failures,
         )?;
-    }
 
-    write!(
-        file,
-        r#"</tbody>
+        for res in &report.results {
+            let status_badge = if res.success {
+                r#"<span class="badge badge-success">SUCCESS</span>"#
+            } else {
+                r#"<span class="badge badge-fail">FAILED</span>"#
+            };
+            let admin_badge =
+                if res.admin { r#"<span class="badge badge-admin">ADMIN</span>"# } else { "—" };
+            let msg_escaped = xml_escape(&res.message);
+            let target_escaped = xml_escape(&res.target);
+            let user_escaped = xml_escape(&res.username);
+            writeln!(
+                file,
+                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}ms</td><td>{}</td></tr>",
+                target_escaped,
+                user_escaped,
+                status_badge,
+                admin_badge,
+                res.duration_ms,
+                msg_escaped
+            )?;
+        }
+
+        write!(
+            file,
+            r#"</tbody>
 </table>
 <div class="footer">Generated by NetExec-RS</div>
 </body>
 </html>
 "#
-    )?;
-
-    file.flush()?;
-    Ok(())
+        )?;
+        Ok(())
+    })
 }
 
 // ─── PDF Export (raw PDF 1.4, zero external dependencies) ───────
@@ -384,91 +468,91 @@ fn build_text_stream(lines: &[String], font_size: f32, leading: f32) -> Vec<u8> 
 
 /// Export results as a PDF 1.4 report (no external dependencies).
 pub fn export_pdf(path: &str, report: &Report) -> Result<()> {
-    let total = report.results.len();
-    let successes = report.results.iter().filter(|r| r.success).count();
-    let admins = report.results.iter().filter(|r| r.admin).count();
-    let failures = total - successes;
+    validate_export_path(path)?;
+    atomic_write_file(path, |file| {
+        let total = report.results.len();
+        let successes = report.results.iter().filter(|r| r.success).count();
+        let admins = report.results.iter().filter(|r| r.admin).count();
+        let failures = total - successes;
 
-    // ── Collect lines for the first content page (summary) ──────
-    let mut summary_lines: Vec<String> = vec![
-        "NetExec-RS Scan Report".to_string(),
-        String::new(),
-        format!("Timestamp : {}", report.timestamp),
-        format!("Protocol  : {}", report.protocol.to_uppercase()),
-        format!("Total     : {}", total),
-        format!("Successful: {}", successes),
-        format!("Admin     : {}", admins),
-        format!("Failed    : {}", failures),
-        String::new(),
-        "--- Results ---".to_string(),
-        String::new(),
-        format!(
-            "{:<18} {:<16} {:<8} {:<6} {:<10} {}",
-            "Target", "Username", "Success", "Admin", "Duration", "Message"
-        ),
-        "-".repeat(90),
-    ];
+        // ── Collect lines for the first content page (summary) ──────
+        let mut summary_lines: Vec<String> = vec![
+            "NetExec-RS Scan Report".to_string(),
+            String::new(),
+            format!("Timestamp : {}", report.timestamp),
+            format!("Protocol  : {}", report.protocol.to_uppercase()),
+            format!("Total     : {}", total),
+            format!("Successful: {}", successes),
+            format!("Admin     : {}", admins),
+            format!("Failed    : {}", failures),
+            String::new(),
+            "--- Results ---".to_string(),
+            String::new(),
+            format!(
+                "{:<18} {:<16} {:<8} {:<6} {:<10} {}",
+                "Target", "Username", "Success", "Admin", "Duration", "Message"
+            ),
+            "-".repeat(90),
+        ];
 
-    for res in &report.results {
-        let success_str = if res.success { "YES" } else { "NO" };
-        let admin_str = if res.admin { "YES" } else { "-" };
-        // Truncate message to keep rows legible
-        let msg: String = res.message.chars().take(40).collect();
-        summary_lines.push(format!(
-            "{:<18} {:<16} {:<8} {:<6} {:<10} {}",
-            truncate_str(&res.target, 17),
-            truncate_str(&res.username, 15),
-            success_str,
-            admin_str,
-            format!("{}ms", res.duration_ms),
-            msg,
-        ));
-    }
+        for res in &report.results {
+            let success_str = if res.success { "YES" } else { "NO" };
+            let admin_str = if res.admin { "YES" } else { "-" };
+            // Truncate message to keep rows legible
+            let msg: String = res.message.chars().take(40).collect();
+            summary_lines.push(format!(
+                "{:<18} {:<16} {:<8} {:<6} {:<10} {}",
+                truncate_str(&res.target, 17),
+                truncate_str(&res.username, 15),
+                success_str,
+                admin_str,
+                format!("{}ms", res.duration_ms),
+                msg,
+            ));
+        }
 
-    summary_lines.push(String::new());
-    summary_lines.push("Generated by NetExec-RS".to_string());
+        summary_lines.push(String::new());
+        summary_lines.push("Generated by NetExec-RS".to_string());
 
-    // ── Build PDF object tree ───────────────────────────────────
-    let mut pdf = PdfWriter::new();
+        // ── Build PDF object tree ───────────────────────────────────
+        let mut pdf = PdfWriter::new();
 
-    // 1 – Font (Helvetica, a built-in base-14 font)
-    let font_obj =
-        pdf.add_object(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec());
+        // 1 – Font (Helvetica, a built-in base-14 font)
+        let font_obj =
+            pdf.add_object(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec());
 
-    // 2 – Content stream
-    let stream = build_text_stream(&summary_lines, 9.0, 11.0);
-    let content_obj = pdf.add_object(stream);
+        // 2 – Content stream
+        let stream = build_text_stream(&summary_lines, 9.0, 11.0);
+        let content_obj = pdf.add_object(stream);
 
-    // 3 – Page
-    // We will fix up /Parent after creating Pages object
-    let page_dict = format!(
-        "<< /Type /Page /Parent {} 0 R /MediaBox [0 0 612 792] /Contents {} 0 R /Resources << /Font << /F1 {} 0 R >> >> >>",
-        content_obj + 1, // pages_obj will be next
-        content_obj,
-        font_obj,
-    );
-    let page_obj = pdf.add_object(page_dict.into_bytes());
+        // 3 – Page
+        let page_dict = format!(
+            "<< /Type /Page /Parent {} 0 R /MediaBox [0 0 612 792] /Contents {} 0 R /Resources << /Font << /F1 {} 0 R >> >> >>",
+            content_obj + 1,
+            content_obj,
+            font_obj,
+        );
+        let page_obj = pdf.add_object(page_dict.into_bytes());
 
-    // 4 – Pages
-    let pages_dict = format!("<< /Type /Pages /Kids [{page_obj} 0 R] /Count 1 >>",);
-    let pages_obj = pdf.add_object(pages_dict.into_bytes());
+        // 4 – Pages
+        let pages_dict = format!("<< /Type /Pages /Kids [{page_obj} 0 R] /Count 1 >>",);
+        let pages_obj = pdf.add_object(pages_dict.into_bytes());
 
-    // Fix page /Parent to point to pages_obj
-    let fixed_page = format!(
-        "<< /Type /Page /Parent {pages_obj} 0 R /MediaBox [0 0 612 792] /Contents {content_obj} 0 R /Resources << /Font << /F1 {font_obj} 0 R >> >> >>",
-    );
-    pdf.objects[page_obj - 1] = fixed_page.into_bytes();
+        // Fix page /Parent to point to pages_obj
+        let fixed_page = format!(
+            "<< /Type /Page /Parent {pages_obj} 0 R /MediaBox [0 0 612 792] /Contents {content_obj} 0 R /Resources << /Font << /F1 {font_obj} 0 R >> >> >>",
+        );
+        pdf.objects[page_obj - 1] = fixed_page.into_bytes();
 
-    // 5 – Catalog
-    let catalog_dict = format!("<< /Type /Catalog /Pages {pages_obj} 0 R >>",);
-    let catalog_obj = pdf.add_object(catalog_dict.into_bytes());
+        // 5 – Catalog
+        let catalog_dict = format!("<< /Type /Catalog /Pages {pages_obj} 0 R >>",);
+        let catalog_obj = pdf.add_object(catalog_dict.into_bytes());
 
-    let bytes = pdf.finish(pages_obj, catalog_obj);
+        let bytes = pdf.finish(pages_obj, catalog_obj);
 
-    let mut file = File::create(path)?;
-    file.write_all(&bytes)?;
-    file.flush()?;
-    Ok(())
+        file.write_all(&bytes)?;
+        Ok(())
+    })
 }
 
 /// Truncate a string to at most `max` characters.
@@ -477,5 +561,34 @@ fn truncate_str(s: &str, max: usize) -> String {
         s.to_string()
     } else {
         format!("{}~", &s[..max - 1])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_csv_field() {
+        assert_eq!(sanitize_csv_field("=cmd|'/C calc'!A0"), "'=cmd|'/C calc'!A0");
+        assert_eq!(sanitize_csv_field("+12345"), "'+12345");
+        assert_eq!(sanitize_csv_field("-12345"), "'-12345");
+        assert_eq!(sanitize_csv_field("@SUM(1+1)"), "'@SUM(1+1)");
+        assert_eq!(sanitize_csv_field("normal_user"), "normal_user");
+    }
+
+    #[test]
+    fn test_sanitize_workspace_name() {
+        assert_eq!(sanitize_workspace_name("default"), "default");
+        assert_eq!(sanitize_workspace_name("../../secret"), "secret");
+        assert_eq!(sanitize_workspace_name("corp_internal-2"), "corp_internal-2");
+        assert_eq!(sanitize_workspace_name("!@#$%^"), "default");
+    }
+
+    #[test]
+    fn test_validate_export_path_traversal() {
+        assert!(validate_export_path("../escaped.json").is_err());
+        assert!(validate_export_path("reports/../../escaped.json").is_err());
+        assert!(validate_export_path("reports/sub/report.json").is_ok());
     }
 }

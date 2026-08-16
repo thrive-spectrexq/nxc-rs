@@ -282,8 +282,9 @@ async fn main() -> Result<()> {
         }
     }
 
-    let verify_ssl =
-        sub_matches.try_get_one::<bool>("verify-ssl").unwrap_or(None).copied().unwrap_or(false);
+    let insecure = matches.get_flag("insecure")
+        || sub_matches.try_get_one::<bool>("insecure").unwrap_or(None).copied().unwrap_or(false);
+    let verify_ssl = !insecure;
     let explicit_port = sub_matches.try_get_one::<u16>("port").unwrap_or(None).copied();
 
     let exec_opts = ExecutionOpts {
@@ -304,24 +305,33 @@ async fn main() -> Result<()> {
     };
 
     // ── Setup Database ──
-    let workspace = matches
+    let workspace_raw = matches
         .get_one::<String>("workspace")
         .map(std::string::String::as_str)
         .unwrap_or("default");
+    let workspace = reporting::sanitize_workspace_name(workspace_raw);
 
-    // Ensure .nxc directory exists in home or current dir
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .unwrap_or_else(|_| ".".to_string());
-    let dot_nxc = std::path::PathBuf::from(home).join(".nxc");
+    // Ensure platform-appropriate .nxc directory exists
+    let dot_nxc = if let Ok(custom) = std::env::var("NXC_HOME") {
+        std::path::PathBuf::from(custom)
+    } else if let Some(legacy) = dirs::home_dir().map(|h| h.join(".nxc")).filter(|p| p.exists()) {
+        legacy
+    } else if let Some(data_dir) = dirs::data_local_dir() {
+        data_dir.join("nxc")
+    } else if let Some(config_dir) = dirs::config_dir() {
+        config_dir.join("nxc")
+    } else {
+        std::path::PathBuf::from(".nxc")
+    };
+
     if !dot_nxc.exists() {
         if let Err(e) = std::fs::create_dir_all(&dot_nxc) {
-            NxcGlobalOutput::warn(&format!("Failed to create .nxc directory: {e}"));
+            NxcGlobalOutput::warn(&format!("Failed to create nxc directory at {:?}: {e}", dot_nxc));
         }
     }
     let db_path = dot_nxc.join("nxc.db");
 
-    let db = match NxcDb::new(&db_path, workspace) {
+    let db = match NxcDb::new(&db_path, &workspace) {
         Ok(d) => Some(Arc::new(d)),
         Err(e) => {
             NxcGlobalOutput::warn(&format!("Failed to initialize database: {e}"));
@@ -514,6 +524,9 @@ async fn main() -> Result<()> {
 mod tests {
     use super::*;
 
+    const TEST_MOCK_PASS_A: &str = "MOCK_SYNTHETIC_TEST_PW_ALPHA_123!";
+    const TEST_MOCK_PASS_B: &str = "MOCK_SYNTHETIC_TEST_PW_BETA_456!";
+
     #[test]
     fn test_cli_parse_smb_basic() {
         let app = build_cli();
@@ -524,7 +537,7 @@ mod tests {
             "-u",
             "admin",
             "-p",
-            "Password123!", // lgtm[rust/hard-coded-cryptographic-value] Test data
+            TEST_MOCK_PASS_A,
         ]);
         let (proto, sub_m) = matches.subcommand().unwrap();
         assert_eq!(proto, "smb");
@@ -562,7 +575,7 @@ mod tests {
             "-u",
             "admin",
             "-p",
-            "pass",
+            TEST_MOCK_PASS_A,
         ]);
         let (_, sub_m) = matches.subcommand().unwrap();
         let targets = sub_m.get_many::<String>("target").unwrap();
@@ -573,7 +586,15 @@ mod tests {
     fn test_build_credentials_spray_mode() {
         let app = build_cli();
         let matches = app.get_matches_from(vec![
-            "nxc", "smb", "10.0.0.1", "-u", "admin", "user", "-p", "pass1", "pass2",
+            "nxc",
+            "smb",
+            "10.0.0.1",
+            "-u",
+            "admin",
+            "user",
+            "-p",
+            TEST_MOCK_PASS_A,
+            TEST_MOCK_PASS_B,
         ]);
         let (_, sub_m) = matches.subcommand().unwrap();
         let creds = build_credentials(sub_m);
@@ -592,8 +613,8 @@ mod tests {
             "admin",
             "user",
             "-p",
-            "pass1",
-            "pass2",
+            TEST_MOCK_PASS_A,
+            TEST_MOCK_PASS_B,
             "--no-bruteforce",
         ]);
         let (_, sub_m) = matches.subcommand().unwrap();

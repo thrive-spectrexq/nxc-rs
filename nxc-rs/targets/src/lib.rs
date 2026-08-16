@@ -247,7 +247,7 @@ impl Default for ExecutionOpts {
             no_bruteforce: false,
             modules: Vec::new(),
             module_opts: HashMap::new(),
-            verify_ssl: false,
+            verify_ssl: true,
             gfail_limit: None,
             ufail_limit: None,
             fail_limit: None,

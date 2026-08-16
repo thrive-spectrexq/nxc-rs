@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroize;
 
 pub mod backend;
 pub mod sqlite_backend;
@@ -96,7 +97,8 @@ pub struct HostInfo {
     pub last_seen: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Zeroize)]
+#[zeroize(drop)]
 pub struct Credential {
     pub id: Option<i64>,
     pub workspace: String,
@@ -123,7 +125,8 @@ pub struct AuthResultEntry {
     pub attempted_at: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Zeroize)]
+#[zeroize(drop)]
 pub struct Loot {
     pub id: Option<i64>,
     pub workspace: String,
