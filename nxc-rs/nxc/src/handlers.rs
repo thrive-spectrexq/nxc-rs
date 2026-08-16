@@ -67,10 +67,18 @@ pub async fn handle_ai_mode(
     };
 
     // Initialize shared resources for AI tools
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .unwrap_or_else(|_| ".".to_string());
-    let dot_nxc = std::path::PathBuf::from(home).join(".nxc");
+    let dot_nxc = if let Ok(custom) = std::env::var("NXC_HOME") {
+        std::path::PathBuf::from(custom)
+    } else if let Some(legacy) = dirs::home_dir().map(|h| h.join(".nxc")).filter(|p| p.exists()) {
+        legacy
+    } else if let Some(data_dir) = dirs::data_local_dir() {
+        data_dir.join("nxc")
+    } else if let Some(config_dir) = dirs::config_dir() {
+        config_dir.join("nxc")
+    } else {
+        std::path::PathBuf::from(".nxc")
+    };
+
     let db_path = dot_nxc.join("nxc.db");
     let db = Arc::new(NxcDb::new(&db_path, "default")?);
     let registry_mod = Arc::new(ModuleRegistry::new());
@@ -86,8 +94,9 @@ pub async fn handle_ai_mode(
 
     // If an initial prompt was provided on CLI, run it first
     if let Some(prompt) = initial_prompt {
-        println!("{} Goal: {}", "🛰️".green().bold(), prompt.green().bold());
-        if let Err(e) = agent.run(&prompt).await {
+        let sanitized_prompt = sanitize_ai_prompt(&prompt);
+        println!("{} Goal: {}", "🛰️".green().bold(), sanitized_prompt.green().bold());
+        if let Err(e) = agent.run(&sanitized_prompt).await {
             eprintln!("{} AI Error: {}", "ERROR".red().bold(), e);
         }
     }
@@ -111,7 +120,8 @@ pub async fn handle_ai_mode(
                 break;
             }
             _ => {
-                if let Err(e) = agent.run(input).await {
+                let sanitized_input = sanitize_ai_prompt(input);
+                if let Err(e) = agent.run(&sanitized_input).await {
                     eprintln!("{} AI Error: {}", "ERROR".red().bold(), e);
                 }
             }
@@ -119,4 +129,52 @@ pub async fn handle_ai_mode(
     }
 
     Ok(())
+}
+
+/// Scrub sensitive credential patterns (NTLM hashes, private key headers) from AI prompts
+/// before sending outbound requests to LLM providers.
+pub fn sanitize_ai_prompt(prompt: &str) -> String {
+    let mut sanitized = prompt.to_string();
+
+    // Mask standard 32-character hex hashes (e.g. NTLM hashes)
+    let hashes_to_redact: Vec<String> = sanitized
+        .split_whitespace()
+        .map(|word| word.trim_matches(|c: char| !c.is_ascii_alphanumeric()).to_string())
+        .filter(|clean| clean.len() == 32 && clean.chars().all(|c| c.is_ascii_hexdigit()))
+        .collect();
+
+    for hash in hashes_to_redact {
+        sanitized = sanitized.replace(&hash, "[REDACTED_NTLM_HASH]");
+    }
+
+    // Mask private key headers
+    if sanitized.contains("BEGIN RSA PRIVATE KEY")
+        || sanitized.contains("BEGIN OPENSSH PRIVATE KEY")
+    {
+        sanitized = "[REDACTED_PRIVATE_KEY]".to_string();
+    }
+
+    sanitized
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_ai_prompt_ntlm() {
+        let prompt =
+            "Check if user admin with hash 8846f7eaee8fb117ad06bdd830b7586c has admin access";
+        let sanitized = sanitize_ai_prompt(prompt);
+        assert!(!sanitized.contains("8846f7eaee8fb117ad06bdd830b7586c"));
+        assert!(sanitized.contains("[REDACTED_NTLM_HASH]"));
+    }
+
+    #[test]
+    fn test_sanitize_ai_prompt_private_key() {
+        let prompt =
+            "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----";
+        let sanitized = sanitize_ai_prompt(prompt);
+        assert_eq!(sanitized, "[REDACTED_PRIVATE_KEY]");
+    }
 }
