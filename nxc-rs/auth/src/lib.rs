@@ -4,9 +4,12 @@
 //! authentication for all NetExec-RS protocol handlers.
 
 pub mod certificate;
+pub mod errors;
 pub mod kerberos;
 pub mod ntlm;
 pub mod registry;
+
+pub use errors::{AuthError, CertificateError, KerberosError, NtlmError, RegistryError};
 
 use anyhow::Result;
 use async_trait::async_trait;

@@ -3,7 +3,9 @@
 //! Handles target specification (CIDR, ranges, files, hostnames) and
 //! drives the concurrent multi-target execution engine.
 
-use anyhow::Result;
+pub mod errors;
+pub use errors::TargetError;
+
 use chrono::Utc;
 use nxc_auth::Credentials;
 use nxc_db::{Credential, HostInfo, NxcDb};
@@ -115,7 +117,10 @@ impl Target {
 /// Parse a target specification string into a list of targets.
 ///
 /// Supports: single IP, CIDR notation, dash ranges, hostnames, file paths.
-pub fn parse_targets(spec: &str) -> Result<Vec<Target>> {
+/// Parse a target specification string into a list of targets.
+///
+/// Supports: single IP, CIDR notation, dash ranges, hostnames, file paths.
+pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
     let spec = spec.trim();
 
     // Check if it's a file path
@@ -143,8 +148,9 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>> {
 }
 
 /// Parse targets from a file (one per line).
-fn parse_target_file(path: &str) -> Result<Vec<Target>> {
-    let contents = std::fs::read_to_string(path)?;
+fn parse_target_file(path: &str) -> Result<Vec<Target>, TargetError> {
+    let contents = std::fs::read_to_string(path)
+        .map_err(|e| TargetError::FileReadError { path: path.to_string(), source: e })?;
     let mut targets = Vec::new();
     for line in contents.lines() {
         let line = line.trim();
@@ -157,15 +163,26 @@ fn parse_target_file(path: &str) -> Result<Vec<Target>> {
 }
 
 /// Parse CIDR notation (e.g. 192.168.1.0/24).
-fn parse_cidr(spec: &str) -> Result<Vec<Target>> {
+fn parse_cidr(spec: &str) -> Result<Vec<Target>, TargetError> {
     let parts: Vec<&str> = spec.split('/').collect();
     if parts.len() != 2 {
-        anyhow::bail!("Invalid CIDR notation: {spec}");
+        return Err(TargetError::InvalidCidr {
+            spec: spec.to_string(),
+            reason: "Must contain exactly one '/' separator".to_string(),
+        });
     }
-    let base_ip: std::net::Ipv4Addr = parts[0].parse()?;
-    let prefix_len: u32 = parts[1].parse()?;
+    let base_ip: std::net::Ipv4Addr = parts[0]
+        .parse()
+        .map_err(|e| TargetError::InvalidIp { spec: parts[0].to_string(), source: e })?;
+    let prefix_len: u32 = parts[1].parse().map_err(|_| TargetError::InvalidCidr {
+        spec: spec.to_string(),
+        reason: "Invalid prefix length integer".to_string(),
+    })?;
     if prefix_len > 32 {
-        anyhow::bail!("Invalid CIDR prefix length: {prefix_len}");
+        return Err(TargetError::InvalidCidr {
+            spec: spec.to_string(),
+            reason: format!("Prefix length {prefix_len} exceeds 32"),
+        });
     }
 
     let base = u32::from(base_ip);
@@ -186,21 +203,28 @@ fn parse_cidr(spec: &str) -> Result<Vec<Target>> {
 }
 
 /// Parse dash range (e.g. 192.168.1.1-254).
-fn parse_range(spec: &str) -> Result<Vec<Target>> {
-    let dash_pos =
-        spec.rfind('-').ok_or_else(|| anyhow::anyhow!("Invalid range format: missing dash"))?;
+fn parse_range(spec: &str) -> Result<Vec<Target>, TargetError> {
+    let dash_pos = spec.rfind('-').ok_or_else(|| TargetError::InvalidRange {
+        spec: spec.to_string(),
+        reason: "Missing dash separator".to_string(),
+    })?;
     let base = &spec[..dash_pos];
-    let end_octet: u8 = spec[dash_pos + 1..].parse()?;
+    let end_octet: u8 = spec[dash_pos + 1..].parse().map_err(|_| TargetError::InvalidRange {
+        spec: spec.to_string(),
+        reason: "Invalid end octet (must be 0-255)".to_string(),
+    })?;
 
-    let base_ip: std::net::Ipv4Addr = base.parse()?;
+    let base_ip: std::net::Ipv4Addr =
+        base.parse().map_err(|e| TargetError::InvalidIp { spec: base.to_string(), source: e })?;
     let base_int = u32::from(base_ip);
     let start_octet = (base_int & 0xFF) as u8;
 
     let mut targets = Vec::new();
     if end_octet < start_octet {
-        anyhow::bail!(
-            "Invalid IP range '{spec}': end octet ({end_octet}) is less than start octet ({start_octet})"
-        );
+        return Err(TargetError::InvalidRange {
+            spec: spec.to_string(),
+            reason: format!("End octet ({end_octet}) is less than start octet ({start_octet})"),
+        });
     }
     for octet in start_octet..=end_octet {
         let ip_int = (base_int & 0xFFFFFF00) | octet as u32;
@@ -235,10 +259,17 @@ pub struct ExecutionOpts {
     pub port: Option<u16>,
 }
 
+impl ExecutionOpts {
+    /// Calculate adaptive concurrency limit based on host CPU parallelism.
+    pub fn adaptive_threads() -> usize {
+        std::thread::available_parallelism().map(|p| (p.get() * 16).clamp(32, 256)).unwrap_or(100)
+    }
+}
+
 impl Default for ExecutionOpts {
     fn default() -> Self {
         Self {
-            threads: 256,
+            threads: Self::adaptive_threads(),
             timeout: Duration::from_secs(30),
             jitter_ms: None,
             shuffle: false,

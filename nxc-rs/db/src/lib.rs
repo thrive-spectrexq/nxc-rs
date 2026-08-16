@@ -8,7 +8,10 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
 pub mod backend;
+pub mod errors;
 pub mod sqlite_backend;
+
+pub use errors::DbError;
 
 // ─── Schema Constants ───────────────────────────────────────────
 

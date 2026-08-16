@@ -90,6 +90,7 @@ p12 = "0.6"
 x509-parser = "0.18"
 aes-kw = "0.3"
 bytes = "1"
+proptest = "1.6"
 
 # ─── Workspace Lints ─────────────────
 [workspace.lints.rust]
