@@ -161,8 +161,7 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
         if let Some(bracket_end) = spec.find(']') {
             let ip_str = &spec[1..bracket_end];
             let port_str = &spec[bracket_end + 1..];
-            let port =
-                if port_str.starts_with(':') { port_str[1..].parse::<u16>().ok() } else { None };
+            let port = port_str.strip_prefix(':').and_then(|p| p.parse::<u16>().ok());
             if let Ok(ip) = ip_str.parse::<IpAddr>() {
                 let mut target = Target::new(ip);
                 if let Some(p) = port {
