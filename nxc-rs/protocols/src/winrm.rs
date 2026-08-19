@@ -254,7 +254,7 @@ impl NxcProtocol for WinrmProtocol {
         let t2_msg = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, t2_base64)?;
 
         let challenge = auth.parse_type2(&t2_msg)?;
-        let t3_msg = auth.generate_type3(creds, &challenge)?;
+        let t3_msg = auth.generate_type3(creds, &challenge, None, None)?;
         let t3_base64 =
             base64::Engine::encode(&base64::engine::general_purpose::STANDARD, t3_msg.message);
 

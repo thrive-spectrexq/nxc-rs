@@ -1115,7 +1115,7 @@ impl NxcProtocol for SmbProtocol {
             let sid = u64::from_le_bytes(resp[40..48].try_into()?);
             let t2 = &resp[u16::from_le_bytes(resp[64..66].try_into()?) as usize..];
             let challenge = auth.parse_type2(t2)?;
-            let t3 = auth.generate_type3(creds, &challenge)?;
+            let t3 = auth.generate_type3(creds, &challenge, None, None)?;
             (sid, challenge, t3.message)
         };
 

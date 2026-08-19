@@ -170,7 +170,7 @@ impl NxcProtocol for WmiProtocol {
         let challenge = auth.parse_type2(t2_msg)?;
 
         // 3. Send AlterContext with NTLM Authenticate
-        let t3_msg = auth.generate_type3(creds, &challenge)?;
+        let t3_msg = auth.generate_type3(creds, &challenge, None, None)?;
         let dcerpc_auth_t3 = DcerpcAuth::new(0x0a, 0x06, t3_msg.message);
         let auth_bytes_t3 = dcerpc_auth_t3.to_bytes();
 

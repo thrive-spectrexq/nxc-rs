@@ -2794,6 +2794,7 @@ dependencies = [
  "nxc-db",
  "nxc-modules",
  "nxc-protocols",
+ "nxc-reporting",
  "nxc-targets",
  "rand 0.10.2",
  "reqwest",
@@ -2804,6 +2805,7 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "uuid",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2955,6 +2957,18 @@ dependencies = [
  "tracing",
  "url 2.5.8",
  "urlencoding",
+ "uuid",
+]
+
+[[package]]
+name = "nxc-reporting"
+version = "0.4.6"
+dependencies = [
+ "anyhow",
+ "csv",
+ "nxc-targets",
+ "serde",
+ "serde_json",
  "uuid",
 ]
 

@@ -34,6 +34,7 @@ nxc-modules = { path = "../modules" }
 nxc-db = { path = "../db" }
 nxc-targets = { path = "../targets" }
 nxc-ai = { path = "../ai" }
+nxc-reporting = { path = "../reporting" }
 tokio = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }
@@ -59,3 +60,6 @@ rand.workspace = true
 
 [features]
 opcua-support = ["nxc-protocols/opcua-support"]
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_System_ProcessStatus", "Win32_System_Threading"] }

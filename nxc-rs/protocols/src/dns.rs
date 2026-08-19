@@ -7,6 +7,7 @@ use crate::{CommandOutput, NxcProtocol, NxcSession};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
+use std::time::Duration;
 use tokio::net::UdpSocket;
 use tracing::{debug, info};
 
@@ -160,12 +161,94 @@ impl DnsProtocol {
         Ok(records)
     }
 
-    /// Check for insecure dynamic DNS updates.
+    /// Check for insecure dynamic DNS updates (RFC 2136).
     pub async fn check_nonsecure_update(&self, session: &DnsSession, domain: &str) -> Result<bool> {
         info!("DNS: Checking insecure dynamic update for {} on {}", domain, session.target);
-        // Build a DNS UPDATE packet and check if the server rejects or accepts it
-        // A proper implementation sends a dynamic update and checks RCODE
-        Ok(false) // Conservative default
+
+        // Build a DNS UPDATE packet (RFC 2136)
+        let test_name = format!("_nxc-test-{}.{}", rand::random::<u16>(), domain);
+        let mut pkt = Vec::new();
+
+        // Transaction ID
+        let txid: u16 = rand::random();
+        pkt.extend_from_slice(&txid.to_be_bytes());
+        // Flags: Opcode=UPDATE (5 << 11)
+        pkt.extend_from_slice(&(5u16 << 11).to_be_bytes());
+        // ZOCOUNT=1, PRCOUNT=0, UPCOUNT=1, ADCOUNT=0
+        pkt.extend_from_slice(&1u16.to_be_bytes()); // Zone count
+        pkt.extend_from_slice(&0u16.to_be_bytes()); // Prerequisite count
+        pkt.extend_from_slice(&1u16.to_be_bytes()); // Update count
+        pkt.extend_from_slice(&0u16.to_be_bytes()); // Additional count
+
+        // Zone section: domain, type SOA (6), class IN (1)
+        pkt.extend_from_slice(&encode_dns_name(domain));
+        pkt.extend_from_slice(&6u16.to_be_bytes());  // SOA
+        pkt.extend_from_slice(&1u16.to_be_bytes());  // IN
+
+        // Update section: Add a TXT record
+        pkt.extend_from_slice(&encode_dns_name(&test_name));
+        pkt.extend_from_slice(&16u16.to_be_bytes()); // TXT
+        pkt.extend_from_slice(&1u16.to_be_bytes());  // IN
+        pkt.extend_from_slice(&300u32.to_be_bytes()); // TTL
+        let txt_data = b"\x08nxc-test"; // Length-prefixed TXT RDATA
+        pkt.extend_from_slice(&(txt_data.len() as u16).to_be_bytes());
+        pkt.extend_from_slice(txt_data);
+
+        // Send via UDP
+        let addr = format!("{}:{}", session.target, session.port);
+        let socket = UdpSocket::bind("0.0.0.0:0")
+            .await
+            .map_err(|e| anyhow!("Failed to bind UDP socket: {e}"))?;
+
+        socket.send_to(&pkt, &addr).await
+            .map_err(|e| anyhow!("Failed to send DNS UPDATE: {e}"))?;
+
+        let mut buf = [0u8; 512];
+        match tokio::time::timeout(Duration::from_secs(3), socket.recv(&mut buf)).await {
+            Ok(Ok(n)) if n >= 4 => {
+                let rcode = buf[3] & 0x0F;
+                let vulnerable = rcode == 0; // NOERROR = update accepted
+                if vulnerable {
+                    info!("DNS: Non-secure dynamic update ACCEPTED — server is vulnerable!");
+                    // Send DELETE to clean up the test record
+                    let _ = self.send_delete_update(session, domain, &test_name).await;
+                } else {
+                    debug!("DNS: Dynamic update rejected (RCODE={rcode})");
+                }
+                Ok(vulnerable)
+            }
+            Ok(Ok(_)) => Ok(false),
+            Ok(Err(_)) | Err(_) => Ok(false), // Timeout or error = not vulnerable
+        }
+    }
+
+    /// Send a DNS UPDATE DELETE to remove a test record.
+    async fn send_delete_update(&self, session: &DnsSession, domain: &str, name: &str) -> Result<()> {
+        let mut pkt = Vec::new();
+        let txid: u16 = rand::random();
+        pkt.extend_from_slice(&txid.to_be_bytes());
+        pkt.extend_from_slice(&(5u16 << 11).to_be_bytes());
+        pkt.extend_from_slice(&1u16.to_be_bytes()); // Zone count
+        pkt.extend_from_slice(&0u16.to_be_bytes()); // Prerequisite count  
+        pkt.extend_from_slice(&1u16.to_be_bytes()); // Update count
+        pkt.extend_from_slice(&0u16.to_be_bytes()); // Additional count
+
+        // Zone section
+        pkt.extend_from_slice(&encode_dns_name(domain));
+        pkt.extend_from_slice(&6u16.to_be_bytes());
+        pkt.extend_from_slice(&1u16.to_be_bytes());
+
+        // Update section: Delete — class ANY (255), TTL 0, RDLENGTH 0
+        pkt.extend_from_slice(&encode_dns_name(name));
+        pkt.extend_from_slice(&16u16.to_be_bytes()); // TXT
+        pkt.extend_from_slice(&255u16.to_be_bytes()); // ANY class = delete
+        pkt.extend_from_slice(&0u32.to_be_bytes()); // TTL=0
+        pkt.extend_from_slice(&0u16.to_be_bytes()); // RDLENGTH=0
+
+        let addr = format!("{}:{}", session.target, session.port);
+        let socket = UdpSocket::bind("0.0.0.0:0").await?;
+        socket.send_to(&pkt, &addr).await?;
+        Ok(())
     }
 }
 

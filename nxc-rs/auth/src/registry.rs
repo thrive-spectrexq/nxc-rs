@@ -7,6 +7,8 @@ use anyhow::{anyhow, Result};
 use md5::{Digest, Md5};
 use nt_hive::{Hive, KeyNode, KeyValue};
 use rc4::{KeyInit, Rc4, StreamCipher};
+use aes::Aes256;
+use cbc::cipher::{BlockModeDecrypt, KeyIvInit, block_padding::NoPadding};
 
 /// Registry Secret Extractor
 pub struct RegistrySecrets;
@@ -137,28 +139,79 @@ impl RegistrySecrets {
             return Err(anyhow!("V structure too short"));
         }
 
-        let off = if hash_type == "NT" { 164 } else { 152 }; // Simplified offsets
-        if v_data.len() < off + 16 {
+        let off = if hash_type == "NT" { 164 } else { 152 };
+        if v_data.len() < off + 4 {
             return Err(anyhow!("Hash offset beyond V length"));
         }
 
-        let encrypted = &v_data[off..off + 16];
-        let mut key = [0u8; 16];
-        let rid_bytes = rid.to_le_bytes();
+        // Check SAM_HASH revision byte
+        let revision = if off >= 2 { v_data[off - 2] } else { 1 };
 
-        let mut hasher = Md5::new();
-        hasher.update(boot_key);
-        hasher.update(rid_bytes);
-        hasher.update(b"NTPASSWORD\0");
-        let derived = hasher.finalize();
-        key.copy_from_slice(&derived);
+        match revision {
+            2 => {
+                // Modern AES-encrypted SAM hash (Windows 10 1607+ / Server 2016+)
+                // Layout: [revision(2)] [IV(16)] [encrypted_hash(16)]
+                if v_data.len() < off + 32 {
+                    return Err(anyhow!("V data too short for AES SAM hash"));
+                }
+                let iv: &[u8; 16] = v_data[off..off + 16].try_into()?;
+                let encrypted = &v_data[off + 16..off + 32];
 
-        let mut rc4 = Rc4::new_from_slice(&key).map_err(|e| anyhow!("RC4 init error: {e}"))?;
-        let mut decrypted = [0u8; 16];
-        decrypted.copy_from_slice(encrypted);
-        rc4.apply_keystream(&mut decrypted);
+                // Derive AES key from boot_key + RID + salt
+                let rid_bytes = rid.to_le_bytes();
+                let mut hasher = Md5::new();
+                hasher.update(boot_key);
+                hasher.update(rid_bytes);
+                if hash_type == "NT" {
+                    hasher.update(b"NTPASSWORD\0");
+                } else {
+                    hasher.update(b"LMPASSWORD\0");
+                }
+                let aes_key = hasher.finalize();
 
-        Ok(hex::encode(decrypted))
+                // Pad key to 32 bytes for AES-256 (double the MD5 output)
+                let mut full_key = [0u8; 32];
+                full_key[..16].copy_from_slice(&aes_key);
+                full_key[16..].copy_from_slice(&aes_key);
+
+                let decrypted = cbc::Decryptor::<Aes256>::new(
+                    (&full_key).into(),
+                    iv.into(),
+                )
+                .decrypt_padded_vec::<NoPadding>(encrypted)
+                .map_err(|e| anyhow!("AES SAM decryption failed: {e}"))?;
+
+                if decrypted.len() >= 16 {
+                    Ok(hex::encode(&decrypted[..16]))
+                } else {
+                    Err(anyhow!("Decrypted SAM hash too short"))
+                }
+            }
+            _ => {
+                // Legacy RC4-encrypted SAM hash
+                if v_data.len() < off + 16 {
+                    return Err(anyhow!("Hash offset beyond V length"));
+                }
+                let encrypted = &v_data[off..off + 16];
+                let rid_bytes = rid.to_le_bytes();
+
+                let mut hasher = Md5::new();
+                hasher.update(boot_key);
+                hasher.update(rid_bytes);
+                hasher.update(b"NTPASSWORD\0");
+                let derived = hasher.finalize();
+                let mut key = [0u8; 16];
+                key.copy_from_slice(&derived);
+
+                let mut rc4 = Rc4::new_from_slice(&key)
+                    .map_err(|e| anyhow!("RC4 init error: {e}"))?;
+                let mut decrypted = [0u8; 16];
+                decrypted.copy_from_slice(encrypted);
+                rc4.apply_keystream(&mut decrypted);
+
+                Ok(hex::encode(decrypted))
+            }
+        }
     }
 
     fn get_classname_by_path(root: &KeyNode<'_, &[u8]>, path: &str) -> Result<String> {

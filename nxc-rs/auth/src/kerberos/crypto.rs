@@ -129,9 +129,7 @@ pub fn decrypt_rc4_hmac(key: &[u8], key_usage: u32, ciphertext: &[u8]) -> Result
     let expected_mac = hmac_verify.finalize().into_bytes();
 
     if expected_mac[..] != checksum[..] {
-        // Technically we shouldn't bail on checksum mismatch if it's an AS-REP issue with AD
-        // but for safety we complain.
-        tracing::debug!("RC4 Checksum mismatch");
+        anyhow::bail!("RC4-HMAC integrity check failed: checksum mismatch");
     }
 
     // Data has 8 bytes of confounder at the start that must be removed.
@@ -217,7 +215,7 @@ pub fn decrypt_aes(
     hmac.update(enc_data);
     let full_mac = hmac.finalize().into_bytes();
     if full_mac[..12] != checksum[..] {
-        tracing::debug!("AES Checksum mismatch");
+        anyhow::bail!("AES integrity check failed: HMAC-SHA1-96 mismatch");
     }
 
     // 3. Decrypt data (AES-CBC with CTS)
@@ -238,7 +236,15 @@ pub fn decrypt_aes(
             decrypted
         }
     } else {
-        decrypted
+        let key_arr: &[u8; 16] = key[..16].try_into()?;
+        let iv = [0u8; 16];
+        if decrypted.len() % 16 == 0 {
+            cbc::Decryptor::<aes::Aes128>::new(key_arr.into(), &iv.into())
+                .decrypt_padded_vec::<NoPadding>(&decrypted)
+                .map_err(|e| anyhow::anyhow!("AES-CBC decrypt failed: {e}"))?
+        } else {
+            decrypted
+        }
     };
 
     if decrypted.len() < 16 {
@@ -273,7 +279,10 @@ pub fn encrypt_aes(
         cbc::Encryptor::<Aes256>::new(key_arr.into(), &iv.into())
             .encrypt_padded_vec::<NoPadding>(&data)
     } else {
-        data
+        let key_arr: &[u8; 16] = key[..16].try_into()?;
+        let iv = [0u8; 16];
+        cbc::Encryptor::<aes::Aes128>::new(key_arr.into(), &iv.into())
+            .encrypt_padded_vec::<NoPadding>(&data)
     };
 
     // Checksum: HMAC-SHA1-96(key, usage, enc_data)

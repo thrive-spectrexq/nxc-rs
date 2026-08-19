@@ -10,6 +10,7 @@ members = [
     "nxc-rs/resilience",
     "nxc-rs/nxc-tests",
     "nxc-rs/nxc-sessions",
+    "nxc-rs/reporting",
 ]
 resolver = "2"
 

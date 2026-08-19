@@ -6,6 +6,7 @@
 use anyhow::Result;
 use std::collections::VecDeque;
 use std::future::Future;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
@@ -26,6 +27,66 @@ pub struct CheckedOut<C> {
     pub connection: C,
     /// The instant this connection was originally created (not the checkout time).
     pub created_at: Instant,
+}
+
+/// Operational metrics for a connection pool.
+///
+/// All counters use atomic operations and can be read concurrently
+/// without blocking pool operations.
+#[derive(Debug, Default)]
+pub struct PoolMetrics {
+    /// Total number of successful checkouts from the pool.
+    pub total_checkouts: AtomicU64,
+    /// Total number of connections returned to the pool.
+    pub total_returns: AtomicU64,
+    /// Total number of connections evicted (idle timeout or max lifetime).
+    pub total_evictions: AtomicU64,
+    /// Number of checkouts that required creating a new connection (pool miss).
+    pub pool_misses: AtomicU64,
+    /// Number of connections dropped because pool was at capacity.
+    pub total_capacity_drops: AtomicU64,
+}
+
+impl PoolMetrics {
+    /// Create a new zeroed metrics instance.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Snapshot all metrics into a displayable summary.
+    pub fn snapshot(&self) -> PoolMetricsSnapshot {
+        PoolMetricsSnapshot {
+            total_checkouts: self.total_checkouts.load(Ordering::Relaxed),
+            total_returns: self.total_returns.load(Ordering::Relaxed),
+            total_evictions: self.total_evictions.load(Ordering::Relaxed),
+            pool_misses: self.pool_misses.load(Ordering::Relaxed),
+            total_capacity_drops: self.total_capacity_drops.load(Ordering::Relaxed),
+        }
+    }
+}
+
+/// Immutable snapshot of pool metrics at a point in time.
+#[derive(Debug, Clone)]
+pub struct PoolMetricsSnapshot {
+    pub total_checkouts: u64,
+    pub total_returns: u64,
+    pub total_evictions: u64,
+    pub pool_misses: u64,
+    pub total_capacity_drops: u64,
+}
+
+impl std::fmt::Display for PoolMetricsSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "checkouts={}, returns={}, evictions={}, misses={}, capacity_drops={}",
+            self.total_checkouts,
+            self.total_returns,
+            self.total_evictions,
+            self.pool_misses,
+            self.total_capacity_drops
+        )
+    }
 }
 
 /// A generic async connection pool.
@@ -56,6 +117,8 @@ pub struct ConnectionPool<C: Send + 'static> {
     max_lifetime: Duration,
     /// Name for logging.
     name: String,
+    /// Operational metrics.
+    metrics: Arc<PoolMetrics>,
 }
 
 impl<C: Send + 'static> ConnectionPool<C> {
@@ -70,6 +133,7 @@ impl<C: Send + 'static> ConnectionPool<C> {
             idle_timeout,
             max_lifetime: Duration::from_secs(3600), // 1 hour default
             name: "pool".to_string(),
+            metrics: Arc::new(PoolMetrics::new()),
         }
     }
 
@@ -119,6 +183,7 @@ impl<C: Send + 'static> ConnectionPool<C> {
                 }
 
                 debug!("Pool '{}': reusing idle connection", self.name);
+                self.metrics.total_checkouts.fetch_add(1, Ordering::Relaxed);
                 return Ok(CheckedOut {
                     connection: entry.connection,
                     created_at: entry.created_at,
@@ -128,6 +193,7 @@ impl<C: Send + 'static> ConnectionPool<C> {
 
         // No valid idle connection — create a new one
         debug!("Pool '{}': creating new connection", self.name);
+        self.metrics.pool_misses.fetch_add(1, Ordering::Relaxed);
         let connection = factory().await?;
         Ok(CheckedOut { connection, created_at: Instant::now() })
     }
@@ -140,6 +206,7 @@ impl<C: Send + 'static> ConnectionPool<C> {
 
         if pool.len() >= self.max_size {
             warn!("Pool '{}': at capacity ({}), dropping connection", self.name, self.max_size);
+            self.metrics.total_capacity_drops.fetch_add(1, Ordering::Relaxed);
             return;
         }
 
@@ -149,6 +216,7 @@ impl<C: Send + 'static> ConnectionPool<C> {
             last_used: Instant::now(),
         });
 
+        self.metrics.total_returns.fetch_add(1, Ordering::Relaxed);
         debug!("Pool '{}': connection returned ({}/{})", self.name, pool.len(), self.max_size);
     }
 
@@ -162,6 +230,7 @@ impl<C: Send + 'static> ConnectionPool<C> {
 
         if pool.len() >= self.max_size {
             warn!("Pool '{}': at capacity ({}), dropping connection", self.name, self.max_size);
+            self.metrics.total_capacity_drops.fetch_add(1, Ordering::Relaxed);
             return;
         }
 
@@ -171,6 +240,7 @@ impl<C: Send + 'static> ConnectionPool<C> {
             last_used: Instant::now(),
         });
 
+        self.metrics.total_returns.fetch_add(1, Ordering::Relaxed);
         debug!("Pool '{}': connection returned ({}/{})", self.name, pool.len(), self.max_size);
     }
 
@@ -186,6 +256,7 @@ impl<C: Send + 'static> ConnectionPool<C> {
 
         let evicted = before - pool.len();
         if evicted > 0 {
+            self.metrics.total_evictions.fetch_add(evicted as u64, Ordering::Relaxed);
             debug!("Pool '{}': evicted {} expired connections", self.name, evicted);
         }
         evicted
@@ -202,6 +273,11 @@ impl<C: Send + 'static> ConnectionPool<C> {
         let count = pool.len();
         pool.clear();
         debug!("Pool '{}': cleared {} connections", self.name, count);
+    }
+
+    /// Get a reference to the pool's operational metrics.
+    pub fn metrics(&self) -> &PoolMetrics {
+        &self.metrics
     }
 }
 

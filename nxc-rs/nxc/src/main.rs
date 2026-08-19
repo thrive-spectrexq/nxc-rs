@@ -8,7 +8,6 @@ mod handlers;
 mod output;
 mod profiling;
 mod relay;
-mod reporting;
 
 use crate::profiling::{log_memory_usage, ScopedTimer};
 use anyhow::Result;
@@ -322,7 +321,7 @@ async fn main() -> Result<()> {
         .get_one::<String>("workspace")
         .map(std::string::String::as_str)
         .unwrap_or("default");
-    let workspace = reporting::sanitize_workspace_name(workspace_raw);
+    let workspace = nxc_reporting::sanitize_workspace_name(workspace_raw);
 
     // Ensure platform-appropriate .nxc directory exists
     let dot_nxc = if let Ok(custom) = std::env::var("NXC_HOME") {
@@ -492,7 +491,7 @@ async fn main() -> Result<()> {
     );
 
     // ── Handle Exports ──
-    let report = reporting::Report {
+    let report = nxc_reporting::Report {
         timestamp: Utc::now().to_rfc3339(),
         protocol: protocol_name.to_string(),
         results: results.clone(),
@@ -505,7 +504,7 @@ async fn main() -> Result<()> {
             let filename =
                 format!("report_{}_{}.json", protocol_name, Utc::now().format("%Y%m%d_%H%M%S"));
             let report_path = ws_reports_dir.join(filename);
-            if let Err(e) = reporting::export_json(report_path.to_str().unwrap_or(""), &report) {
+            if let Err(e) = nxc_reporting::export_json(report_path.to_str().unwrap_or(""), &report) {
                 NxcGlobalOutput::warn(&format!("Failed to save workspace report: {e}"));
             }
         }
@@ -516,7 +515,7 @@ async fn main() -> Result<()> {
 
     // Automated raw result logging if requested
     if let Some(log_res_path) = sub_matches.try_get_one::<String>("log-results").unwrap_or(None) {
-        if let Err(e) = reporting::export_ndjson(log_res_path, &results) {
+        if let Err(e) = nxc_reporting::export_ndjson(log_res_path, &results) {
             NxcGlobalOutput::warn(&format!("Failed to write results log: {e}"));
         }
     }
@@ -532,13 +531,13 @@ async fn main() -> Result<()> {
         }
 
         let res = match format.as_str() {
-            "json" => reporting::export_json(&path, &report),
-            "csv" => reporting::export_csv(&path, &results),
-            "html" => reporting::export_html(&path, &report),
-            "pdf" => reporting::export_pdf(&path, &report),
-            "xml" => reporting::export_xml(&path, &report),
-            "markdown" | "md" => reporting::export_markdown(&path, &report),
-            "ndjson" => reporting::export_ndjson(&path, &results),
+            "json" => nxc_reporting::export_json(&path, &report),
+            "csv" => nxc_reporting::export_csv(&path, &results),
+            "html" => nxc_reporting::export_html(&path, &report),
+            "pdf" => nxc_reporting::export_pdf(&path, &report),
+            "xml" => nxc_reporting::export_xml(&path, &report),
+            "markdown" | "md" => nxc_reporting::export_markdown(&path, &report),
+            "ndjson" => nxc_reporting::export_ndjson(&path, &results),
             unknown => anyhow::bail!("Unknown export format: {unknown}"),
         };
 

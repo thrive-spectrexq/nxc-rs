@@ -269,7 +269,7 @@ impl NxcProtocol for RdpProtocol {
 
         // 5. Send NTLM Authenticate
         let challenge = auth.parse_type2(&t2_msg)?;
-        let t3_res = auth.generate_type3(creds, &challenge)?;
+        let t3_res = auth.generate_type3(creds, &challenge, None, None)?;
         let ts_req2 = TsRequest {
             version: 6,
             nego_tokens: Some(vec![NegoData { nego_token: NegoToken(t3_res.message) }]),

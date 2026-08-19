@@ -255,6 +255,8 @@ impl NtlmAuthenticator {
         &self,
         creds: &Credentials,
         challenge: &NtlmChallenge,
+        negotiate_msg: Option<&[u8]>,
+        challenge_msg: Option<&[u8]>,
     ) -> Result<NtlmAuthResult> {
         let username = creds.username.clone();
         let domain = creds.domain.as_deref().unwrap_or("").to_string();
@@ -399,6 +401,15 @@ impl NtlmAuthenticator {
         msg.extend_from_slice(&ws_utf16);
         if !enc_key_data.is_empty() {
             msg.extend_from_slice(enc_key_data);
+        }
+
+        if let (Some(type1), Some(type2)) = (negotiate_msg, challenge_msg) {
+            let mut mic_hmac = <HmacMd5 as HmacKeyInit>::new_from_slice(&exported_session_key)?;
+            mic_hmac.update(type1);
+            mic_hmac.update(type2);
+            mic_hmac.update(&msg);
+            let mic: [u8; 16] = mic_hmac.finalize().into_bytes().into();
+            msg[mic_offset..mic_offset + 16].copy_from_slice(&mic);
         }
 
         debug!(
@@ -710,7 +721,7 @@ mod tests {
             target_info_raw: vec![0x00, 0x00, 0x00, 0x00], // MsvAvEOL
         };
 
-        let result = auth.generate_type3(&creds, &challenge).unwrap();
+        let result = auth.generate_type3(&creds, &challenge, None, None).unwrap();
         assert!(result.message.starts_with(b"NTLMSSP\0"));
         assert_eq!(result.session_security.exported_session_key.len(), 16);
     }
