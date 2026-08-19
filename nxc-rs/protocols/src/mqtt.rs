@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use nxc_auth::{AuthResult, Credentials};
 use rand;
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
 use tokio::net::TcpStream;
 use tokio::time::timeout;
 use tracing::{debug, info};
