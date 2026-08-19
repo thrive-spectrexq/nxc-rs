@@ -182,13 +182,13 @@ impl DnsProtocol {
 
         // Zone section: domain, type SOA (6), class IN (1)
         pkt.extend_from_slice(&encode_dns_name(domain));
-        pkt.extend_from_slice(&6u16.to_be_bytes());  // SOA
-        pkt.extend_from_slice(&1u16.to_be_bytes());  // IN
+        pkt.extend_from_slice(&6u16.to_be_bytes()); // SOA
+        pkt.extend_from_slice(&1u16.to_be_bytes()); // IN
 
         // Update section: Add a TXT record
         pkt.extend_from_slice(&encode_dns_name(&test_name));
         pkt.extend_from_slice(&16u16.to_be_bytes()); // TXT
-        pkt.extend_from_slice(&1u16.to_be_bytes());  // IN
+        pkt.extend_from_slice(&1u16.to_be_bytes()); // IN
         pkt.extend_from_slice(&300u32.to_be_bytes()); // TTL
         let txt_data = b"\x08nxc-test"; // Length-prefixed TXT RDATA
         pkt.extend_from_slice(&(txt_data.len() as u16).to_be_bytes());
@@ -200,8 +200,7 @@ impl DnsProtocol {
             .await
             .map_err(|e| anyhow!("Failed to bind UDP socket: {e}"))?;
 
-        socket.send_to(&pkt, &addr).await
-            .map_err(|e| anyhow!("Failed to send DNS UPDATE: {e}"))?;
+        socket.send_to(&pkt, &addr).await.map_err(|e| anyhow!("Failed to send DNS UPDATE: {e}"))?;
 
         let mut buf = [0u8; 512];
         match tokio::time::timeout(Duration::from_secs(3), socket.recv(&mut buf)).await {
@@ -223,13 +222,18 @@ impl DnsProtocol {
     }
 
     /// Send a DNS UPDATE DELETE to remove a test record.
-    async fn send_delete_update(&self, session: &DnsSession, domain: &str, name: &str) -> Result<()> {
+    async fn send_delete_update(
+        &self,
+        session: &DnsSession,
+        domain: &str,
+        name: &str,
+    ) -> Result<()> {
         let mut pkt = Vec::new();
         let txid: u16 = rand::random();
         pkt.extend_from_slice(&txid.to_be_bytes());
         pkt.extend_from_slice(&(5u16 << 11).to_be_bytes());
         pkt.extend_from_slice(&1u16.to_be_bytes()); // Zone count
-        pkt.extend_from_slice(&0u16.to_be_bytes()); // Prerequisite count  
+        pkt.extend_from_slice(&0u16.to_be_bytes()); // Prerequisite count
         pkt.extend_from_slice(&1u16.to_be_bytes()); // Update count
         pkt.extend_from_slice(&0u16.to_be_bytes()); // Additional count
 

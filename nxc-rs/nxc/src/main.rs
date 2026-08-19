@@ -504,7 +504,8 @@ async fn main() -> Result<()> {
             let filename =
                 format!("report_{}_{}.json", protocol_name, Utc::now().format("%Y%m%d_%H%M%S"));
             let report_path = ws_reports_dir.join(filename);
-            if let Err(e) = nxc_reporting::export_json(report_path.to_str().unwrap_or(""), &report) {
+            if let Err(e) = nxc_reporting::export_json(report_path.to_str().unwrap_or(""), &report)
+            {
                 NxcGlobalOutput::warn(&format!("Failed to save workspace report: {e}"));
             }
         }

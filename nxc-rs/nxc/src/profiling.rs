@@ -44,24 +44,20 @@ pub fn log_memory_usage(label: &str) {
 /// Get process memory usage from the OS.
 #[cfg(target_os = "windows")]
 fn get_process_memory() -> (Option<u64>, Option<u64>) {
-    use windows_sys::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
+    use windows_sys::Win32::System::ProcessStatus::{
+        GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS,
+    };
     use windows_sys::Win32::System::Threading::GetCurrentProcess;
 
     let mut counters: PROCESS_MEMORY_COUNTERS = unsafe { std::mem::zeroed() };
     counters.cb = std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32;
 
-    let success = unsafe {
-        GetProcessMemoryInfo(
-            GetCurrentProcess(),
-            &mut counters,
-            counters.cb,
-        )
-    };
+    let success = unsafe { GetProcessMemoryInfo(GetCurrentProcess(), &mut counters, counters.cb) };
 
     if success != 0 {
         (
-            Some(counters.WorkingSetSize as u64),  // RSS equivalent
-            Some(counters.PagefileUsage as u64),   // VMS equivalent
+            Some(counters.WorkingSetSize as u64), // RSS equivalent
+            Some(counters.PagefileUsage as u64),  // VMS equivalent
         )
     } else {
         (None, None)

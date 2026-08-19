@@ -10,7 +10,9 @@ use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
 use super::asn1::*;
-use super::crypto::{decrypt_aes, encrypt_aes, decrypt_rc4_hmac, encrypt_rc4_hmac, string2key_rc4, EncryptionType};
+use super::crypto::{
+    decrypt_aes, decrypt_rc4_hmac, encrypt_aes, encrypt_rc4_hmac, string2key_rc4, EncryptionType,
+};
 use rasn::types::GeneralizedTime;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,7 +69,12 @@ impl KerberosClient {
 
     /// Helper to request a TGT using a Credentials object.
     pub async fn request_tgt_with_creds(&self, creds: &Credentials) -> Result<KerberosTicket> {
-        let cache_key = format!("{}@{}@{}", creds.username.to_lowercase(), self.domain.to_lowercase(), self.kdc_ip);
+        let cache_key = format!(
+            "{}@{}@{}",
+            creds.username.to_lowercase(),
+            self.domain.to_lowercase(),
+            self.kdc_ip
+        );
 
         {
             let cache = TICKET_CACHE.lock().await;
@@ -136,7 +143,7 @@ impl KerberosClient {
         if !key.is_empty() {
             let now = GeneralizedTime::from(chrono::Utc::now());
             let ts_der = rasn::der::encode(&now).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
-            
+
             let enc_ts = match key_etype {
                 18 => encrypt_aes(&key, 1, &ts_der, true)?,
                 17 => encrypt_aes(&key, 1, &ts_der, false)?,
@@ -281,10 +288,14 @@ impl KerberosClient {
 
         let auth_der =
             rasn::der::encode(&authenticator).map_err(|e| anyhow!("ASN.1 encode error: {e}"))?;
-            
+
         let (enc_auth, auth_etype) = match tgt.enc_type {
-            EncryptionType::Aes256CtsHmacSha196 => (encrypt_aes(&tgt.session_key, 11, &auth_der, true)?, 18),
-            EncryptionType::Aes128CtsHmacSha196 => (encrypt_aes(&tgt.session_key, 11, &auth_der, false)?, 17),
+            EncryptionType::Aes256CtsHmacSha196 => {
+                (encrypt_aes(&tgt.session_key, 11, &auth_der, true)?, 18)
+            }
+            EncryptionType::Aes128CtsHmacSha196 => {
+                (encrypt_aes(&tgt.session_key, 11, &auth_der, false)?, 17)
+            }
             EncryptionType::Rc4Hmac => (encrypt_rc4_hmac(&tgt.session_key, 11, &auth_der)?, 23),
         };
 

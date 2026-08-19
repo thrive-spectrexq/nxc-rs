@@ -128,7 +128,9 @@ impl NxcProtocol for MqttProtocol {
         };
 
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
-        stream.write_all(&connect_packet).await
+        stream
+            .write_all(&connect_packet)
+            .await
             .map_err(|e| anyhow!("MQTT CONNECT send failed: {e}"))?;
 
         let mut buf = [0u8; 4];
@@ -142,9 +144,15 @@ impl NxcProtocol for MqttProtocol {
                         mqtt_sess.credentials = Some(creds.clone());
                         Ok(AuthResult::success(false))
                     }
-                    4 => Ok(AuthResult::failure("Bad username or password", Some("CONNACK_BAD_CREDENTIALS"))),
+                    4 => Ok(AuthResult::failure(
+                        "Bad username or password",
+                        Some("CONNACK_BAD_CREDENTIALS"),
+                    )),
                     5 => Ok(AuthResult::failure("Not authorized", Some("CONNACK_NOT_AUTHORIZED"))),
-                    _ => Ok(AuthResult::failure(&format!("CONNACK return code: {return_code}"), None)),
+                    _ => Ok(AuthResult::failure(
+                        &format!("CONNACK return code: {return_code}"),
+                        None,
+                    )),
                 }
             }
             Ok(Ok(_)) => Ok(AuthResult::failure("CONNACK too short", None)),
@@ -159,7 +167,11 @@ impl NxcProtocol for MqttProtocol {
 }
 
 /// Build an MQTT 3.1.1 CONNECT packet.
-fn build_connect_packet(client_id: &str, username: Option<&str>, password: Option<&str>) -> Vec<u8> {
+fn build_connect_packet(
+    client_id: &str,
+    username: Option<&str>,
+    password: Option<&str>,
+) -> Vec<u8> {
     let mut variable_header = Vec::new();
     // Protocol Name: "MQTT"
     variable_header.extend_from_slice(&[0x00, 0x04]); // Length
@@ -201,7 +213,7 @@ fn build_connect_packet(client_id: &str, username: Option<&str>, password: Optio
     let remaining_len = variable_header.len() + payload.len();
     let mut packet = Vec::new();
     packet.push(0x10); // CONNECT packet type
-    // Encode remaining length (simplified: assumes < 128 bytes for typical CONNECT)
+                       // Encode remaining length (simplified: assumes < 128 bytes for typical CONNECT)
     encode_remaining_length(&mut packet, remaining_len);
     packet.extend_from_slice(&variable_header);
     packet.extend_from_slice(&payload);
@@ -235,4 +247,3 @@ fn parse_connack(data: &[u8]) -> Result<(bool, u8)> {
     let return_code = data[3];
     Ok((session_present, return_code))
 }
-

@@ -3,12 +3,12 @@
 //! Logic for parsing offline SAM, SYSTEM, and SECURITY hives to extract
 //! Boot Key, NT hashes, and LSA secrets.
 
+use aes::Aes256;
 use anyhow::{anyhow, Result};
+use cbc::cipher::{block_padding::NoPadding, BlockModeDecrypt, KeyIvInit};
 use md5::{Digest, Md5};
 use nt_hive::{Hive, KeyNode, KeyValue};
 use rc4::{KeyInit, Rc4, StreamCipher};
-use aes::Aes256;
-use cbc::cipher::{BlockModeDecrypt, KeyIvInit, block_padding::NoPadding};
 
 /// Registry Secret Extractor
 pub struct RegistrySecrets;
@@ -174,12 +174,9 @@ impl RegistrySecrets {
                 full_key[..16].copy_from_slice(&aes_key);
                 full_key[16..].copy_from_slice(&aes_key);
 
-                let decrypted = cbc::Decryptor::<Aes256>::new(
-                    (&full_key).into(),
-                    iv.into(),
-                )
-                .decrypt_padded_vec::<NoPadding>(encrypted)
-                .map_err(|e| anyhow!("AES SAM decryption failed: {e}"))?;
+                let decrypted = cbc::Decryptor::<Aes256>::new((&full_key).into(), iv.into())
+                    .decrypt_padded_vec::<NoPadding>(encrypted)
+                    .map_err(|e| anyhow!("AES SAM decryption failed: {e}"))?;
 
                 if decrypted.len() >= 16 {
                     Ok(hex::encode(&decrypted[..16]))
@@ -203,8 +200,8 @@ impl RegistrySecrets {
                 let mut key = [0u8; 16];
                 key.copy_from_slice(&derived);
 
-                let mut rc4 = Rc4::new_from_slice(&key)
-                    .map_err(|e| anyhow!("RC4 init error: {e}"))?;
+                let mut rc4 =
+                    Rc4::new_from_slice(&key).map_err(|e| anyhow!("RC4 init error: {e}"))?;
                 let mut decrypted = [0u8; 16];
                 decrypted.copy_from_slice(encrypted);
                 rc4.apply_keystream(&mut decrypted);
