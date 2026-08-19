@@ -3,6 +3,7 @@
 //! Provides conditional profiling support for tracking memory usage
 //! and performance metrics during execution. Enabled via the `profiling`
 //! feature flag.
+#![allow(unsafe_code)]
 
 use tracing::info;
 
