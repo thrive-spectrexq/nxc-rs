@@ -101,10 +101,13 @@ impl SessionManager {
     }
 
     /// Create a new session manager with disk persistence.
-    pub fn with_ttl_and_dir(ttl: std::time::Duration, persist_dir: Option<std::path::PathBuf>) -> Self {
+    pub fn with_ttl_and_dir(
+        ttl: std::time::Duration,
+        persist_dir: Option<std::path::PathBuf>,
+    ) -> Self {
         let cache = Arc::new(DashMap::new());
         let cache_clone = Arc::clone(&cache);
-        
+
         if let Some(dir) = &persist_dir {
             let _ = std::fs::create_dir_all(dir);
         }
@@ -130,7 +133,7 @@ impl SessionManager {
         if let Some(dir) = &self.persist_dir {
             let file_path = dir.join(format!("{}.json", record.id));
             let tmp_path = dir.join(format!("{}.json.tmp", record.id));
-            
+
             let data = serde_json::to_vec(record)?;
             tokio::fs::write(&tmp_path, data).await?;
             tokio::fs::rename(&tmp_path, &file_path).await?;

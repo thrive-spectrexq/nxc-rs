@@ -118,7 +118,10 @@ impl NxcProtocol for RedisProtocol {
                     Err(crate::errors::RedisError::ConnectionFailed(e.to_string()).into())
                 }
             }
-            Err(_) => Err(crate::errors::RedisError::ConnectionFailed(format!("timeout to {target}:{port}")).into()),
+            Err(_) => Err(crate::errors::RedisError::ConnectionFailed(format!(
+                "timeout to {target}:{port}"
+            ))
+            .into()),
         }
     }
 

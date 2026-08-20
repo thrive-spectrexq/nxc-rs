@@ -33,15 +33,21 @@ async fn main() -> Result<()> {
         } else {
             "Unknown panic"
         };
-        
+
         let loc = if let Some(l) = info.location() {
             format!("{}:{}", l.file(), l.line())
         } else {
             "unknown location".to_string()
         };
-        
-        eprintln!("\n{} NetExec-RS encountered a fatal error (panic) at {loc}: {msg}", colored::Colorize::red(colored::Colorize::bold("CRITICAL:")));
-        eprintln!("{} This is a bug. Please report this to the repository issue tracker.", colored::Colorize::red(colored::Colorize::bold("CRITICAL:")));
+
+        eprintln!(
+            "\n{} NetExec-RS encountered a fatal error (panic) at {loc}: {msg}",
+            colored::Colorize::red(colored::Colorize::bold("CRITICAL:"))
+        );
+        eprintln!(
+            "{} This is a bug. Please report this to the repository issue tracker.",
+            colored::Colorize::red(colored::Colorize::bold("CRITICAL:"))
+        );
     }));
 
     // Load .env file at the very beginning and warn if permissions are unsafe

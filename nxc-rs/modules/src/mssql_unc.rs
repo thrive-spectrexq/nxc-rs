@@ -63,8 +63,13 @@ impl NxcModule for MssqlUnc {
         let attacker_ip = opts.get("UNC_IP").ok_or_else(|| anyhow!("UNC_IP is required"))?;
         let share = opts.get("SHARE").map(std::string::String::as_str).unwrap_or("share");
 
-        if attacker_ip.contains('\'') || attacker_ip.contains('\\') || attacker_ip.contains(';') ||
-           share.contains('\'') || share.contains('\\') || share.contains(';') {
+        if attacker_ip.contains('\'')
+            || attacker_ip.contains('\\')
+            || attacker_ip.contains(';')
+            || share.contains('\'')
+            || share.contains('\\')
+            || share.contains(';')
+        {
             return Err(anyhow!("Invalid UNC_IP or SHARE: contains illegal characters"));
         }
 

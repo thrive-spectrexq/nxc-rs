@@ -87,13 +87,7 @@ mod integration_tests {
 
     impl ModuleTestEnv {
         pub fn new(protocol: &'static str, target: &str, is_admin: bool) -> Self {
-            Self {
-                session: MockSession {
-                    protocol,
-                    target: target.to_string(),
-                    is_admin,
-                }
-            }
+            Self { session: MockSession { protocol, target: target.to_string(), is_admin } }
         }
     }
 }

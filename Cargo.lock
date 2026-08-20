@@ -2869,6 +2869,7 @@ dependencies = [
  "once_cell",
  "p12",
  "pbkdf2",
+ "proptest",
  "rand 0.10.2",
  "rasn",
  "rc4",

@@ -50,6 +50,9 @@ allow = [
     "Unlicense",
     "Zlib",
 ]
+exceptions = [
+    { allow = ["GPL-2.0-or-later"], name = "nt-hive" }
+]
 confidence-threshold = 0.7
 
 [licenses.private]

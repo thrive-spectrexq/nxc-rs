@@ -98,7 +98,10 @@ impl NxcProtocol for MysqlProtocol {
                 }))
             }
             Ok(Err(e)) => Err(crate::errors::MysqlError::ConnectionFailed(e.to_string()).into()),
-            Err(_) => Err(crate::errors::MysqlError::ConnectionFailed(format!("timeout to {addr}")).into()),
+            Err(_) => {
+                Err(crate::errors::MysqlError::ConnectionFailed(format!("timeout to {addr}"))
+                    .into())
+            }
         }
     }
 

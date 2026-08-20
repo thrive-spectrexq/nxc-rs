@@ -26,11 +26,11 @@ impl ScriptModule {
         // For now, simpler: use filename
         let description = format!("Script module loaded from {}", path.display());
 
-        Ok(Self { 
+        Ok(Self {
             name: Box::leak(name.into_boxed_str()),
             description: Box::leak(description.into_boxed_str()),
-            path, 
-            ast 
+            path,
+            ast,
         })
     }
 }
