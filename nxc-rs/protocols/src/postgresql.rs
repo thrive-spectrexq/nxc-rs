@@ -200,12 +200,7 @@ impl NxcProtocol for PostgresProtocol {
         let table_name = format!("nxc_exec_{}", &uuid::Uuid::new_v4().simple().to_string()[..8]);
 
         client.execute(&format!("CREATE TEMP TABLE {table_name} (output text)"), &[]).await?;
-        client
-            .execute(
-                &format!("COPY {table_name} FROM PROGRAM $nxc${cmd}$nxc$"),
-                &[],
-            )
-            .await?;
+        client.execute(&format!("COPY {table_name} FROM PROGRAM $nxc${cmd}$nxc$"), &[]).await?;
 
         let rows = client.query(&format!("SELECT * FROM {table_name}"), &[]).await?;
         let mut stdout = String::new();
