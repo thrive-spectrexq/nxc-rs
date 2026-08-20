@@ -47,7 +47,7 @@ where
     })?;
 
     // Generate SHA256 integrity signature
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
     let data = std::fs::read(target_path)?;
     let mut hasher = Sha256::new();
     hasher.update(&data);
@@ -61,7 +61,8 @@ where
 /// Sanitize a string for safe inclusion in CSV cells to prevent Formula Injection (CSV injection).
 /// Handles Unicode homograph attacks and strips unexpected control characters.
 pub fn sanitize_csv_field(val: &str) -> String {
-    let sanitized = val.replace(|c: char| c.is_control() && c != '\n' && c != '\t' && c != '\r', "");
+    let sanitized =
+        val.replace(|c: char| c.is_control() && c != '\n' && c != '\t' && c != '\r', "");
 
     let first_char = sanitized.chars().next().unwrap_or('\0');
     if matches!(
@@ -265,7 +266,7 @@ pub fn export_markdown(path: &str, report: &Report) -> Result<()> {
             let msg = xml_escape(&res.message).replace('|', "\\|");
             let target_escaped = xml_escape(&res.target);
             let user_escaped = xml_escape(&res.username);
-            
+
             writeln!(
                 file,
                 "| {} | {} | {} | {} | {} | {} |",

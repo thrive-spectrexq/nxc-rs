@@ -196,7 +196,8 @@ impl NxcProtocol for MysqlProtocol {
             .pool_opts(pool_opts);
 
         let pool = Pool::new(opts);
-        let mut conn = tokio::time::timeout(self.timeout, pool.get_conn()).await
+        let mut conn = tokio::time::timeout(self.timeout, pool.get_conn())
+            .await
             .map_err(|_| anyhow!("Connection timeout"))??;
 
         // MySQL execution is typically SQL-based.
@@ -261,7 +262,8 @@ impl MysqlProtocol {
             .pool_opts(pool_opts);
 
         let pool = Pool::new(opts);
-        let mut conn = tokio::time::timeout(self.timeout, pool.get_conn()).await
+        let mut conn = tokio::time::timeout(self.timeout, pool.get_conn())
+            .await
             .map_err(|_| anyhow!("Connection timeout"))??;
 
         let rows = conn.query::<Row, _>("SHOW DATABASES").await?;

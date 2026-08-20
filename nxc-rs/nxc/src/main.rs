@@ -296,7 +296,7 @@ async fn main() -> Result<()> {
 
     let mut insecure = matches.get_flag("insecure")
         || sub_matches.try_get_one::<bool>("insecure").unwrap_or(None).copied().unwrap_or(false);
-    
+
     // Explicit confirmation for insecure mode in interactive environments
     if insecure {
         use std::io::IsTerminal;
@@ -307,7 +307,9 @@ async fn main() -> Result<()> {
             std::io::stdout().flush().unwrap();
             let mut input = String::new();
             if std::io::stdin().read_line(&mut input).is_ok() {
-                if !input.trim().eq_ignore_ascii_case("y") && !input.trim().eq_ignore_ascii_case("yes") {
+                if !input.trim().eq_ignore_ascii_case("y")
+                    && !input.trim().eq_ignore_ascii_case("yes")
+                {
                     println!("Aborting.");
                     std::process::exit(1);
                 }

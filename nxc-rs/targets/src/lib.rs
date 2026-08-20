@@ -153,18 +153,30 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
             let port = if port_str.is_empty() {
                 None
             } else if let Some(p_str) = port_str.strip_prefix(':') {
-                let p = p_str.parse::<u16>().map_err(|_| TargetError::InvalidPort { spec: spec.to_string(), reason: "Invalid port number".to_string() })?;
+                let p = p_str.parse::<u16>().map_err(|_| TargetError::InvalidPort {
+                    spec: spec.to_string(),
+                    reason: "Invalid port number".to_string(),
+                })?;
                 if p == 0 {
-                    return Err(TargetError::InvalidPort { spec: spec.to_string(), reason: "Port must be > 0".to_string() });
+                    return Err(TargetError::InvalidPort {
+                        spec: spec.to_string(),
+                        reason: "Port must be > 0".to_string(),
+                    });
                 }
                 Some(p)
             } else {
-                return Err(TargetError::InvalidIp { spec: spec.to_string(), source: "invalid".parse::<IpAddr>().unwrap_err() }); // Hacky but works
+                return Err(TargetError::InvalidIp {
+                    spec: spec.to_string(),
+                    source: "invalid".parse::<IpAddr>().unwrap_err(),
+                }); // Hacky but works
             };
-            
+
             if let Ok(ip) = ip_str.parse::<IpAddr>() {
                 if !ip.is_ipv6() {
-                    return Err(TargetError::InvalidIp { spec: spec.to_string(), source: "invalid".parse::<IpAddr>().unwrap_err() });
+                    return Err(TargetError::InvalidIp {
+                        spec: spec.to_string(),
+                        source: "invalid".parse::<IpAddr>().unwrap_err(),
+                    });
                 }
                 let mut target = Target::new(ip);
                 if let Some(p) = port {
@@ -172,10 +184,16 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
                 }
                 return Ok(vec![target]);
             } else {
-                return Err(TargetError::InvalidIp { spec: spec.to_string(), source: "invalid".parse::<IpAddr>().unwrap_err() });
+                return Err(TargetError::InvalidIp {
+                    spec: spec.to_string(),
+                    source: "invalid".parse::<IpAddr>().unwrap_err(),
+                });
             }
         }
-        return Err(TargetError::InvalidIp { spec: spec.to_string(), source: "invalid".parse::<IpAddr>().unwrap_err() });
+        return Err(TargetError::InvalidIp {
+            spec: spec.to_string(),
+            source: "invalid".parse::<IpAddr>().unwrap_err(),
+        });
     }
 
     // Check for hostname:port or IPv4:port
@@ -186,7 +204,10 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
             let port_part = &spec[colon_pos + 1..];
             if let Ok(port) = port_part.parse::<u16>() {
                 if port == 0 {
-                    return Err(TargetError::InvalidPort { spec: spec.to_string(), reason: "Port must be > 0".to_string() });
+                    return Err(TargetError::InvalidPort {
+                        spec: spec.to_string(),
+                        reason: "Port must be > 0".to_string(),
+                    });
                 }
                 if let Ok(ip) = host_part.parse::<IpAddr>() {
                     return Ok(vec![Target::new(ip).with_port(port)]);
@@ -208,10 +229,14 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
 
 /// Parse targets from a file (one per line).
 fn parse_target_file(path: &str) -> Result<Vec<Target>, TargetError> {
-    if std::path::Path::new(path).components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+    if std::path::Path::new(path).components().any(|c| matches!(c, std::path::Component::ParentDir))
+    {
         return Err(TargetError::FileReadError {
             path: path.to_string(),
-            source: std::io::Error::new(std::io::ErrorKind::InvalidInput, "Path traversal not allowed"),
+            source: std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Path traversal not allowed",
+            ),
         });
     }
     let contents = std::fs::read_to_string(path)
@@ -226,7 +251,10 @@ fn parse_target_file(path: &str) -> Result<Vec<Target>, TargetError> {
         if targets.len() > 1_000_000 {
             return Err(TargetError::FileReadError {
                 path: path.to_string(),
-                source: std::io::Error::new(std::io::ErrorKind::InvalidData, "Maximum target count exceeded"),
+                source: std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Maximum target count exceeded",
+                ),
             });
         }
     }
@@ -258,7 +286,9 @@ fn parse_cidr(spec: &str) -> Result<Vec<Target>, TargetError> {
     if prefix_len < 8 {
         return Err(TargetError::InvalidCidr {
             spec: spec.to_string(),
-            reason: format!("Prefix length {prefix_len} is too large (minimum /8) to prevent memory exhaustion"),
+            reason: format!(
+                "Prefix length {prefix_len} is too large (minimum /8) to prevent memory exhaustion"
+            ),
         });
     }
 
@@ -667,11 +697,12 @@ async fn execute_single_target(ctx: TargetTaskContext) -> ExecutionResult {
     // Apply per-target rate limiting if configured
     let _rate_limit_guard = if let Some(delay_ms) = ctx.opts.rate_limit_ms {
         let target_str = ctx.target.display();
-        let mutex = ctx.target_rate_limits
+        let mutex = ctx
+            .target_rate_limits
             .entry(target_str)
             .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
             .clone();
-        
+
         // Wait in line for this specific target
         let guard = mutex.lock_owned().await;
         // Apply the delay before allowing the next task to proceed

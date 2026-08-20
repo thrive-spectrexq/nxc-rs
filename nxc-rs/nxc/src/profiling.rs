@@ -56,7 +56,7 @@ fn get_process_memory() -> (Option<u64>, Option<u64>) {
     let mut counters: PROCESS_MEMORY_COUNTERS = unsafe { std::mem::zeroed() };
     counters.cb = std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32;
 
-    // SAFETY: 
+    // SAFETY:
     // 1. `GetCurrentProcess()` returns a pseudo-handle to the current process, which is always valid and does not need to be closed.
     // 2. `&mut counters` is a valid mutable reference to a `PROCESS_MEMORY_COUNTERS` struct.
     // 3. `counters.cb` correctly specifies the size of the buffer.
