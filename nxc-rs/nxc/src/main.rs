@@ -50,15 +50,14 @@ async fn main() -> Result<()> {
         );
     }));
 
-    // Load .env file at the very beginning and warn if permissions are unsafe
-    if let Ok(path) = dotenvy::dotenv() {
+    if let Ok(_path) = dotenvy::dotenv() {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            if let Ok(meta) = std::fs::metadata(&path) {
+            if let Ok(meta) = std::fs::metadata(&_path) {
                 let mode = meta.permissions().mode();
                 if mode & 0o077 != 0 {
-                    eprintln!("{} WARNING: Your {} file has unsafe permissions ({:o}). It should not be readable by other users.", colored::Colorize::yellow("!"), path.display(), mode);
+                    eprintln!("{} WARNING: Your {} file has unsafe permissions ({:o}). It should not be readable by other users.", colored::Colorize::yellow("!"), _path.display(), mode);
                 }
             }
         }

@@ -81,7 +81,7 @@ pub fn sanitize_csv_field(val: &str) -> String {
             | '\u{FF0D}' // FULLWIDTH HYPHEN-MINUS
             | '\u{FF20}' // FULLWIDTH COMMERCIAL AT
     ) {
-        format!("'{}", sanitized)
+        format!("'{sanitized}")
     } else {
         sanitized
     }
