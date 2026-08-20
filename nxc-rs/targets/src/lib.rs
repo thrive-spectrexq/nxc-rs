@@ -167,7 +167,10 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
             } else {
                 return Err(TargetError::InvalidIp {
                     spec: spec.to_string(),
-                    source: "invalid".parse::<IpAddr>().unwrap_err(),
+                    source: match "invalid".parse::<IpAddr>() {
+                        Err(e) => e,
+                        Ok(_) => unreachable!(),
+                    },
                 }); // Hacky but works
             };
 
@@ -175,7 +178,10 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
                 if !ip.is_ipv6() {
                     return Err(TargetError::InvalidIp {
                         spec: spec.to_string(),
-                        source: "invalid".parse::<IpAddr>().unwrap_err(),
+                        source: match "invalid".parse::<IpAddr>() {
+                            Err(e) => e,
+                            Ok(_) => unreachable!(),
+                        },
                     });
                 }
                 let mut target = Target::new(ip);
@@ -186,13 +192,19 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
             } else {
                 return Err(TargetError::InvalidIp {
                     spec: spec.to_string(),
-                    source: "invalid".parse::<IpAddr>().unwrap_err(),
+                    source: match "invalid".parse::<IpAddr>() {
+                        Err(e) => e,
+                        Ok(_) => unreachable!(),
+                    },
                 });
             }
         }
         return Err(TargetError::InvalidIp {
             spec: spec.to_string(),
-            source: "invalid".parse::<IpAddr>().unwrap_err(),
+            source: match "invalid".parse::<IpAddr>() {
+                Err(e) => e,
+                Ok(_) => unreachable!(),
+            },
         });
     }
 
