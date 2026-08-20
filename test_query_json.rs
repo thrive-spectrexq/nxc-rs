@@ -1,1 +1,0 @@
-use tiberius::{Client, Config}; use tokio::net::TcpStream; use tokio_util::compat::TokioAsyncWriteCompatExt; async fn test(client: &mut Client<tokio_util::compat::Compat<TcpStream>>, sql: &str, params: &[&str]) -> anyhow::Result<()> { let mut sql_params = Vec::<&dyn tiberius::ToSql>::new(); for p in params { sql_params.push(p); } client.query(sql, &sql_params).await?; Ok(()) }
