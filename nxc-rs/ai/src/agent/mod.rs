@@ -115,6 +115,14 @@ Guidelines:
             for tc in &resp.tool_calls {
                 self.feedback.on_tool_call(&tc.name, &tc.arguments).await?;
 
+                let allowed_tools = ["query_db", "search_modules", "parse_targets"];
+                if !allowed_tools.contains(&tc.name.as_str()) {
+                    let err_msg = format!("SECURITY INTERCEPT: Tool '{}' is not in the allow-list and cannot be executed without explicit user approval.", tc.name);
+                    self.feedback.on_tool_result(&tc.name, &err_msg).await?;
+                    tool_results.push(ToolResult { call_id: tc.name.clone(), content: err_msg });
+                    continue;
+                }
+
                 let tool =
                     self.tools.get(&tc.name).context(format!("Tool not found: {}", tc.name))?;
                 let args: Value = serde_json::from_str(&tc.arguments)?;

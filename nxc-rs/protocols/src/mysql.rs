@@ -97,8 +97,8 @@ impl NxcProtocol for MysqlProtocol {
                     credentials: None,
                 }))
             }
-            Ok(Err(e)) => Err(anyhow!("Connection failed: {e}")),
-            Err(_) => Err(anyhow!("Connection timeout to {addr}")),
+            Ok(Err(e)) => Err(crate::errors::MysqlError::ConnectionFailed(e.to_string()).into()),
+            Err(_) => Err(crate::errors::MysqlError::ConnectionFailed(format!("timeout to {addr}")).into()),
         }
     }
 
@@ -121,7 +121,7 @@ impl NxcProtocol for MysqlProtocol {
         let port = mysql_sess.port;
 
         let pool_opts = mysql_async::PoolOpts::default()
-            .with_constraints(mysql_async::PoolConstraints::new(1, 10).unwrap())
+            .with_constraints(mysql_async::PoolConstraints::new(1, 10).unwrap_or_default())
             .with_inactive_connection_ttl(Duration::from_secs(60));
 
         let opts = OptsBuilder::default()
@@ -183,7 +183,7 @@ impl NxcProtocol for MysqlProtocol {
 
         let creds = mysql_sess.credentials.as_ref().ok_or_else(|| anyhow!("Not authenticated"))?;
         let pool_opts = mysql_async::PoolOpts::default()
-            .with_constraints(mysql_async::PoolConstraints::new(1, 10).unwrap())
+            .with_constraints(mysql_async::PoolConstraints::new(1, 10).unwrap_or_default())
             .with_inactive_connection_ttl(Duration::from_secs(60));
 
         let opts = OptsBuilder::default()
@@ -236,7 +236,7 @@ impl NxcProtocol for MysqlProtocol {
                 }
             }
             Err(e) => {
-                return Err(anyhow!("MySQL Query Error: {e}"));
+                return Err(crate::errors::MysqlError::QueryFailed(e.to_string()).into());
             }
         }
 
@@ -250,7 +250,7 @@ impl MysqlProtocol {
     pub async fn list_databases(&self, session: &MysqlSession) -> Result<Vec<String>> {
         let creds = session.credentials.as_ref().ok_or_else(|| anyhow!("Not authenticated"))?;
         let pool_opts = mysql_async::PoolOpts::default()
-            .with_constraints(mysql_async::PoolConstraints::new(1, 10).unwrap())
+            .with_constraints(mysql_async::PoolConstraints::new(1, 10).unwrap_or_default())
             .with_inactive_connection_ttl(Duration::from_secs(60));
 
         let opts = OptsBuilder::default()

@@ -11,6 +11,7 @@ members = [
     "nxc-rs/nxc-tests",
     "nxc-rs/nxc-sessions",
     "nxc-rs/reporting",
+    "nxc-rs/fuzz",
 ]
 resolver = "2"
 

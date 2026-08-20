@@ -330,7 +330,10 @@ impl ModuleRegistry {
         register_module!(modules, "lsa", lsa::LsaModule::new());
 
         // ─── Dynamic Script Modules ─────────────────────────────────
-        let engine = rhai::Engine::new();
+        let mut engine = rhai::Engine::new();
+        engine.set_max_operations(100_000);
+        engine.set_max_string_size(1024);
+        engine.set_max_array_size(256);
         let script_dir = std::path::Path::new("./modules");
         if script_dir.exists() && script_dir.is_dir() {
             if let Ok(entries) = std::fs::read_dir(script_dir) {

@@ -56,4 +56,44 @@ mod integration_tests {
         assert_eq!(options.len(), 1);
         assert_eq!(options[0].name, "COMMAND");
     }
+
+    pub struct MockSession {
+        pub protocol: &'static str,
+        pub target: String,
+        pub is_admin: bool,
+    }
+
+    impl nxc_protocols::NxcSession for MockSession {
+        fn protocol(&self) -> &'static str {
+            self.protocol
+        }
+        fn target(&self) -> &str {
+            &self.target
+        }
+        fn is_admin(&self) -> bool {
+            self.is_admin
+        }
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+            self
+        }
+    }
+
+    pub struct ModuleTestEnv {
+        pub session: MockSession,
+    }
+
+    impl ModuleTestEnv {
+        pub fn new(protocol: &'static str, target: &str, is_admin: bool) -> Self {
+            Self {
+                session: MockSession {
+                    protocol,
+                    target: target.to_string(),
+                    is_admin,
+                }
+            }
+        }
+    }
 }

@@ -91,7 +91,11 @@ impl NxcProtocol for DockerProtocol {
 
         debug!("Docker: Checking connection to {}", addr);
 
-        let client = reqwest::Client::builder().timeout(self.timeout).build()?;
+        let client = reqwest::Client::builder()
+            .timeout(self.timeout)
+            .min_tls_version(reqwest::tls::Version::TLS_1_2)
+            .use_rustls_tls()
+            .build()?;
 
         let resp = client.get(&addr).send().await;
         match resp {
@@ -149,7 +153,11 @@ impl NxcProtocol for DockerProtocol {
 
         debug!("Docker: Authenticating as {} at {}", username, addr);
 
-        let client = reqwest::Client::builder().timeout(self.timeout).build()?;
+        let client = reqwest::Client::builder()
+            .timeout(self.timeout)
+            .min_tls_version(reqwest::tls::Version::TLS_1_2)
+            .use_rustls_tls()
+            .build()?;
 
         let resp = client.get(&addr).basic_auth(username, Some(password)).send().await;
 
@@ -201,7 +209,11 @@ impl NxcProtocol for DockerProtocol {
             .and_then(|id| id.as_str())
             .ok_or_else(|| anyhow!("No active containers found to execute against"))?;
 
-        let client = reqwest::Client::builder().timeout(self.timeout).build()?;
+        let client = reqwest::Client::builder()
+            .timeout(self.timeout)
+            .min_tls_version(reqwest::tls::Version::TLS_1_2)
+            .use_rustls_tls()
+            .build()?;
         let base_url = format!("http://{}:{}", docker_sess.target, docker_sess.port);
 
         // 2. Create Exec Instance
@@ -255,7 +267,11 @@ impl NxcProtocol for DockerProtocol {
 impl DockerProtocol {
     /// List repositories (Registry) or containers (API).
     pub async fn enumerate(&self, session: &DockerSession) -> Result<String> {
-        let client = reqwest::Client::builder().timeout(self.timeout).build()?;
+        let client = reqwest::Client::builder()
+            .timeout(self.timeout)
+            .min_tls_version(reqwest::tls::Version::TLS_1_2)
+            .use_rustls_tls()
+            .build()?;
 
         let mut req = if session.is_registry {
             client.get(format!("http://{}:{}/v2/_catalog", session.target, session.port))

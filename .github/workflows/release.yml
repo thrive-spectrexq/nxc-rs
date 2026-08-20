@@ -65,6 +65,14 @@ jobs:
       run: |
         mv target/release/${{ matrix.artifact_name }} target/release/${{ matrix.asset_name }}
 
+    - name: Generate SBOM
+      if: matrix.os == 'ubuntu-latest'
+      uses: anchore/sbom-action@v0
+      with:
+        path: ./
+        format: cyclonedx-json
+        output-file: target/release/nxc-rs-sbom.json
+
     - name: Upload Binary to Release
       uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v2
       if: startsWith(github.ref, 'refs/tags/')
@@ -72,6 +80,7 @@ jobs:
         files: |
           target/release/${{ matrix.asset_name }}
           target/release/*.deb
+          target/release/nxc-rs-sbom.json
         draft: false
         prerelease: false
       env:

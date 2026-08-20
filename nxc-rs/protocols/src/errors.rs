@@ -100,6 +100,22 @@ pub enum MssqlError {
     Unknown(String),
 }
 
+/// Errors that can occur during MySQL authentication and querying.
+#[derive(Error, Debug)]
+pub enum MysqlError {
+    #[error("Authentication failed: {0}")]
+    AuthFailed(String),
+
+    #[error("Connection failed: {0}")]
+    ConnectionFailed(String),
+
+    #[error("Query failed: {0}")]
+    QueryFailed(String),
+
+    #[error("Unknown MySQL error: {0}")]
+    Unknown(String),
+}
+
 /// Errors that can occur during FTP authentication and file operations.
 #[derive(Error, Debug)]
 pub enum FtpError {
@@ -254,6 +270,9 @@ pub enum ProtocolError {
     #[error("MSSQL Error: {0}")]
     Mssql(#[from] MssqlError),
 
+    #[error("MySQL Error: {0}")]
+    Mysql(#[from] MysqlError),
+
     /// FTP protocol errors.
     #[error("FTP Error: {0}")]
     Ftp(#[from] FtpError),
@@ -295,6 +314,7 @@ impl ProtocolError {
                 | Self::Ssh(SshError::AuthFailed(_))
                 | Self::WinRm(WinRmError::AuthFailed(_))
                 | Self::Mssql(MssqlError::AuthFailed(_))
+                | Self::Mysql(MysqlError::AuthFailed(_))
                 | Self::Ftp(FtpError::AuthFailed(_))
                 | Self::Rdp(RdpError::AuthFailed(_))
                 | Self::Vnc(VncError::AuthFailed(_))
@@ -313,6 +333,7 @@ impl ProtocolError {
                 | Self::Ssh(SshError::ConnectionFailed(_))
                 | Self::WinRm(WinRmError::ConnectionFailed(_))
                 | Self::Mssql(MssqlError::ConnectionFailed(_))
+                | Self::Mysql(MysqlError::ConnectionFailed(_))
                 | Self::Ftp(FtpError::ConnectionFailed(_))
                 | Self::Rdp(RdpError::ConnectionFailed(_))
                 | Self::Vnc(VncError::ConnectionFailed(_))
@@ -330,6 +351,7 @@ impl ProtocolError {
                 | Self::Ssh(SshError::ExecutionFailed(_))
                 | Self::WinRm(WinRmError::ExecutionFailed(_))
                 | Self::Mssql(MssqlError::QueryFailed(_))
+                | Self::Mysql(MysqlError::QueryFailed(_))
                 | Self::Redis(RedisError::ExecutionFailed(_))
                 | Self::Docker(DockerError::ExecutionFailed(_))
                 | Self::Kube(KubeError::ExecutionFailed(_))
@@ -344,6 +366,7 @@ impl ProtocolError {
             Self::Ssh(_) => "ssh",
             Self::WinRm(_) => "winrm",
             Self::Mssql(_) => "mssql",
+            Self::Mysql(_) => "mysql",
             Self::Ftp(_) => "ftp",
             Self::Rdp(_) => "rdp",
             Self::Vnc(_) => "vnc",
@@ -392,6 +415,12 @@ impl From<std::io::Error> for WinRmError {
 }
 
 impl From<std::io::Error> for MssqlError {
+    fn from(err: std::io::Error) -> Self {
+        Self::ConnectionFailed(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for MysqlError {
     fn from(err: std::io::Error) -> Self {
         Self::ConnectionFailed(err.to_string())
     }

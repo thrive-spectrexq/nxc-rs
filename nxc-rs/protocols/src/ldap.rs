@@ -60,6 +60,18 @@ impl LdapProtocol {
         format!("{scheme}://{target}:{port}")
     }
 
+    fn build_settings(&self) -> ldap3::LdapConnSettings {
+        let mut settings = ldap3::LdapConnSettings::new();
+        // Force TLS 1.2+ minimum, disable SSLv3, TLS 1.0, 1.1
+        let mut builder = native_tls::TlsConnector::builder();
+        builder.min_protocol_version(Some(native_tls::Protocol::Tlsv12));
+        
+        if let Ok(connector) = builder.build() {
+            settings = settings.set_connector(connector);
+        }
+        settings
+    }
+
     /// Perform an authenticated search against the LDAP server.
     pub async fn search(
         &self,
@@ -75,7 +87,7 @@ impl LdapProtocol {
             .as_ref()
             .ok_or_else(|| anyhow!("Session skipped authentication"))?;
 
-        let (conn, mut ldap) = tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::new(&url))
+        let (conn, mut ldap) = tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::with_settings(self.build_settings(), &url))
             .await
             .map_err(|_| anyhow!("LDAP connection timeout"))??;
 
@@ -135,7 +147,7 @@ impl LdapProtocol {
     /// Resolve naming contexts to find the base DN if not provided.
     pub async fn get_base_dn(&self, session: &LdapSession) -> Result<String> {
         let url = self.build_url(&session.target, session.port);
-        let (conn, mut ldap) = tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::new(&url))
+        let (conn, mut ldap) = tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::with_settings(self.build_settings(), &url))
             .await
             .map_err(|_| anyhow!("LDAP connection timeout"))??;
 
@@ -362,7 +374,7 @@ impl NxcProtocol for LdapProtocol {
         debug!("LDAP: Authenticating {}@{}", username, url);
 
         let (conn, mut ldap) =
-            match tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::new(&url)).await {
+            match tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::with_settings(self.build_settings(), &url)).await {
                 Ok(Ok(res)) => res,
                 Ok(Err(e)) => {
                     return Ok(AuthResult::failure(&format!("Connection failed: {e}"), None))
@@ -425,7 +437,7 @@ impl LdapProtocol {
 
         let url = self.build_url(&ldap_session.target, ldap_session.port);
         let (conn, mut ldap) =
-            match tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::new(&url)).await {
+            match tokio::time::timeout(self.timeout, ldap3::LdapConnAsync::with_settings(self.build_settings(), &url)).await {
                 Ok(Ok(res)) => res,
                 Ok(Err(e)) => {
                     return Ok(AuthResult::failure(&format!("Connection failed: {e}"), None))

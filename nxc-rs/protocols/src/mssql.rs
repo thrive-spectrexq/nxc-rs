@@ -247,8 +247,7 @@ impl NxcProtocol for MssqlProtocol {
             client.execute("EXEC sp_configure 'show advanced options', 1; RECONFIGURE;", &[]).await;
         let _ = client.execute("EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;", &[]).await;
 
-        let sql = format!("EXEC xp_cmdshell '{}'", cmd.replace('\'', "''"));
-        let result = client.query(sql, &[]).await?;
+        let result = client.query("EXEC xp_cmdshell @P1", &[&cmd]).await?;
         let rows = result.into_first_result().await?;
 
         let mut stdout = String::new();
@@ -290,10 +289,11 @@ impl NxcProtocol for MssqlProtocol {
 }
 
 impl MssqlProtocol {
-    pub async fn query_json(
+    pub async fn query_json_with_params(
         &self,
         session: &MssqlSession,
         sql: &str,
+        params: &[&str],
     ) -> Result<Vec<serde_json::Value>> {
         let creds = session.credentials.as_ref().ok_or_else(|| {
             crate::errors::MssqlError::AuthFailed("Session not authenticated".into())
@@ -318,7 +318,11 @@ impl MssqlProtocol {
                 .await?;
         let mut client = Client::connect(config, tcp.compat_write()).await?;
 
-        let result = client.query(sql, &[]).await?;
+        let mut sql_params = Vec::<&dyn tiberius::ToSql>::new();
+        for p in params {
+            sql_params.push(p);
+        }
+        let result = client.query(sql, &sql_params).await?;
         let rows = result.into_first_result().await?;
         let mut results = Vec::new();
 
@@ -340,6 +344,14 @@ impl MssqlProtocol {
 
         let _ = client.close().await;
         Ok(results)
+    }
+
+    pub async fn query_json(
+        &self,
+        session: &MssqlSession,
+        sql: &str,
+    ) -> Result<Vec<serde_json::Value>> {
+        self.query_json_with_params(session, sql, &[]).await
     }
 
     /// Enumerate linked servers.

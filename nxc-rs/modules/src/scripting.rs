@@ -11,10 +11,9 @@ use std::path::PathBuf;
 
 use crate::{ModuleOption, ModuleOptions, ModuleResult, NxcModule};
 
-/// A module implemented as a Rhai script.
 pub struct ScriptModule {
-    name: String,
-    description: String,
+    name: &'static str,
+    description: &'static str,
     path: PathBuf,
     ast: AST,
 }
@@ -27,21 +26,23 @@ impl ScriptModule {
         // For now, simpler: use filename
         let description = format!("Script module loaded from {}", path.display());
 
-        Ok(Self { name, description, path, ast })
+        Ok(Self { 
+            name: Box::leak(name.into_boxed_str()),
+            description: Box::leak(description.into_boxed_str()),
+            path, 
+            ast 
+        })
     }
 }
 
 #[async_trait]
 impl NxcModule for ScriptModule {
     fn name(&self) -> &'static str {
-        // We need 'static str, which is tricky for dynamic modules.
-        // For now, we'll leak the name to get a 'static reference.
-        // In a long-running app this is a leak, but for a CLI it's fine.
-        Box::leak(self.name.clone().into_boxed_str())
+        self.name
     }
 
     fn description(&self) -> &'static str {
-        Box::leak(self.description.clone().into_boxed_str())
+        self.description
     }
 
     fn supported_protocols(&self) -> &[&str] {
@@ -60,7 +61,10 @@ impl NxcModule for ScriptModule {
         session: &mut dyn NxcSession,
         opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
-        let engine = Engine::new();
+        let mut engine = Engine::new();
+        engine.set_max_operations(100_000);
+        engine.set_max_string_size(1024);
+        engine.set_max_array_size(256);
         let mut scope = rhai::Scope::new();
 
         // 1. Setup Context (as a Map)

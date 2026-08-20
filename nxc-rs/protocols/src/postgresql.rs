@@ -202,7 +202,7 @@ impl NxcProtocol for PostgresProtocol {
         client.execute(&format!("CREATE TEMP TABLE {table_name} (output text)"), &[]).await?;
         client
             .execute(
-                &format!("COPY {} FROM PROGRAM '{}'", table_name, cmd.replace('\'', "''")),
+                &format!("COPY {} FROM PROGRAM $nxc${}$nxc$", table_name, cmd),
                 &[],
             )
             .await?;

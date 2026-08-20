@@ -86,21 +86,30 @@ fn current_time_secs() -> i64 {
 pub struct SessionManager {
     cache: Arc<DashMap<SessionId, SessionRecord>>,
     ttl: std::time::Duration,
+    persist_dir: Option<std::path::PathBuf>,
 }
 
 impl SessionManager {
-    /// Create a new session manager with a default TTL of 1 hour.
+    /// Create a new session manager with a default TTL of 1 hour and no disk persistence.
     pub fn new() -> Self {
-        Self::with_ttl(std::time::Duration::from_secs(3600))
+        Self::with_ttl_and_dir(std::time::Duration::from_secs(3600), None)
     }
 
     /// Create a new session manager with a specific TTL.
-    /// Spawns a background Tokio task to periodically remove expired sessions.
     pub fn with_ttl(ttl: std::time::Duration) -> Self {
+        Self::with_ttl_and_dir(ttl, None)
+    }
+
+    /// Create a new session manager with disk persistence.
+    pub fn with_ttl_and_dir(ttl: std::time::Duration, persist_dir: Option<std::path::PathBuf>) -> Self {
         let cache = Arc::new(DashMap::new());
         let cache_clone = Arc::clone(&cache);
+        
+        if let Some(dir) = &persist_dir {
+            let _ = std::fs::create_dir_all(dir);
+        }
 
-        let manager = Self { cache, ttl };
+        let manager = Self { cache, ttl, persist_dir };
 
         // Spawn cleanup task
         tokio::spawn(async move {
@@ -114,6 +123,19 @@ impl SessionManager {
         });
 
         manager
+    }
+
+    /// Write a session to disk atomically using a temporary file and rename.
+    async fn persist_to_disk(&self, record: &SessionRecord) -> Result<()> {
+        if let Some(dir) = &self.persist_dir {
+            let file_path = dir.join(format!("{}.json", record.id));
+            let tmp_path = dir.join(format!("{}.json.tmp", record.id));
+            
+            let data = serde_json::to_vec(record)?;
+            tokio::fs::write(&tmp_path, data).await?;
+            tokio::fs::rename(&tmp_path, &file_path).await?;
+        }
+        Ok(())
     }
 
     /// Manually remove sessions that have expired based on the configured TTL.
@@ -156,16 +178,25 @@ impl SessionCache for SessionManager {
 
     async fn store_session(&self, mut record: SessionRecord) -> Result<()> {
         record.last_accessed = current_time_secs();
+        self.persist_to_disk(&record).await?;
         self.cache.insert(record.id.clone(), record);
         Ok(())
     }
 
     async fn link_sessions(&self, parent_id: &str, child_id: &str) -> Result<()> {
-        if let Some(mut parent) = self.cache.get_mut(parent_id) {
-            if !parent.linked_sessions.contains(&child_id.to_string()) {
-                parent.linked_sessions.push(child_id.to_string());
+        let parent_opt = {
+            if let Some(mut parent) = self.cache.get_mut(parent_id) {
+                if !parent.linked_sessions.contains(&child_id.to_string()) {
+                    parent.linked_sessions.push(child_id.to_string());
+                }
+                parent.last_accessed = current_time_secs();
+                Some(parent.clone())
+            } else {
+                None
             }
-            parent.last_accessed = current_time_secs();
+        };
+        if let Some(parent) = parent_opt {
+            self.persist_to_disk(&parent).await?;
         }
         Ok(())
     }

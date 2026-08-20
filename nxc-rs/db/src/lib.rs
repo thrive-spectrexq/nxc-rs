@@ -269,6 +269,31 @@ pub struct NxcDb {
 impl NxcDb {
     /// Create a new NxcDb, running schema migrations.
     pub fn new(db_path: &std::path::Path, workspace: &str) -> Result<Self> {
+        if !db_path.exists() {
+            if let Some(parent) = db_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .mode(0o600)
+                    .open(db_path)?;
+            }
+            #[cfg(not(unix))]
+            std::fs::File::create(db_path)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(mut perms) = std::fs::metadata(db_path).map(|m| m.permissions()) {
+                    perms.set_mode(0o600);
+                    let _ = std::fs::set_permissions(db_path, perms);
+                }
+            }
+        }
+
         let manager = r2d2_sqlite::SqliteConnectionManager::file(db_path);
         let pool = r2d2::Pool::new(manager)?;
 

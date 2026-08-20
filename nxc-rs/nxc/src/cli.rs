@@ -185,8 +185,33 @@ pub fn build_cli() -> Command {
     let ipmi_cmd = build_ipmi_cmd(&auth_args, &module_args, &export_args);
     let kube_cmd = build_kube_cmd(&auth_args, &module_args, &export_args);
 
+    let usage_examples = "
+EXAMPLES:
+  # SMB
+  nxc smb 192.168.1.0/24 -u user -p pass -M gpp_password
+  nxc smb 10.10.10.10 -u admin -H <NT_HASH> --local-auth
+
+  # WinRM
+  nxc winrm 192.168.1.10 -u admin -p pass -x \"whoami\"
+
+  # SSH
+  nxc ssh 10.0.0.5 -u root -p pass --key-file ~/.ssh/id_rsa -x \"id\"
+
+  # LDAP
+  nxc ldap domain.local -u user -p pass -M get-desc-users
+
+  # Database (MSSQL / Postgres / MySQL)
+  nxc mssql 192.168.1.20 -u sa -p pass -q \"SELECT @@version\"
+
+  # Web/HTTP
+  nxc http 10.10.10.50 -M webdav
+
+For more protocol-specific options, run: nxc <protocol> --help
+";
+
     let cmd = Command::new("nxc")
         .about(banner)
+        .after_help(usage_examples)
         .version(VERSION)
         .arg(
             Arg::new("threads")

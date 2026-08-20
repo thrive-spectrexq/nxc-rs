@@ -25,8 +25,38 @@ use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Load .env file at the very beginning
-    let _ = dotenvy::dotenv();
+    std::panic::set_hook(Box::new(|info| {
+        let msg = if let Some(s) = info.payload().downcast_ref::<&str>() {
+            *s
+        } else if let Some(s) = info.payload().downcast_ref::<String>() {
+            s.as_str()
+        } else {
+            "Unknown panic"
+        };
+        
+        let loc = if let Some(l) = info.location() {
+            format!("{}:{}", l.file(), l.line())
+        } else {
+            "unknown location".to_string()
+        };
+        
+        eprintln!("\n{} NetExec-RS encountered a fatal error (panic) at {loc}: {msg}", colored::Colorize::red(colored::Colorize::bold("CRITICAL:")));
+        eprintln!("{} This is a bug. Please report this to the repository issue tracker.", colored::Colorize::red(colored::Colorize::bold("CRITICAL:")));
+    }));
+
+    // Load .env file at the very beginning and warn if permissions are unsafe
+    if let Ok(path) = dotenvy::dotenv() {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(meta) = std::fs::metadata(&path) {
+                let mode = meta.permissions().mode();
+                if mode & 0o077 != 0 {
+                    eprintln!("{} WARNING: Your {} file has unsafe permissions ({:o}). It should not be readable by other users.", colored::Colorize::yellow("!"), path.display(), mode);
+                }
+            }
+        }
+    }
 
     let app = build_cli();
     let matches = app.get_matches();
@@ -304,7 +334,7 @@ async fn main() -> Result<()> {
             println!("{} SECURITY WARNING: You have specified --insecure. This disables SSL certificate validation and exposes connections to MITM attacks.", colored::Colorize::yellow("!"));
             print!("Are you sure you want to proceed? [y/N]: ");
             use std::io::Write;
-            std::io::stdout().flush().unwrap();
+            let _ = std::io::stdout().flush();
             let mut input = String::new();
             if std::io::stdin().read_line(&mut input).is_ok() {
                 if !input.trim().eq_ignore_ascii_case("y")
@@ -361,6 +391,15 @@ async fn main() -> Result<()> {
     if !dot_nxc.exists() {
         if let Err(e) = std::fs::create_dir_all(&dot_nxc) {
             NxcGlobalOutput::warn(&format!("Failed to create nxc directory at {dot_nxc:?}: {e}"));
+        } else {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(mut perms) = std::fs::metadata(&dot_nxc).map(|m| m.permissions()) {
+                    perms.set_mode(0o700);
+                    let _ = std::fs::set_permissions(&dot_nxc, perms);
+                }
+            }
         }
     }
     let db_path = dot_nxc.join("nxc.db");
@@ -523,6 +562,14 @@ async fn main() -> Result<()> {
     let ws_reports_dir = dot_nxc.join("workspaces").join(workspace).join("reports");
     match std::fs::create_dir_all(&ws_reports_dir) {
         Ok(_) => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(mut perms) = std::fs::metadata(&ws_reports_dir).map(|m| m.permissions()) {
+                    perms.set_mode(0o700);
+                    let _ = std::fs::set_permissions(&ws_reports_dir, perms);
+                }
+            }
             let filename =
                 format!("report_{}_{}.json", protocol_name, Utc::now().format("%Y%m%d_%H%M%S"));
             let report_path = ws_reports_dir.join(filename);

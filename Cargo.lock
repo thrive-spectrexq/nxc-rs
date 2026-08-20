@@ -2905,6 +2905,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nxc-fuzz"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libfuzzer-sys",
+ "nxc-auth",
+ "tempfile",
+]
+
+[[package]]
 name = "nxc-modules"
 version = "0.4.7"
 dependencies = [
@@ -3011,6 +3021,7 @@ dependencies = [
  "async-trait",
  "dashmap",
  "serde",
+ "serde_json",
  "tokio",
  "tracing",
  "uuid",

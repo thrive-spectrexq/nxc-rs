@@ -77,6 +77,8 @@ impl NxcProtocol for KubeProtocol {
 
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
+            .min_tls_version(reqwest::tls::Version::TLS_1_2)
+            .use_rustls_tls()
             .timeout(std::time::Duration::from_secs(10))
             .build()?;
 
@@ -132,6 +134,8 @@ impl NxcProtocol for KubeProtocol {
 
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
+            .min_tls_version(reqwest::tls::Version::TLS_1_2)
+            .use_rustls_tls()
             .timeout(std::time::Duration::from_secs(10))
             .build()?;
 
@@ -177,6 +181,8 @@ impl NxcProtocol for KubeProtocol {
 
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
+            .min_tls_version(reqwest::tls::Version::TLS_1_2)
+            .use_rustls_tls()
             .timeout(std::time::Duration::from_secs(30))
             .build()?;
 
@@ -271,7 +277,11 @@ impl NxcProtocol for KubeProtocol {
 impl KubeProtocol {
     /// Enumerate service accounts and secrets.
     pub async fn list_secrets(&self, session: &KubeSession) -> Result<Vec<serde_json::Value>> {
-        let client = reqwest::Client::builder().danger_accept_invalid_certs(true).build()?;
+        let client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .min_tls_version(reqwest::tls::Version::TLS_1_2)
+            .use_rustls_tls()
+            .build()?;
 
         let ns = session.namespace.as_deref().unwrap_or("default");
         let url =
@@ -289,7 +299,10 @@ impl KubeProtocol {
 
     /// List pods in a namespace.
     pub async fn list_pods(&self, session: &KubeSession) -> Result<Vec<serde_json::Value>> {
-        let client = reqwest::Client::builder().danger_accept_invalid_certs(true).build()?;
+        let client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .min_tls_version(reqwest::tls::Version::TLS_1_2)
+            .build()?;
 
         let ns = session.namespace.as_deref().unwrap_or("default");
         let url =

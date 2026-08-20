@@ -27,6 +27,7 @@ ignore = [
 
 # ─── License Compliance ─────────────────────────────────────────
 [licenses]
+# Dual licenses (e.g. `MIT OR Apache-2.0`) are automatically allowed if at least one license is approved below.
 allow = [
     "0BSD",
     "Apache-2.0",
@@ -37,7 +38,6 @@ allow = [
     "bzip2-1.0.6",
     "CC0-1.0",
     "CDLA-Permissive-2.0",
-    "GPL-2.0-or-later",
     "ISC",
     "MIT",
     "MIT-0",

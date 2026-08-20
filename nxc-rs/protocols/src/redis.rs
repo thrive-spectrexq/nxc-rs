@@ -104,7 +104,6 @@ impl NxcProtocol for RedisProtocol {
                 }))
             }
             Ok(Err(e)) => {
-                // If it requires auth, we might still be "connected" but unable to run commands
                 if e.to_string().contains("Authentication required")
                     || e.to_string().contains("NOAUTH")
                 {
@@ -116,10 +115,10 @@ impl NxcProtocol for RedisProtocol {
                         credentials: None,
                     }))
                 } else {
-                    Err(anyhow!("Connection failed: {e}"))
+                    Err(crate::errors::RedisError::ConnectionFailed(e.to_string()).into())
                 }
             }
-            Err(_) => Err(anyhow!("Connection timeout to {target}:{port}")),
+            Err(_) => Err(crate::errors::RedisError::ConnectionFailed(format!("timeout to {target}:{port}")).into()),
         }
     }
 
@@ -157,7 +156,7 @@ impl NxcProtocol for RedisProtocol {
 
         match connect_fut.await {
             Ok(Ok(mut _conn)) => {
-                debug!("Redis: Auth successful for password: {}", password);
+                debug!("Redis: Auth successful");
                 redis_sess.credentials = Some(creds.clone());
                 redis_sess.admin = true; // Redis auth usually gives full access
                 Ok(AuthResult::success(true))

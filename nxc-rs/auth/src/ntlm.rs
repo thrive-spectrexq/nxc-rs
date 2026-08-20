@@ -755,3 +755,28 @@ mod tests {
         assert_eq!(u32::from_le_bytes([sig[0], sig[1], sig[2], sig[3]]), 1);
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn doesnt_crash_nt_hash(password in ".*") {
+            let hash = calculate_nt_hash(&password);
+            assert_eq!(hash.len(), 16);
+        }
+
+        #[test]
+        fn doesnt_crash_v2_hash(username in ".*", domain in ".*", hash in any::<[u8; 16]>()) {
+            let v2 = calculate_v2_hash(&username, &domain, &hash);
+            assert_eq!(v2.len(), 16);
+        }
+
+        #[test]
+        fn dont_crash_target_info_parse(data in any::<Vec<u8>>()) {
+            let _ = NtlmTargetInfo::parse(&data);
+        }
+    }
+}

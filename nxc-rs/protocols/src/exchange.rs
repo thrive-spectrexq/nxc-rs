@@ -89,8 +89,12 @@ impl NxcProtocol for ExchangeProtocol {
         let scheme = if use_ssl { "https" } else { "http" };
         let url = format!("{scheme}://{target}:{port}/EWS/Exchange.asmx");
 
-        let client =
-            Client::builder().timeout(self.timeout).danger_accept_invalid_certs(true).build()?;
+        let client = Client::builder()
+            .timeout(self.timeout)
+            .danger_accept_invalid_certs(true)
+            .min_tls_version(reqwest::tls::Version::TLS_1_2)
+            .use_rustls_tls()
+            .build()?;
 
         let resp = client.get(&url).send().await;
 
@@ -131,8 +135,12 @@ impl NxcProtocol for ExchangeProtocol {
         let port = exchange_sess.port;
         let url = format!("{scheme}://{target}:{port}/EWS/Exchange.asmx");
 
-        let client =
-            Client::builder().timeout(self.timeout).danger_accept_invalid_certs(true).build()?;
+        let client = Client::builder()
+            .timeout(self.timeout)
+            .danger_accept_invalid_certs(true)
+            .min_tls_version(reqwest::tls::Version::TLS_1_2)
+            .use_rustls_tls()
+            .build()?;
 
         // Perform basic auth attempt
         let password = creds.password.as_deref().unwrap_or_default();
