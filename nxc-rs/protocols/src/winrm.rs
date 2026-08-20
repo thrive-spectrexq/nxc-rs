@@ -76,6 +76,10 @@ impl WinrmProtocol {
 
     /// Build a reqwest client configured for WinRM communication (ignoring rigorous cert checks for now, similar to NXC)
     fn build_client(&self, proxy_str: Option<&str>) -> Result<Client> {
+        if !self.verify_ssl {
+            tracing::warn!("SECURITY WARNING: SSL certificate verification is disabled for WinRM. Connection is vulnerable to MITM attacks.");
+        }
+
         let mut builder =
             Client::builder().timeout(self.timeout).danger_accept_invalid_certs(!self.verify_ssl); // lgtm[rust/disabled-certificate-check] Configurable certificate verification
 

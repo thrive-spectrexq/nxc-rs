@@ -50,9 +50,17 @@ fn get_process_memory() -> (Option<u64>, Option<u64>) {
     };
     use windows_sys::Win32::System::Threading::GetCurrentProcess;
 
+    // SAFETY: We are zero-initializing a POD struct expected by the Win32 API.
+    // The `cb` field is correctly initialized to the size of the struct, which
+    // is a requirement for `GetProcessMemoryInfo`.
     let mut counters: PROCESS_MEMORY_COUNTERS = unsafe { std::mem::zeroed() };
     counters.cb = std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32;
 
+    // SAFETY: 
+    // 1. `GetCurrentProcess()` returns a pseudo-handle to the current process, which is always valid and does not need to be closed.
+    // 2. `&mut counters` is a valid mutable reference to a `PROCESS_MEMORY_COUNTERS` struct.
+    // 3. `counters.cb` correctly specifies the size of the buffer.
+    // The FFI call will only write to the bounds of the provided struct.
     let success = unsafe { GetProcessMemoryInfo(GetCurrentProcess(), &mut counters, counters.cb) };
 
     if success != 0 {

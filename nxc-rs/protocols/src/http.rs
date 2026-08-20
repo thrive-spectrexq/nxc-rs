@@ -46,7 +46,7 @@ pub struct HttpProtocol {
 
 impl Default for HttpProtocol {
     fn default() -> Self {
-        Self::new(false, false)
+        Self::new(false, true)
     }
 }
 
@@ -101,6 +101,10 @@ impl NxcProtocol for HttpProtocol {
         port: u16,
         proxy: Option<&str>,
     ) -> Result<Box<dyn NxcSession>> {
+        if !self.verify_ssl {
+            tracing::warn!("SECURITY WARNING: SSL certificate verification is disabled for HTTP. Connection is vulnerable to MITM attacks.");
+        }
+
         let mut builder = Client::builder()
             .danger_accept_invalid_certs(!self.verify_ssl) // Option to bypass cert warnings common on IoT
             .user_agent(Self::get_random_user_agent())

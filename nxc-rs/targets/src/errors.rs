@@ -9,6 +9,9 @@ pub enum TargetError {
     #[error("Invalid IP range '{spec}': {reason}")]
     InvalidRange { spec: String, reason: String },
 
+    #[error("Invalid port in target '{spec}': {reason}")]
+    InvalidPort { spec: String, reason: String },
+
     #[error("Invalid IP address '{spec}': {source}")]
     InvalidIp {
         spec: String,

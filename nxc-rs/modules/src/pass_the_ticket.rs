@@ -60,6 +60,19 @@ impl NxcModule for PassTheTicket {
         let ticket = opts.get("TICKET").ok_or_else(|| anyhow::anyhow!("TICKET is required"))?;
         let format = opts.get("FORMAT").map(String::as_str).unwrap_or("ccache");
 
+        if format != "ccache" && format != "kirbi" {
+            return Err(anyhow::anyhow!("FORMAT must be 'ccache' or 'kirbi'"));
+        }
+        
+        if ticket.len() > 1024 * 1024 {
+            return Err(anyhow::anyhow!("TICKET length exceeds maximum limit of 1MB"));
+        }
+
+        // Prevent directory traversal if it's a file path
+        if std::path::Path::new(ticket).components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+            return Err(anyhow::anyhow!("Path traversal (..) is not allowed in TICKET option"));
+        }
+
         tracing::info!("pass_the_ticket: Injecting {} ticket...", format);
 
         // Simulating the ticket injection and validation

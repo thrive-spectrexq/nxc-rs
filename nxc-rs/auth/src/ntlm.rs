@@ -269,19 +269,24 @@ impl NtlmAuthenticator {
             now * 10_000_000 + epoch_diff
         });
 
-        let client_nonce = rand::random::<[u8; 8]>();
+        let mut client_nonce = [0u8; 8];
+        if let Err(e) = getrandom::getrandom(&mut client_nonce) {
+            return Err(anyhow::anyhow!("CryptoError: RNG failure: {e}"));
+        }
 
         // 1. Calculate NT hash
-        let nt_hash = if let Some(ref hash) = creds.nt_hash {
+        let nt_hash_arr: [u8; 16] = if let Some(ref hash) = creds.nt_hash {
             hex::decode(hash)?.try_into().map_err(|_| anyhow::anyhow!("Invalid NT hash length"))?
         } else if let Some(ref pass) = creds.password {
             calculate_nt_hash(pass)
         } else {
             return Err(anyhow::anyhow!("No password or hash provided"));
         };
+        let nt_hash = zeroize::Zeroizing::new(nt_hash_arr);
 
         // 2. Calculate NTLMv2 hash
-        let v2_hash = calculate_v2_hash(&username, &domain, &nt_hash);
+        let v2_hash_arr = calculate_v2_hash(&username, &domain, &nt_hash);
+        let v2_hash = zeroize::Zeroizing::new(v2_hash_arr);
 
         // 3. Build NTLMv2 response blob
         let mut blob = Vec::new();
@@ -294,7 +299,7 @@ impl NtlmAuthenticator {
         blob.extend_from_slice(&[0; 4]); // End padding
 
         // 4. Calculate NTProofStr
-        let mut hmac = <HmacMd5 as HmacKeyInit>::new_from_slice(&v2_hash)?;
+        let mut hmac = <HmacMd5 as HmacKeyInit>::new_from_slice(v2_hash.as_ref())?;
         hmac.update(&challenge.nonce);
         hmac.update(&blob);
         let nt_proof_str: [u8; 16] = hmac.finalize().into_bytes().into();
@@ -305,7 +310,7 @@ impl NtlmAuthenticator {
         nt_response.extend_from_slice(&blob);
 
         // 6. Compute session base key
-        let mut session_hmac = <HmacMd5 as HmacKeyInit>::new_from_slice(&v2_hash)?;
+        let mut session_hmac = <HmacMd5 as HmacKeyInit>::new_from_slice(v2_hash.as_ref())?;
         session_hmac.update(&nt_proof_str);
         let session_base_key: Vec<u8> = session_hmac.finalize().into_bytes().to_vec();
 
@@ -313,7 +318,10 @@ impl NtlmAuthenticator {
         let negotiate_flags = self.negotiate_flags & challenge.server_flags;
         let (exported_session_key, encrypted_random_session_key) =
             if negotiate_flags & NTLMSSP_NEGOTIATE_KEY_EXCH != 0 {
-                let exported_key: [u8; 16] = rand::random();
+                let mut exported_key = [0u8; 16];
+                if let Err(e) = getrandom::getrandom(&mut exported_key) {
+                    return Err(anyhow::anyhow!("CryptoError: RNG failure: {e}"));
+                }
                 let key_array: &[u8; 16] = session_base_key[..16].try_into().map_err(|_| {
                     anyhow::anyhow!("CryptoError: key derivation slice wrong length")
                 })?;
@@ -532,9 +540,12 @@ impl NtlmSessionSecurity {
 /// Calculate NT hash from a password (MD4 of UTF-16LE encoded password).
 pub fn calculate_nt_hash(password: &str) -> [u8; 16] {
     let mut hasher = Md4::new();
-    let utf16: Vec<u16> = password.encode_utf16().collect();
-    let bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
+    let mut utf16: Vec<u16> = password.encode_utf16().collect();
+    let mut bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
     hasher.update(&bytes);
+    use zeroize::Zeroize;
+    for x in &mut utf16 { *x = 0; }
+    bytes.zeroize();
     hasher.finalize().into()
 }
 
@@ -544,9 +555,12 @@ pub fn calculate_v2_hash(username: &str, domain: &str, nt_hash: &[u8; 16]) -> [u
     let mut hmac =
         <HmacMd5 as HmacKeyInit>::new_from_slice(nt_hash).expect("MD5 accepts any key length");
     let identity = format!("{}{}", username.to_uppercase(), domain.to_uppercase());
-    let utf16: Vec<u16> = identity.encode_utf16().collect();
-    let bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
+    let mut utf16: Vec<u16> = identity.encode_utf16().collect();
+    let mut bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
     hmac.update(&bytes);
+    use zeroize::Zeroize;
+    for x in &mut utf16 { *x = 0; }
+    bytes.zeroize();
     hmac.finalize().into_bytes().into()
 }
 

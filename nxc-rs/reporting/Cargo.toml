@@ -16,3 +16,5 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 csv = { workspace = true }
 uuid = { workspace = true }
+sha2.workspace = true
+hex.workspace = true

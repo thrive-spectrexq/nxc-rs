@@ -15,7 +15,7 @@ use super::crypto::{
 };
 use rasn::types::GeneralizedTime;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct KerberosTicket {
     pub client_realm: String,
     pub client_name: String,
@@ -23,6 +23,7 @@ pub struct KerberosTicket {
     pub server_name: String,
     pub session_key: Vec<u8>,
     pub ticket_data: Vec<u8>,
+    #[zeroize(skip)]
     pub enc_type: EncryptionType,
 }
 
@@ -128,7 +129,7 @@ impl KerberosClient {
 
         let mut padata = Vec::new();
 
-        let (key, key_etype) = if let Some(aes) = aes_key {
+        let (key_vec, key_etype) = if let Some(aes) = aes_key {
             let decoded = hex::decode(aes)?;
             let etype = if decoded.len() == 32 { 18 } else { 17 };
             (decoded, etype)
@@ -139,6 +140,7 @@ impl KerberosClient {
         } else {
             (vec![], 23)
         };
+        let key = zeroize::Zeroizing::new(key_vec);
 
         if !key.is_empty() {
             let now = GeneralizedTime::from(chrono::Utc::now());

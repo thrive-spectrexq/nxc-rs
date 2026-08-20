@@ -120,12 +120,18 @@ impl NxcProtocol for MysqlProtocol {
         let target = &mysql_sess.target;
         let port = mysql_sess.port;
 
+        let pool_opts = mysql_async::PoolOpts::default()
+            .with_constraints(mysql_async::PoolConstraints::new(1, 10).unwrap())
+            .with_inactive_connection_ttl(Duration::from_secs(60));
+
         let opts = OptsBuilder::default()
             .ip_or_hostname(target)
             .tcp_port(port)
             .user(Some(username))
             .pass(Some(password))
-            .db_name(Some("mysql"));
+            .db_name(Some("mysql"))
+            .conn_ttl(Duration::from_secs(60))
+            .pool_opts(pool_opts);
 
         let pool = Pool::new(opts);
         debug!("MySQL: Authenticating {}@{}", username, target);
@@ -176,15 +182,22 @@ impl NxcProtocol for MysqlProtocol {
         };
 
         let creds = mysql_sess.credentials.as_ref().ok_or_else(|| anyhow!("Not authenticated"))?;
+        let pool_opts = mysql_async::PoolOpts::default()
+            .with_constraints(mysql_async::PoolConstraints::new(1, 10).unwrap())
+            .with_inactive_connection_ttl(Duration::from_secs(60));
+
         let opts = OptsBuilder::default()
             .ip_or_hostname(&mysql_sess.target)
             .tcp_port(mysql_sess.port)
             .user(Some(&creds.username))
             .pass(Some(creds.password.as_deref().unwrap_or_default()))
-            .db_name(Some("mysql"));
+            .db_name(Some("mysql"))
+            .conn_ttl(Duration::from_secs(60))
+            .pool_opts(pool_opts);
 
         let pool = Pool::new(opts);
-        let mut conn = pool.get_conn().await?;
+        let mut conn = tokio::time::timeout(self.timeout, pool.get_conn()).await
+            .map_err(|_| anyhow!("Connection timeout"))??;
 
         // MySQL execution is typically SQL-based.
         // For OS command execution, it would involve UDF or FILE privilege (into outfile).
@@ -235,14 +248,21 @@ impl MysqlProtocol {
     /// List all databases.
     pub async fn list_databases(&self, session: &MysqlSession) -> Result<Vec<String>> {
         let creds = session.credentials.as_ref().ok_or_else(|| anyhow!("Not authenticated"))?;
+        let pool_opts = mysql_async::PoolOpts::default()
+            .with_constraints(mysql_async::PoolConstraints::new(1, 10).unwrap())
+            .with_inactive_connection_ttl(Duration::from_secs(60));
+
         let opts = OptsBuilder::default()
             .ip_or_hostname(&session.target)
             .tcp_port(session.port)
             .user(Some(&creds.username))
-            .pass(Some(creds.password.as_deref().unwrap_or_default()));
+            .pass(Some(creds.password.as_deref().unwrap_or_default()))
+            .conn_ttl(Duration::from_secs(60))
+            .pool_opts(pool_opts);
 
         let pool = Pool::new(opts);
-        let mut conn = pool.get_conn().await?;
+        let mut conn = tokio::time::timeout(self.timeout, pool.get_conn()).await
+            .map_err(|_| anyhow!("Connection timeout"))??;
 
         let rows = conn.query::<Row, _>("SHOW DATABASES").await?;
         let dbs = rows.into_iter().map(|row| row.get(0).unwrap_or_default()).collect();

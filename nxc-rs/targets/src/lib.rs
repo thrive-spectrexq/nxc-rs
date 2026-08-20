@@ -150,15 +150,32 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
         if let Some(bracket_end) = spec.find(']') {
             let ip_str = &spec[1..bracket_end];
             let port_str = &spec[bracket_end + 1..];
-            let port = port_str.strip_prefix(':').and_then(|p| p.parse::<u16>().ok());
+            let port = if port_str.is_empty() {
+                None
+            } else if let Some(p_str) = port_str.strip_prefix(':') {
+                let p = p_str.parse::<u16>().map_err(|_| TargetError::InvalidPort { spec: spec.to_string(), reason: "Invalid port number".to_string() })?;
+                if p == 0 {
+                    return Err(TargetError::InvalidPort { spec: spec.to_string(), reason: "Port must be > 0".to_string() });
+                }
+                Some(p)
+            } else {
+                return Err(TargetError::InvalidIp { spec: spec.to_string(), source: "invalid".parse::<IpAddr>().unwrap_err() }); // Hacky but works
+            };
+            
             if let Ok(ip) = ip_str.parse::<IpAddr>() {
+                if !ip.is_ipv6() {
+                    return Err(TargetError::InvalidIp { spec: spec.to_string(), source: "invalid".parse::<IpAddr>().unwrap_err() });
+                }
                 let mut target = Target::new(ip);
                 if let Some(p) = port {
                     target = target.with_port(p);
                 }
                 return Ok(vec![target]);
+            } else {
+                return Err(TargetError::InvalidIp { spec: spec.to_string(), source: "invalid".parse::<IpAddr>().unwrap_err() });
             }
         }
+        return Err(TargetError::InvalidIp { spec: spec.to_string(), source: "invalid".parse::<IpAddr>().unwrap_err() });
     }
 
     // Check for hostname:port or IPv4:port
@@ -168,6 +185,9 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
             let host_part = &spec[..colon_pos];
             let port_part = &spec[colon_pos + 1..];
             if let Ok(port) = port_part.parse::<u16>() {
+                if port == 0 {
+                    return Err(TargetError::InvalidPort { spec: spec.to_string(), reason: "Port must be > 0".to_string() });
+                }
                 if let Ok(ip) = host_part.parse::<IpAddr>() {
                     return Ok(vec![Target::new(ip).with_port(port)]);
                 } else if !host_part.is_empty() {
@@ -188,6 +208,12 @@ pub fn parse_targets(spec: &str) -> Result<Vec<Target>, TargetError> {
 
 /// Parse targets from a file (one per line).
 fn parse_target_file(path: &str) -> Result<Vec<Target>, TargetError> {
+    if std::path::Path::new(path).components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+        return Err(TargetError::FileReadError {
+            path: path.to_string(),
+            source: std::io::Error::new(std::io::ErrorKind::InvalidInput, "Path traversal not allowed"),
+        });
+    }
     let contents = std::fs::read_to_string(path)
         .map_err(|e| TargetError::FileReadError { path: path.to_string(), source: e })?;
     let mut targets = Vec::new();
@@ -197,6 +223,12 @@ fn parse_target_file(path: &str) -> Result<Vec<Target>, TargetError> {
             continue;
         }
         targets.extend(parse_targets(line)?);
+        if targets.len() > 1_000_000 {
+            return Err(TargetError::FileReadError {
+                path: path.to_string(),
+                source: std::io::Error::new(std::io::ErrorKind::InvalidData, "Maximum target count exceeded"),
+            });
+        }
     }
     Ok(targets)
 }
@@ -221,6 +253,12 @@ fn parse_cidr(spec: &str) -> Result<Vec<Target>, TargetError> {
         return Err(TargetError::InvalidCidr {
             spec: spec.to_string(),
             reason: format!("Prefix length {prefix_len} exceeds 32"),
+        });
+    }
+    if prefix_len < 8 {
+        return Err(TargetError::InvalidCidr {
+            spec: spec.to_string(),
+            reason: format!("Prefix length {prefix_len} is too large (minimum /8) to prevent memory exhaustion"),
         });
     }
 
@@ -296,6 +334,8 @@ pub struct ExecutionOpts {
     pub fail_limit: Option<u32>,
     /// Custom port to connect to.
     pub port: Option<u16>,
+    /// Per-target rate limit in milliseconds (delay between connections).
+    pub rate_limit_ms: Option<u64>,
 }
 
 impl ExecutionOpts {
@@ -322,6 +362,7 @@ impl Default for ExecutionOpts {
             ufail_limit: None,
             fail_limit: None,
             port: None,
+            rate_limit_ms: None,
         }
     }
 }
@@ -429,6 +470,8 @@ impl ExecutionEngine {
         let user_fails: Arc<dashmap::DashMap<String, AtomicU32>> =
             Arc::new(dashmap::DashMap::new());
         let host_fails: Arc<dashmap::DashMap<String, AtomicU32>> =
+            Arc::new(dashmap::DashMap::new());
+        let target_rate_limits: Arc<dashmap::DashMap<String, Arc<tokio::sync::Mutex<()>>>> =
             Arc::new(dashmap::DashMap::new());
 
         let total_tasks = targets.len() * creds.len();
@@ -544,6 +587,7 @@ impl ExecutionEngine {
                     global_fails: global_fails.clone(),
                     user_fails: user_fails.clone(),
                     host_fails: host_fails.clone(),
+                    target_rate_limits: target_rate_limits.clone(),
                     host_succeeded: host_succeeded.clone(),
                     module_registry: module_registry.clone(),
                     permit,
@@ -581,6 +625,7 @@ struct TargetTaskContext {
     global_fails: Arc<AtomicU32>,
     user_fails: Arc<dashmap::DashMap<String, AtomicU32>>,
     host_fails: Arc<dashmap::DashMap<String, AtomicU32>>,
+    target_rate_limits: Arc<dashmap::DashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     host_succeeded: Arc<std::sync::atomic::AtomicBool>,
     module_registry: Arc<nxc_modules::ModuleRegistry>,
     pb: Option<indicatif::ProgressBar>,
@@ -618,6 +663,23 @@ async fn execute_single_target(ctx: TargetTaskContext) -> ExecutionResult {
             tokio::time::sleep(Duration::from_millis(delay)).await;
         }
     }
+
+    // Apply per-target rate limiting if configured
+    let _rate_limit_guard = if let Some(delay_ms) = ctx.opts.rate_limit_ms {
+        let target_str = ctx.target.display();
+        let mutex = ctx.target_rate_limits
+            .entry(target_str)
+            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+            .clone();
+        
+        // Wait in line for this specific target
+        let guard = mutex.lock_owned().await;
+        // Apply the delay before allowing the next task to proceed
+        tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+        Some(guard) // Hold the guard for the duration of the connection
+    } else {
+        None
+    };
 
     let result = tokio::time::timeout(ctx.opts.timeout, async {
         let target_str = ctx.target.display();

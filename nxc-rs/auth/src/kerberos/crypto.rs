@@ -33,9 +33,12 @@ impl EncryptionType {
 /// Derive RC4-HMAC key (Type 23) from password. This is identical to NT Hash.
 pub fn string2key_rc4(password: &str) -> [u8; 16] {
     let mut hasher = Md4::new();
-    let utf16: Vec<u16> = password.encode_utf16().collect();
-    let bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
+    let mut utf16: Vec<u16> = password.encode_utf16().collect();
+    let mut bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
     hasher.update(&bytes);
+    use zeroize::Zeroize;
+    for x in &mut utf16 { *x = 0; }
+    bytes.zeroize();
     hasher.finalize().into()
 }
 
@@ -49,7 +52,10 @@ pub fn string2key_aes(password: &str, salt: &str, is_aes256: bool) -> Vec<u8> {
     pbkdf2::pbkdf2_hmac::<Sha1>(password.as_bytes(), salt.as_bytes(), iters, &mut key);
 
     // RFC 3962 §4: AES string2key requires an additional DK step: DK(base_key, "kerberos")
-    derive_key_aes(&key, b"kerberos", is_aes256)
+    let res = derive_key_aes(&key, b"kerberos", is_aes256);
+    use zeroize::Zeroize;
+    key.zeroize();
+    res
 }
 
 /// AES-CTS DK (Derive Key) function (RFC 3962 §5.1)

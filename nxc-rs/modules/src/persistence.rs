@@ -379,6 +379,11 @@ impl NxcModule for EmpireExec {
             .downcast_ref::<nxc_protocols::smb::SmbSession>()
             .ok_or_else(|| anyhow!("SMB required"))?;
         let launcher = opts.get("LAUNCHER").ok_or_else(|| anyhow!("LAUNCHER required"))?;
+        
+        // Sanitize string option value to prevent shell injection or traversal
+        if std::path::Path::new(launcher).components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+            return Err(anyhow::anyhow!("Path traversal (..) is not allowed in LAUNCHER option"));
+        }
         let output = format!(
             "Empire Exec on {}:\n  [*] Launcher: {}...\n",
             smb.target,

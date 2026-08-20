@@ -75,6 +75,29 @@ impl NxcModule for DcshadowModule {
         _session: &mut dyn NxcSession,
         _opts: &ModuleOptions,
     ) -> Result<ModuleResult> {
+        let target_object = _opts.get("TARGET_OBJECT").ok_or_else(|| anyhow::anyhow!("TARGET_OBJECT is required"))?;
+        let attribute = _opts.get("ATTRIBUTE").ok_or_else(|| anyhow::anyhow!("ATTRIBUTE is required"))?;
+        let value = _opts.get("VALUE").ok_or_else(|| anyhow::anyhow!("VALUE is required"))?;
+        let mimikatz_url = _opts.get("MIMIKATZ_URL").map(String::as_str).unwrap_or("http://127.0.0.1/Invoke-Mimikatz.ps1");
+        
+        // Strict schema validation
+        if target_object.len() > 1024 || attribute.len() > 256 || value.len() > 8192 {
+            return Err(anyhow::anyhow!("Module options exceed maximum length limits"));
+        }
+        
+        // Sanitize string option values
+        if target_object.contains(';') || target_object.contains('&') || target_object.contains('|') {
+            return Err(anyhow::anyhow!("Invalid characters in TARGET_OBJECT"));
+        }
+        if attribute.contains(';') || attribute.contains('&') || attribute.contains('|') {
+            return Err(anyhow::anyhow!("Invalid characters in ATTRIBUTE"));
+        }
+        
+        // Validate URL
+        if !mimikatz_url.starts_with("http://") && !mimikatz_url.starts_with("https://") {
+            return Err(anyhow::anyhow!("MIMIKATZ_URL must be a valid HTTP/HTTPS URL"));
+        }
+
         Err(anyhow::anyhow!("Module not yet implemented"))
     }
 }

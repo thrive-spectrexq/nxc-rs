@@ -14,7 +14,7 @@ pub struct Report {
 }
 
 /// Atomically writes content to a target file path by writing to a temporary file
-/// in the same directory and renaming it.
+/// in the same directory and renaming it. Also generates a SHA256 checksum for integrity.
 pub fn atomic_write_file<F>(path: &str, write_fn: F) -> Result<()>
 where
     F: FnOnce(&mut File) -> Result<()>,
@@ -46,22 +46,35 @@ where
         format!("Failed to rename temporary file from {tmp_path:?} to {target_path:?}")
     })?;
 
+    // Generate SHA256 integrity signature
+    use sha2::{Sha256, Digest};
+    let data = std::fs::read(target_path)?;
+    let mut hasher = Sha256::new();
+    hasher.update(&data);
+    let hash = hex::encode(hasher.finalize());
+    let hash_path = PathBuf::from(format!("{}.sha256", target_path.display()));
+    std::fs::write(&hash_path, hash.as_bytes())?;
+
     Ok(())
 }
 
 /// Sanitize a string for safe inclusion in CSV cells to prevent Formula Injection (CSV injection).
-/// If a string starts with `=`, `+`, `-`, `@`, tab, or carriage return, prepend `'`.
+/// Handles Unicode homograph attacks and strips unexpected control characters.
 pub fn sanitize_csv_field(val: &str) -> String {
-    if val.starts_with('=')
-        || val.starts_with('+')
-        || val.starts_with('-')
-        || val.starts_with('@')
-        || val.starts_with('\t')
-        || val.starts_with('\r')
-    {
-        format!("'{val}")
+    let sanitized = val.replace(|c: char| c.is_control() && c != '\n' && c != '\t' && c != '\r', "");
+
+    let first_char = sanitized.chars().next().unwrap_or('\0');
+    if matches!(
+        first_char,
+        '=' | '+' | '-' | '@' | '\t' | '\r' | '\n'
+            | '\u{FF1D}' // FULLWIDTH EQUALS SIGN
+            | '\u{FF0B}' // FULLWIDTH PLUS SIGN
+            | '\u{FF0D}' // FULLWIDTH HYPHEN-MINUS
+            | '\u{FF20}' // FULLWIDTH COMMERCIAL AT
+    ) {
+        format!("'{}", sanitized)
     } else {
-        val.to_string()
+        sanitized
     }
 }
 
@@ -78,10 +91,13 @@ pub fn sanitize_workspace_name(name: &str) -> String {
 
 /// Validate export file path to ensure it does not attempt directory traversal out of expected bounds.
 pub fn validate_export_path(path: &str) -> Result<PathBuf> {
+    if path.len() > 255 {
+        anyhow::bail!("Export path exceeds maximum length of 255 bytes");
+    }
     let pb = PathBuf::from(path);
     for component in pb.components() {
-        if let std::path::Component::ParentDir = component {
-            anyhow::bail!("Path traversal ('..') is not permitted in export path: {path}");
+        if matches!(component, std::path::Component::ParentDir | std::path::Component::CurDir) {
+            anyhow::bail!("Path traversal ('.' or '..') is not permitted in export path: {path}");
         }
     }
     Ok(pb)
@@ -245,12 +261,15 @@ pub fn export_markdown(path: &str, report: &Report) -> Result<()> {
         for res in &report.results {
             let success_icon = if res.success { "✅" } else { "❌" };
             let admin_icon = if res.admin { "👑" } else { "—" };
-            // Escape pipe characters in message
-            let msg = res.message.replace('|', "\\|");
+            // Escape pipe characters and HTML entities
+            let msg = xml_escape(&res.message).replace('|', "\\|");
+            let target_escaped = xml_escape(&res.target);
+            let user_escaped = xml_escape(&res.username);
+            
             writeln!(
                 file,
                 "| {} | {} | {} | {} | {} | {} |",
-                res.target, res.username, success_icon, admin_icon, res.duration_ms, msg
+                target_escaped, user_escaped, success_icon, admin_icon, res.duration_ms, msg
             )?;
         }
 

@@ -294,8 +294,28 @@ async fn main() -> Result<()> {
         }
     }
 
-    let insecure = matches.get_flag("insecure")
+    let mut insecure = matches.get_flag("insecure")
         || sub_matches.try_get_one::<bool>("insecure").unwrap_or(None).copied().unwrap_or(false);
+    
+    // Explicit confirmation for insecure mode in interactive environments
+    if insecure {
+        use std::io::IsTerminal;
+        if std::io::stdout().is_terminal() {
+            println!("{} SECURITY WARNING: You have specified --insecure. This disables SSL certificate validation and exposes connections to MITM attacks.", colored::Colorize::yellow("!"));
+            print!("Are you sure you want to proceed? [y/N]: ");
+            use std::io::Write;
+            std::io::stdout().flush().unwrap();
+            let mut input = String::new();
+            if std::io::stdin().read_line(&mut input).is_ok() {
+                if !input.trim().eq_ignore_ascii_case("y") && !input.trim().eq_ignore_ascii_case("yes") {
+                    println!("Aborting.");
+                    std::process::exit(1);
+                }
+            } else {
+                insecure = false;
+            }
+        }
+    }
     let verify_ssl = !insecure;
     let explicit_port = sub_matches.try_get_one::<u16>("port").unwrap_or(None).copied();
 
@@ -314,8 +334,8 @@ async fn main() -> Result<()> {
         ufail_limit: sub_matches.try_get_one::<u32>("ufail-limit").unwrap_or(None).copied(),
         fail_limit: sub_matches.try_get_one::<u32>("fail-limit").unwrap_or(None).copied(),
         port: explicit_port,
+        rate_limit_ms: None,
     };
-
     // ── Setup Database ──
     let workspace_raw = matches
         .get_one::<String>("workspace")
