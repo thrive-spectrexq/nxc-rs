@@ -544,9 +544,7 @@ pub fn calculate_nt_hash(password: &str) -> [u8; 16] {
     let mut bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
     hasher.update(&bytes);
     use zeroize::Zeroize;
-    for x in &mut utf16 {
-        *x = 0;
-    }
+    utf16.fill(0);
     bytes.zeroize();
     hasher.finalize().into()
 }
@@ -561,9 +559,7 @@ pub fn calculate_v2_hash(username: &str, domain: &str, nt_hash: &[u8; 16]) -> [u
     let mut bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
     hmac.update(&bytes);
     use zeroize::Zeroize;
-    for x in &mut utf16 {
-        *x = 0;
-    }
+    utf16.fill(0);
     bytes.zeroize();
     hmac.finalize().into_bytes().into()
 }

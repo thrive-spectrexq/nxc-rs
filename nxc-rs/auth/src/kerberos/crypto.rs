@@ -37,9 +37,7 @@ pub fn string2key_rc4(password: &str) -> [u8; 16] {
     let mut bytes: Vec<u8> = utf16.iter().flat_map(|&u| u.to_le_bytes()).collect();
     hasher.update(&bytes);
     use zeroize::Zeroize;
-    for x in &mut utf16 {
-        *x = 0;
-    }
+    utf16.fill(0);
     bytes.zeroize();
     hasher.finalize().into()
 }
