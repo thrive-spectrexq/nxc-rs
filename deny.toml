@@ -10,11 +10,7 @@ feature-depth = 1
 
 # ─── Advisory Database ──────────────────────────────────────────
 [advisories]
-vulnerability = "deny"
-unmaintained = "none"
-unsound = "none"
 yanked = "warn"
-unused-ignored-advisory = "allow"
 ignore = [
     "RUSTSEC-2024-0421",
     "RUSTSEC-2021-0139", # ansi_term unmaintained

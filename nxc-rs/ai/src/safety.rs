@@ -25,9 +25,7 @@ pub fn sanitize_prompt(prompt: &str) -> Result<String> {
     }
 
     if prompt.len() > MAX_PROMPT_LENGTH {
-        return Err(anyhow!(
-            "Prompt exceeds maximum allowed length of {MAX_PROMPT_LENGTH} bytes"
-        ));
+        return Err(anyhow!("Prompt exceeds maximum allowed length of {MAX_PROMPT_LENGTH} bytes"));
     }
 
     // Check for high-risk prompt injection markers
