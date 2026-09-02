@@ -40,12 +40,20 @@ async fn main() -> Result<()> {
             "unknown location".to_string()
         };
 
+        // Emit structured panic event to tracing if initialized
+        tracing::error!(
+            target: "crash_report",
+            panic_message = %msg,
+            panic_location = %loc,
+            "NetExec-RS encountered a fatal panic"
+        );
+
         eprintln!(
             "\n{} NetExec-RS encountered a fatal error (panic) at {loc}: {msg}",
             colored::Colorize::red(colored::Colorize::bold("CRITICAL:"))
         );
         eprintln!(
-            "{} This is a bug. Please report this to the repository issue tracker.",
+            "{} This is a bug. Please report this with environment details to https://github.com/thrive-spectrexq/nxc-rs/issues",
             colored::Colorize::red(colored::Colorize::bold("CRITICAL:"))
         );
     }));
@@ -114,8 +122,34 @@ async fn main() -> Result<()> {
             let initial_prompt = ai_matches.get_one::<String>("prompt").cloned();
             let provider_name = ai_matches.get_one::<String>("provider").cloned();
             let model = ai_matches.get_one::<String>("model").cloned();
+            let confirm_exec = matches.get_flag("confirm-ai-exec")
+                || ai_matches
+                    .try_get_one::<bool>("confirm-ai-exec")
+                    .unwrap_or(None)
+                    .copied()
+                    .unwrap_or(false);
+            let dry_run = matches.get_flag("dry-run")
+                || ai_matches
+                    .try_get_one::<bool>("dry-run")
+                    .unwrap_or(None)
+                    .copied()
+                    .unwrap_or(false);
+            let log_prompts = matches.get_flag("log-prompts")
+                || ai_matches
+                    .try_get_one::<bool>("log-prompts")
+                    .unwrap_or(None)
+                    .copied()
+                    .unwrap_or(false);
 
-            handle_ai_mode(initial_prompt, provider_name, model).await?;
+            handle_ai_mode(
+                initial_prompt,
+                provider_name,
+                model,
+                confirm_exec,
+                dry_run,
+                log_prompts,
+            )
+            .await?;
             return Ok(());
         }
         Some(("relay", relay_matches)) => {
@@ -332,8 +366,15 @@ async fn main() -> Result<()> {
     let mut insecure = matches.get_flag("insecure")
         || sub_matches.try_get_one::<bool>("insecure").unwrap_or(None).copied().unwrap_or(false);
 
+    let non_interactive = matches.get_flag("non-interactive")
+        || sub_matches
+            .try_get_one::<bool>("non-interactive")
+            .unwrap_or(None)
+            .copied()
+            .unwrap_or(false);
+
     // Explicit confirmation for insecure mode in interactive environments
-    if insecure {
+    if insecure && !non_interactive {
         use std::io::IsTerminal;
         if std::io::stdout().is_terminal() {
             println!("{} SECURITY WARNING: You have specified --insecure. This disables SSL certificate validation and exposes connections to MITM attacks.", colored::Colorize::yellow("!"));

@@ -54,6 +54,11 @@ jobs:
     - name: Build Release Binary
       run: cargo build --release --workspace
 
+    - name: Smoke Test Release Binary
+      shell: bash
+      run: |
+        ./target/release/${{ matrix.artifact_name }} --help
+
     - name: Build Debian Package (Linux only)
       if: matrix.os == 'ubuntu-latest'
       run: |
@@ -64,6 +69,16 @@ jobs:
       shell: bash
       run: |
         mv target/release/${{ matrix.artifact_name }} target/release/${{ matrix.asset_name }}
+
+    - name: Generate Checksums
+      shell: bash
+      run: |
+        cd target/release
+        if command -v sha256sum >/dev/null 2>&1; then
+          sha256sum ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
+        elif command -v shasum >/dev/null 2>&1; then
+          shasum -a 256 ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
+        fi
 
     - name: Generate SBOM
       if: matrix.os == 'ubuntu-latest'
@@ -79,9 +94,11 @@ jobs:
       with:
         files: |
           target/release/${{ matrix.asset_name }}
+          target/release/${{ matrix.asset_name }}.sha256
           target/release/*.deb
           target/release/nxc-rs-sbom.json
         draft: false
         prerelease: false
+        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

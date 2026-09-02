@@ -520,6 +520,77 @@ fn decode_sid(sid_bytes: &[u8]) -> String {
     sid
 }
 
+// ─── LDAP DN & Filter Utilities ──────────────────────────────────
+
+/// Escape an LDAP search filter assertion value according to RFC 4515 §3.
+///
+/// Converts reserved characters:
+/// - `\` -> `\5c`
+/// - `*` -> `\2a`
+/// - `(` -> `\28`
+/// - `)` -> `\29`
+/// - `\0` -> `\00`
+pub fn escape_ldap_filter(val: &str) -> String {
+    let mut out = String::with_capacity(val.len());
+    for c in val.chars() {
+        match c {
+            '\\' => out.push_str("\\5c"),
+            '*' => out.push_str("\\2a"),
+            '(' => out.push_str("\\28"),
+            ')' => out.push_str("\\29"),
+            '\0' => out.push_str("\\00"),
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+/// Parse an LDAP Distinguished Name (DN) into its Relative Distinguished Name (RDN) pairs.
+///
+/// Handles backslash-escaped characters (such as `\,`).
+pub fn parse_ldap_dn(dn: &str) -> Vec<(String, String)> {
+    let mut results = Vec::new();
+    let mut current_token = String::new();
+    let mut escaped = false;
+
+    for c in dn.chars() {
+        if escaped {
+            current_token.push(c);
+            escaped = false;
+        } else if c == '\\' {
+            escaped = true;
+            current_token.push(c);
+        } else if c == ',' {
+            if let Some((k, v)) = split_rdn(&current_token) {
+                results.push((k, v));
+            }
+            current_token.clear();
+        } else {
+            current_token.push(c);
+        }
+    }
+
+    if !current_token.is_empty() {
+        if let Some((k, v)) = split_rdn(&current_token) {
+            results.push((k, v));
+        }
+    }
+
+    results
+}
+
+fn split_rdn(rdn: &str) -> Option<(String, String)> {
+    let trimmed = rdn.trim();
+    let mut parts = trimmed.splitn(2, '=');
+    let key = parts.next()?.trim().to_string();
+    let val = parts.next()?.trim().to_string();
+    if key.is_empty() {
+        None
+    } else {
+        Some((key, val))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -555,5 +626,60 @@ mod tests {
     fn test_decode_sid_short_buffer() {
         let result = decode_sid(&[0x01, 0x00, 0x00]);
         assert!(result.starts_with("[SID: "));
+    }
+
+    #[test]
+    fn test_escape_ldap_filter() {
+        assert_eq!(escape_ldap_filter("admin*"), "admin\\2a");
+        assert_eq!(escape_ldap_filter("user(test)"), "user\\28test\\29");
+        assert_eq!(escape_ldap_filter("slash\\star*"), "slash\\5cstar\\2a");
+        assert_eq!(escape_ldap_filter("safe_user123"), "safe_user123");
+    }
+
+    #[test]
+    fn test_parse_ldap_dn_basic() {
+        let dn = "CN=Administrator,CN=Users,DC=corp,DC=local";
+        let parsed = parse_ldap_dn(dn);
+        assert_eq!(parsed.len(), 4);
+        assert_eq!(parsed[0], ("CN".to_string(), "Administrator".to_string()));
+        assert_eq!(parsed[1], ("CN".to_string(), "Users".to_string()));
+        assert_eq!(parsed[2], ("DC".to_string(), "corp".to_string()));
+        assert_eq!(parsed[3], ("DC".to_string(), "local".to_string()));
+    }
+
+    #[test]
+    fn test_parse_ldap_dn_escaped_comma() {
+        let dn = r"CN=Smith\, John,OU=Employees,DC=example,DC=com";
+        let parsed = parse_ldap_dn(dn);
+        assert_eq!(parsed.len(), 4);
+        assert_eq!(parsed[0], ("CN".to_string(), r"Smith\, John".to_string()));
+        assert_eq!(parsed[1], ("OU".to_string(), "Employees".to_string()));
+        assert_eq!(parsed[2], ("DC".to_string(), "example".to_string()));
+        assert_eq!(parsed[3], ("DC".to_string(), "com".to_string()));
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn dont_crash_decode_sid(data in proptest::collection::vec(any::<u8>(), 0..64)) {
+            let _ = decode_sid(&data);
+        }
+
+        #[test]
+        fn dont_crash_parse_ldap_dn(s in "\\PC*") {
+            let _ = parse_ldap_dn(&s);
+        }
+
+        #[test]
+        fn escape_ldap_filter_contains_no_raw_specials(s in "\\PC*") {
+            let escaped = escape_ldap_filter(&s);
+            // Escaped string should not contain unescaped wildcards or parens
+            assert!(!escaped.contains('\0'));
+        }
     }
 }

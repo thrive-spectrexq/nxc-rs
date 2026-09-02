@@ -132,9 +132,18 @@ pub fn decrypt_rc4_hmac(key: &[u8], key_usage: u32, ciphertext: &[u8]) -> Result
     // 5. Verify checksum (HMAC-MD5(K1, decrypted))
     let mut hmac_verify = <HmacMd5 as HmacKeyInit>::new_from_slice(&k1)?;
     hmac_verify.update(&decrypted);
-    let expected_mac = hmac_verify.finalize().into_bytes();
+    let mut expected_mac = hmac_verify.finalize().into_bytes();
 
-    if expected_mac[..] != checksum[..] {
+    let mac_valid = crate::constant_time_eq(&expected_mac[..], checksum);
+
+    use zeroize::Zeroize;
+    let mut k1_mut = k1;
+    let mut k3_mut = k3;
+    k1_mut.zeroize();
+    k3_mut.zeroize();
+    expected_mac.zeroize();
+
+    if !mac_valid {
         anyhow::bail!("RC4-HMAC integrity check failed: checksum mismatch");
     }
 
@@ -184,6 +193,12 @@ pub fn encrypt_rc4_hmac(key: &[u8], key_usage: u32, plaintext: &[u8]) -> Result<
         Rc4::new_from_slice(k3_array).map_err(|e| anyhow::anyhow!("RC4 init fail: {e}"))?;
     rc4_key.apply_keystream(&mut data);
 
+    use zeroize::Zeroize;
+    let mut k1_mut = k1;
+    let mut k3_mut = k3;
+    k1_mut.zeroize();
+    k3_mut.zeroize();
+
     // 7. Format output: Checksum + EncryptedData
     let mut out = Vec::with_capacity(16 + data.len());
     out.extend_from_slice(&checksum);
@@ -219,8 +234,11 @@ pub fn decrypt_aes(
         .map_err(|e| anyhow::anyhow!("HMAC init failed: {e}"))?;
     hmac.update(&key_usage.to_be_bytes()); // Simplified usage derivation
     hmac.update(enc_data);
-    let full_mac = hmac.finalize().into_bytes();
-    if full_mac[..12] != checksum[..] {
+    let mut full_mac = hmac.finalize().into_bytes();
+    let mac_valid = crate::constant_time_eq(&full_mac[..12], checksum);
+    use zeroize::Zeroize;
+    full_mac.zeroize();
+    if !mac_valid {
         anyhow::bail!("AES integrity check failed: HMAC-SHA1-96 mismatch");
     }
 

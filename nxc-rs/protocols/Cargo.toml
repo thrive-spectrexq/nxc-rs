@@ -56,3 +56,6 @@ opcua = { workspace = true, optional = true }
 opcua-support = ["opcua"]
 winauth = []
 integrated-auth-gssapi = []
+
+[dev-dependencies]
+proptest.workspace = true

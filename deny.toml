@@ -10,6 +10,7 @@ feature-depth = 1
 
 # ─── Advisory Database ──────────────────────────────────────────
 [advisories]
+vulnerability = "deny"
 unmaintained = "none"
 unsound = "none"
 yanked = "warn"

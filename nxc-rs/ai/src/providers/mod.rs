@@ -4,11 +4,13 @@ use serde::{Deserialize, Serialize};
 
 pub mod anthropic;
 pub mod gemini;
+pub mod mock;
 pub mod ollama;
 pub mod openai;
 
 pub use anthropic::AnthropicProvider;
 pub use gemini::GeminiProvider;
+pub use mock::MockAiProvider;
 pub use ollama::OllamaProvider;
 pub use openai::OpenAiProvider;
 
@@ -67,4 +69,31 @@ pub enum Role {
 pub struct ToolResult {
     pub call_id: String,
     pub content: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_provider_debug_redacts_keys() {
+        let secret_key = "sk-proj-super-secret-api-key-that-must-never-leak";
+
+        let oai = OpenAiProvider::new(secret_key.to_string(), Some("gpt-4o".to_string()));
+        let debug_str = format!("{oai:?}");
+        assert!(!debug_str.contains(secret_key));
+        assert!(debug_str.contains("[REDACTED]"));
+
+        let gemini =
+            GeminiProvider::new(secret_key.to_string(), Some("gemini-2.0-flash".to_string()));
+        let debug_str = format!("{gemini:?}");
+        assert!(!debug_str.contains(secret_key));
+        assert!(debug_str.contains("[REDACTED]"));
+
+        let anthropic =
+            AnthropicProvider::new(secret_key.to_string(), Some("claude-3-7".to_string()));
+        let debug_str = format!("{anthropic:?}");
+        assert!(!debug_str.contains(secret_key));
+        assert!(debug_str.contains("[REDACTED]"));
+    }
 }

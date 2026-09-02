@@ -35,10 +35,32 @@ esac
 
 # 2. Download
 DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/$ASSET_NAME"
+CHECKSUM_URL="https://github.com/$REPO/releases/latest/download/$ASSET_NAME.sha256"
 echo -e "${BLUE}[*] Downloading latest release ($ASSET_NAME)...${NC}"
 
 TEMP_FILE=$(mktemp)
 curl -L -sSf "$DOWNLOAD_URL" -o "$TEMP_FILE"
+
+# 2.1 Verify Checksum if available
+TEMP_CHECKSUM=$(mktemp)
+if curl -L -sSf "$CHECKSUM_URL" -o "$TEMP_CHECKSUM" 2>/dev/null; then
+    echo -e "${BLUE}[*] Verifying SHA256 checksum...${NC}"
+    EXPECTED_HASH=$(awk '{print $1}' "$TEMP_CHECKSUM")
+    ACTUAL_HASH=""
+    if command -v sha256sum >/dev/null 2>&1; then
+        ACTUAL_HASH=$(sha256sum "$TEMP_FILE" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        ACTUAL_HASH=$(shasum -a 256 "$TEMP_FILE" | awk '{print $1}')
+    fi
+    if [[ -n "$ACTUAL_HASH" && "$EXPECTED_HASH" != "$ACTUAL_HASH" ]]; then
+        echo -e "${RED}[!] Error: Checksum verification failed!${NC}"
+        echo -e "${RED}[!] Expected: $EXPECTED_HASH, Got: $ACTUAL_HASH${NC}"
+        rm -f "$TEMP_FILE" "$TEMP_CHECKSUM"
+        exit 1
+    fi
+    echo -e "${GREEN}[+] Checksum verified successfully.${NC}"
+    rm -f "$TEMP_CHECKSUM"
+fi
 
 # 3. Install
 INSTALL_DIR="/usr/local/bin"

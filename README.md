@@ -105,6 +105,83 @@ cd nxc-rs
 cargo build --release --package nxc
 ```
 
+## Quickstart
+
+### Linux & macOS Quickstart
+
+```bash
+# 1. Inspect target subnet over SMB
+nxc smb 192.168.1.0/24
+
+# 2. Authenticate with credentials and list shares
+nxc smb 192.168.1.50 -u Administrator -p 'P@ssw0rd123!' --shares
+
+# 3. Authenticate with NTLM hash
+nxc smb 192.168.1.50 -u Administrator -H aad3b435b51404eeaad3b435b51404ee:8846f7eaee8fb117ad06bdd830b7586c
+
+# 4. Execute command via WinRM
+nxc winrm 192.168.1.50 -u Administrator -p 'P@ssw0rd123!' -x "whoami /all"
+
+# 5. Output JSON for pipeline consumption
+nxc smb 192.168.1.0/24 --json | jq .
+```
+
+### Windows (PowerShell) Quickstart
+
+```powershell
+# 1. Sweep local network for SMB services
+nxc.exe smb 10.0.0.0/24
+
+# 2. Query Active Directory LDAP users
+nxc.exe ldap 10.0.0.5 -u "CORP\audit" -p "Audit2026!" --users
+
+# 3. Run Kerberoasting against Domain Controller
+nxc.exe ldap 10.0.0.5 -u "CORP\audit" -p "Audit2026!" --kerberoasting
+
+# 4. Scripted execution with non-interactive confirmation
+nxc.exe smb 10.0.0.50 -u Admin -p Pass123 --insecure --non-interactive
+```
+
+## Development Guide
+
+### Prerequisites
+- Rust stable (1.88+) installed via `rustup`.
+- On Linux (Debian/Ubuntu), install native development libraries:
+  ```bash
+  sudo apt-get update && sudo apt-get install -y libkrb5-dev libsasl2-dev libldap2-dev pkg-config libssl-dev
+  ```
+
+### Running Tests
+Run the entire workspace test suite:
+```bash
+cargo test --workspace
+```
+
+Run tests for a single crate:
+```bash
+cargo test -p nxc-auth
+cargo test -p nxc-protocols
+cargo test -p nxc-ai
+```
+
+Run a specific unit test by name:
+```bash
+cargo test -p nxc-auth test_ntlm_v2_hash
+```
+
+### Code Quality & Lints
+Format check and static analysis:
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets
+```
+
+Dependency security and license auditing:
+```bash
+cargo deny check
+cargo audit
+```
+
 ## Usage
 
 ### Help & Discovery
@@ -116,23 +193,17 @@ Protocol-specific help:
 ```bash
 nxc smb --help
 nxc winrm --help
+nxc ldap --help
 ```
 
-### Examples
-
-**WinRM Command Execution**
+### Automation & Pipeline Integration
+All commands support structured JSON and non-interactive scripted modes for CI/CD or security pipelines:
 ```bash
-nxc winrm <target> -u Admin -p Pass123 -x "Get-Process"
-```
+# Machine-readable output with zero interactive prompts
+nxc smb 10.0.0.0/24 --json --non-interactive > results.json
 
-**SMB Credential Dumping**
-```bash
-nxc smb 192.168.1.0/24 -u Admin -H <hash> -M lsassy
-```
-
-**NFS Enumeration**
-```bash
-nxc nfs <target> --enum-shares
+# Stream logs with structured tracing
+nxc winrm 10.0.0.50 -u Admin -p Pass123 -x "hostname" --log run.log --json-log
 ```
 
 ### AI Mission Control (Elite Reaper)
@@ -141,57 +212,56 @@ Control operations using natural language.
 
 #### Setup
 
-Set one provider:
+Configure your preferred LLM provider in `.env` or via environment variables:
 
 ```bash
-export GEMINI_API_KEY=...
-export OPENAI_API_KEY=...
-export ANTHROPIC_API_KEY=...
-export OLLAMA_API_BASE=...
+export GEMINI_API_KEY="..."
+# or export OPENAI_API_KEY="..."
+# or export ANTHROPIC_API_KEY="..."
+# or export OLLAMA_API_BASE="http://localhost:11434"
 ```
 
 #### Examples
 ```bash
-nxc ai "Scan 10.0.0.0/24 for port 445 and identify OS versions"
-nxc ai "Enumerate all GPO names using LDAP"
-nxc ai "Find hosts with SMB signing disabled"
+# Safe plan generation (dry-run mode)
+nxc ai "Scan 10.0.0.0/24 for SMB and plan domain enumeration" --dry-run
+
+# Active execution requires explicit confirmation flag
+nxc ai "Audit SMB shares and extract domain users" --confirm-ai-exec
 ```
 
 ## Architecture
 
 nxc-rs is built as a modular Rust workspace:
 
-- `/nxc` → CLI + orchestration
-- `/protocols` → SMB, LDAP, SSH, etc.
-- `/auth` → NTLM, Kerberos engine
-- `/ai` → Elite Reaper AI engine
-- `/modules` → Recon & post-exploitation modules
-- `/db` → Credential storage (SQLite)
+- `/nxc` → CLI application + orchestrator
+- `/protocols` → SMB, LDAP, SSH, WinRM, MSSQL, RDP, etc.
+- `/auth` → Pure-Rust NTLM, Kerberos v5, PKINIT, certificate engine
+- `/ai` → Mission control, tool registry, and prompt safety guardrails
+- `/modules` → Reconnaissance & post-exploitation modules
+- `/db` → SQLite workspace storage
+- `/resilience` → Circuit breakers, jitter, and rate limiting
+- `/reporting` → Multi-format reporting engine
 
-### Design Principles
-- Modular & extensible
-- Async-first
-- Protocol-driven architecture
-- Clean separation of concerns
+For in-depth architecture and threat model diagrams, consult:
+- [Architecture Guide](docs/architecture.md)
+- [Threat Model & Cryptographic Specifications](docs/threat_model.md)
 
 ## Contributing
 
-Contributions are welcome.
-
-1. Fork the repo
-2. Create a feature branch
-3. Submit a PR
-
-For major changes, open an issue first.
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for our PR checklist, commit guidelines, and coding standards.
 
 ## License
 
 Licensed under the BSD 2-Clause License.
 See [LICENSE](LICENSE) for details.
 
-## ⚠️ Legal Disclaimer
+## ⚠️ Legal Disclaimer & Acceptable Use Policy
 
-This tool is intended strictly for authorized security testing and educational purposes.
+**FOR AUTHORIZED PROFESSIONAL USE ONLY.**
 
-- Unauthorized use against systems without explicit permission is illegal.
-- The authors are not responsible for misuse or damages.
+NetExec-RS (`nxc-rs`) is a network execution and penetration testing framework developed specifically for authorized security assessments, vulnerability research, and penetration testing within environments where explicit, documented authorization has been granted.
+
+- **Explicit Authorization Required**: Operating NetExec-RS against networks, devices, or systems without prior written consent from the target infrastructure owner is strictly illegal under the Computer Fraud and Abuse Act (CFAA), the UK Computer Misuse Act, and international computer crime statutes.
+- **Limitation of Liability**: The developers and contributors of NetExec-RS assume no liability and are not responsible for any misuse, damage, data loss, or legal consequences resulting from the use of this software.
+- **Compliance**: It is the end user's sole responsibility to comply with all applicable local, national, and international laws and organizational rules of engagement before executing any modules or protocol handlers.

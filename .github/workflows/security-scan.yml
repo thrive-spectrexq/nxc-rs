@@ -22,3 +22,21 @@ jobs:
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate .env.example has zero live secrets
+        shell: bash
+        run: |
+          echo "Scanning .env.example for accidental secrets..."
+          while IFS= read -r line || [[ -n "$line" ]]; do
+            # Skip comments and empty lines
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line// }" ]] && continue
+            if [[ "$line" =~ ^[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD|API) ]]; then
+              val=$(echo "$line" | cut -d'=' -f2- | tr -d '"' | tr -d "'" | tr -d '[:space:]')
+              if [[ -n "$val" && "$val" != "placeholder" && "$val" != "test" && "$val" != "10000" ]]; then
+                echo "::error file=.env.example::Detected non-empty secret key in .env.example: $line"
+                exit 1
+              fi
+            fi
+          done < .env.example
+          echo "Validation passed: .env.example contains only empty/safe template values."

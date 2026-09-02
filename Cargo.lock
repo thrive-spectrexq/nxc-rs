@@ -2954,6 +2954,7 @@ dependencies = [
  "nxc-db",
  "nxc-resilience",
  "opcua",
+ "proptest",
  "rand 0.10.2",
  "rasn",
  "redis",

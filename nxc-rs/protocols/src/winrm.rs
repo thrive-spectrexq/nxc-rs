@@ -685,3 +685,23 @@ mod tests {
         assert!(bypassed.contains("whoami\""));
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn dont_crash_extract_xml_tag(xml in "\\PC*", tag in "[a-zA-Z0-9:_]+") {
+            let _ = WinrmProtocol::new().extract_xml_tag(&xml, &tag);
+        }
+
+        #[test]
+        fn extract_xml_tag_roundtrip(tag in "[a-z]+", content in "[a-zA-Z0-9_-]+") {
+            let xml = format!("<{tag}>{content}</{tag}>");
+            let extracted = WinrmProtocol::new().extract_xml_tag(&xml, &tag);
+            prop_assert_eq!(extracted, Some(content));
+        }
+    }
+}

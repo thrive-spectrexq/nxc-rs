@@ -11,6 +11,15 @@ pub struct OpenAiProvider {
     pub model: String,
 }
 
+impl std::fmt::Debug for OpenAiProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpenAiProvider")
+            .field("model", &self.model)
+            .field("api_key", &"[REDACTED]")
+            .finish()
+    }
+}
+
 impl OpenAiProvider {
     pub fn new(api_key: String, model: Option<String>) -> Self {
         let model = model.unwrap_or_else(|| {
@@ -113,20 +122,50 @@ impl AiProvider for OpenAiProvider {
             body["tool_choice"] = json!("auto");
         }
 
-        let resp = self
-            .client
-            .post(url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send()
-            .await?;
+        let mut attempts = 0;
+        let max_attempts = 3;
+        let mut backoff = std::time::Duration::from_millis(500);
 
-        let status = resp.status();
-        if !status.is_success() {
-            let err_text = resp.text().await?;
-            anyhow::bail!("OpenAI API error ({status}): {err_text}");
-        }
+        let resp = loop {
+            attempts += 1;
+            match self
+                .client
+                .post(url)
+                .header("Authorization", format!("Bearer {}", self.api_key))
+                .header("Content-Type", "application/json")
+                .json(&body)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        break resp;
+                    }
+                    if attempts < max_attempts
+                        && (status.as_u16() == 429 || status.is_server_error())
+                    {
+                        tracing::warn!("OpenAI API status {status}; retrying in {:?}", backoff);
+                        tokio::time::sleep(backoff).await;
+                        backoff *= 2;
+                        continue;
+                    }
+                    let err_text =
+                        resp.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                    let safe_err = err_text.replace(&self.api_key, "[REDACTED]");
+                    anyhow::bail!("OpenAI API error ({status}): {safe_err}");
+                }
+                Err(e) => {
+                    if attempts < max_attempts {
+                        tracing::warn!("OpenAI request error: {e}; retrying in {:?}", backoff);
+                        tokio::time::sleep(backoff).await;
+                        backoff *= 2;
+                        continue;
+                    }
+                    anyhow::bail!("OpenAI connection error after {attempts} attempts: {e}");
+                }
+            }
+        };
 
         let oai_resp: OpenAiResponse = resp.json().await?;
 

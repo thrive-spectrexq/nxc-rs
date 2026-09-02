@@ -321,6 +321,36 @@ For more protocol-specific options, run: nxc <protocol> --help
                 .global(true),
         )
         .arg(
+            Arg::new("non-interactive")
+                .long("non-interactive")
+                .short('y')
+                .alias("yes")
+                .help("Do not prompt for confirmation; auto-confirm security warnings (useful for scripting and CI)")
+                .action(ArgAction::SetTrue)
+                .global(true),
+        )
+        .arg(
+            Arg::new("confirm-ai-exec")
+                .long("confirm-ai-exec")
+                .help("Explicitly authorize AI engine to execute active network and exploitation tools")
+                .action(ArgAction::SetTrue)
+                .global(true),
+        )
+        .arg(
+            Arg::new("dry-run")
+                .long("dry-run")
+                .help("Simulate execution and tool calls without sending active network traffic")
+                .action(ArgAction::SetTrue)
+                .global(true),
+        )
+        .arg(
+            Arg::new("log-prompts")
+                .long("log-prompts")
+                .help("Opt-in to logging AI prompts (scrubs credentials before recording)")
+                .action(ArgAction::SetTrue)
+                .global(true),
+        )
+        .arg(
             Arg::new("workspace")
                 .short('w')
                 .long("workspace")

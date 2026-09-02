@@ -26,6 +26,22 @@ pub use ntlm::{
 };
 pub use registry::RegistrySecrets;
 
+/// Constant-time byte slice comparison to mitigate timing side-channel attacks.
+///
+/// Returns `true` if and only if both slices have identical length and byte values,
+/// taking constant time relative to slice length.
+#[inline]
+pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
 // ─── Credential Types ───────────────────────────────────────────
 
 /// All supported authentication methods.
@@ -386,5 +402,19 @@ mod tests {
 
         let fail = AuthResult::failure("Bad creds", None);
         assert!(format!("{fail}").contains("[-] Bad creds"));
+    }
+
+    #[test]
+    fn test_constant_time_eq() {
+        let a = b"secret-token-123";
+        let b = b"secret-token-123";
+        let c = b"secret-token-456";
+        let d = b"short";
+
+        assert!(constant_time_eq(a, b));
+        assert!(!constant_time_eq(a, c));
+        assert!(!constant_time_eq(a, d));
+        assert!(constant_time_eq(b"", b""));
+        assert!(!constant_time_eq(b"", b"a"));
     }
 }

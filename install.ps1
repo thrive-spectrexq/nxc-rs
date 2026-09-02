@@ -27,6 +27,26 @@ if (!(Test-Path $InstallDir)) {
 $BinaryPath = Join-Path $InstallDir $BinaryName
 Invoke-WebRequest -Uri $DownloadUrl -OutFile $BinaryPath
 
+# 2.1 Verify Checksum if available
+$ChecksumUrl = "$DownloadUrl.sha256"
+try {
+    $ExpectedHashContent = (Invoke-WebRequest -Uri $ChecksumUrl -UseBasicParsing -ErrorAction SilentlyContinue).Content
+    if ($ExpectedHashContent) {
+        Write-Host "[*] Verifying SHA256 checksum..." -ForegroundColor Cyan
+        $ExpectedHash = ($ExpectedHashContent.Trim() -split '\s+')[0].ToLower()
+        $ActualHash = (Get-FileHash -Path $BinaryPath -Algorithm SHA256).Hash.ToLower()
+        if ($ExpectedHash -and ($ExpectedHash -ne $ActualHash)) {
+            Write-Host "[!] Error: Checksum verification failed!" -ForegroundColor Red
+            Write-Host "[!] Expected: $ExpectedHash, Got: $ActualHash" -ForegroundColor Red
+            Remove-Item $BinaryPath -Force
+            exit 1
+        }
+        Write-Host "[+] Checksum verified successfully." -ForegroundColor Green
+    }
+} catch {
+    Write-Host "[*] Release checksum not reachable; continuing with installation." -ForegroundColor DarkGray
+}
+
 # 3. Path Management
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($UserPath -notlike "*$InstallDir*") {

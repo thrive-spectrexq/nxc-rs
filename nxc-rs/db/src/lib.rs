@@ -3,7 +3,7 @@
 //! Extends the netsage-session SQLite store with tables for hosts, credentials,
 //! auth results, and shares — the nxcdb equivalent.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
@@ -721,6 +721,35 @@ impl NxcDb {
 
         Ok((host_count, cred_count))
     }
+
+    /// Verify database file integrity via PRAGMA quick_check.
+    pub fn check_integrity(&self) -> Result<bool> {
+        let conn = self.pool.get()?;
+        let status: String = conn.query_row("PRAGMA quick_check", [], |row| row.get(0))?;
+        Ok(status.eq_ignore_ascii_case("ok"))
+    }
+
+    /// Perform an online, transactionally-consistent backup of the database to a target path.
+    pub fn backup(&self, destination: &std::path::Path) -> Result<()> {
+        if let Some(parent) = destination.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let conn = self.pool.get()?;
+        let dest_str = destination.to_str().context("Invalid destination path for backup")?;
+        conn.execute("VACUUM INTO ?1", rusqlite::params![dest_str])?;
+        Ok(())
+    }
+
+    /// Securely delete all credentials in a workspace and VACUUM to purge residual freelist data.
+    pub fn erase_credentials(&self, workspace: &str) -> Result<usize> {
+        let conn = self.pool.get()?;
+        let count = conn.execute(
+            "DELETE FROM nxc_credentials WHERE workspace = ?1",
+            rusqlite::params![workspace],
+        )?;
+        conn.execute_batch("VACUUM;")?;
+        Ok(count)
+    }
 }
 
 #[cfg(test)]
@@ -981,5 +1010,70 @@ mod tests {
         let imported_hosts = db2.list_hosts().unwrap();
         assert_eq!(imported_hosts[0].ip, "10.0.0.1");
         assert_eq!(imported_hosts[0].workspace, "imported");
+    }
+
+    #[test]
+    fn test_db_check_integrity_and_backup() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("primary.db");
+        let backup_path = dir.path().join("backup.db");
+
+        let db = NxcDb::new(&db_path, "default").unwrap();
+        assert!(db.check_integrity().unwrap());
+
+        // Add a host and credential
+        db.upsert_host(&HostInfo {
+            id: None,
+            workspace: "default".into(),
+            ip: "192.168.1.50".into(),
+            hostname: Some("fileserver".into()),
+            domain: Some("DOMAIN".into()),
+            os: None,
+            os_version: None,
+            smb_signing: None,
+            signing_required: None,
+            is_dc: false,
+            first_seen: 10,
+            last_seen: 20,
+        })
+        .unwrap();
+
+        db.add_credential(&Credential {
+            id: None,
+            workspace: "default".into(),
+            domain: Some("DOMAIN".into()),
+            username: "svc_backup".into(),
+            password: Some("secret_pass".into()),
+            nt_hash: None,
+            lm_hash: None,
+            aes_128: None,
+            aes_256: None,
+            source: Some("smb".into()),
+            host_id: None,
+            created_at: 10,
+        })
+        .unwrap();
+
+        // Perform online backup
+        db.backup(&backup_path).unwrap();
+        assert!(backup_path.exists());
+
+        // Open database from backup path and verify integrity and contents
+        let restored_db = NxcDb::new(&backup_path, "default").unwrap();
+        assert!(restored_db.check_integrity().unwrap());
+
+        let hosts = restored_db.list_hosts().unwrap();
+        assert_eq!(hosts.len(), 1);
+        assert_eq!(hosts[0].hostname.as_deref(), Some("fileserver"));
+
+        let creds = restored_db.list_credentials().unwrap();
+        assert_eq!(creds.len(), 1);
+        assert_eq!(creds[0].username, "svc_backup");
+
+        // Test erase credentials and vacuum
+        let erased = restored_db.erase_credentials("default").unwrap();
+        assert_eq!(erased, 1);
+        assert_eq!(restored_db.list_credentials().unwrap().len(), 0);
+        assert!(restored_db.check_integrity().unwrap());
     }
 }

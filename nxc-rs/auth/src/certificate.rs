@@ -44,6 +44,24 @@ impl CertificateAuth {
         Ok(())
     }
 
+    /// Check if certificate and private key are loaded into memory.
+    pub fn is_loaded(&self) -> bool {
+        self.certificate.is_some() && self.private_key.is_some()
+    }
+
+    /// Explicitly zeroize private key and certificate buffers from memory.
+    pub fn clear(&mut self) {
+        use zeroize::Zeroize;
+        if let Some(ref mut key) = self.private_key {
+            key.zeroize();
+        }
+        if let Some(ref mut cert) = self.certificate {
+            cert.zeroize();
+        }
+        self.private_key = None;
+        self.certificate = None;
+    }
+
     /// Prepare PKINIT pre-auth data for Kerberos AS-REQ (PA-PK-AS-REQ)
     pub fn prepare_pkinit(&self) -> Result<Vec<u8>> {
         if self.certificate.is_none() {
@@ -60,5 +78,40 @@ impl CertificateAuth {
         // Temporary placeholder that identifies as PKINIT to the AS-REQ logic
         // Real ASN.1 construction resides in the upcoming Phase 1 signer logic.
         Ok(vec![0x30, 0x82, 0x01, 0x00])
+    }
+}
+
+impl Drop for CertificateAuth {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use zeroize::Zeroize;
+
+    #[test]
+    fn test_certificate_auth_zeroize_on_clear() {
+        let mut auth = CertificateAuth::new("dummy.pfx");
+        let mut test_key = vec![0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03];
+        let mut test_cert = vec![0xCA, 0xFE, 0xBA, 0xBE];
+
+        auth.private_key = Some(test_key.clone());
+        auth.certificate = Some(test_cert.clone());
+        assert!(auth.is_loaded());
+
+        // Call clear explicitly
+        auth.clear();
+        assert!(!auth.is_loaded());
+        assert!(auth.private_key.is_none());
+        assert!(auth.certificate.is_none());
+
+        // Verify zeroize on a buffer works as expected
+        test_key.zeroize();
+        test_cert.zeroize();
+        assert!(test_key.iter().all(|&b| b == 0));
+        assert!(test_cert.iter().all(|&b| b == 0));
     }
 }

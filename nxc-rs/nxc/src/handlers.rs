@@ -13,6 +13,9 @@ pub async fn handle_ai_mode(
     initial_prompt: Option<String>,
     provider_name: Option<String>,
     model: Option<String>,
+    confirm_exec: bool,
+    dry_run: bool,
+    log_prompts: bool,
 ) -> Result<()> {
     dotenvy::dotenv().ok();
 
@@ -90,7 +93,10 @@ pub async fn handle_ai_mode(
     registry.register(Box::new(SearchModulesTool::new(registry_mod)));
     registry.register(Box::new(UtilityTool));
 
-    let mut agent = AiAgent::new(provider, registry, Box::new(CliFeedback));
+    let mut agent = AiAgent::new(provider, registry, Box::new(CliFeedback))
+        .with_confirm_exec(confirm_exec)
+        .with_dry_run(dry_run)
+        .with_prompt_logging(log_prompts);
 
     // If an initial prompt was provided on CLI, run it first
     if let Some(prompt) = initial_prompt {

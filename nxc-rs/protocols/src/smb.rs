@@ -35,7 +35,7 @@ pub struct SmbHostInfo {
 
 // ─── SMB2 Header ──────────────────────────────────────────────
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Smb2Header {
     pub protocol_id: [u8; 4],
     pub structure_size: u16,
@@ -87,6 +87,73 @@ impl Smb2Header {
         buf.extend_from_slice(&self.session_id.to_le_bytes());
         buf.extend_from_slice(&self.signature);
         buf
+    }
+
+    /// Parse SMB2 header from raw byte buffer (RFC 5321 / MS-SMB2 §2.2.1)
+    pub fn parse(data: &[u8]) -> Result<Self> {
+        if data.len() < 64 {
+            anyhow::bail!("SMB2 header buffer too short: {} bytes (expected 64)", data.len());
+        }
+        if &data[0..4] != SMB2_MAGIC {
+            anyhow::bail!("Invalid SMB2 magic bytes: {:?}", &data[0..4]);
+        }
+
+        let structure_size = u16::from_le_bytes([data[4], data[5]]);
+        let credit_charge = u16::from_le_bytes([data[6], data[7]]);
+        let status = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
+        let command = u16::from_le_bytes([data[12], data[13]]);
+        let credits_requested = u16::from_le_bytes([data[14], data[15]]);
+        let flags = u32::from_le_bytes([data[16], data[17], data[18], data[19]]);
+        let next_command = u32::from_le_bytes([data[20], data[21], data[22], data[23]]);
+        let message_id = u64::from_le_bytes(data[24..32].try_into()?);
+        let reserved = u32::from_le_bytes(data[32..36].try_into()?);
+        let tree_id = u32::from_le_bytes(data[36..40].try_into()?);
+        let session_id = u64::from_le_bytes(data[40..48].try_into()?);
+        let mut signature = [0u8; 16];
+        signature.copy_from_slice(&data[48..64]);
+
+        Ok(Self {
+            protocol_id: [data[0], data[1], data[2], data[3]],
+            structure_size,
+            credit_charge,
+            status,
+            command,
+            credits_requested,
+            flags,
+            next_command,
+            message_id,
+            reserved,
+            tree_id,
+            session_id,
+            signature,
+        })
+    }
+}
+
+/// NetBIOS Session Service packet framing (RFC 1002 / MS-SMB2 §2.1)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NetbiosSessionHeader {
+    pub msg_type: u8,
+    pub length: u32,
+}
+
+impl NetbiosSessionHeader {
+    pub fn new(length: usize) -> Self {
+        Self { msg_type: NETBIOS_SESSION_MSG, length: (length & 0x00FFFFFF) as u32 }
+    }
+
+    pub fn to_bytes(&self) -> [u8; 4] {
+        let b = (self.length & 0x00FFFFFF).to_be_bytes();
+        [self.msg_type, b[1], b[2], b[3]]
+    }
+
+    pub fn parse(data: &[u8]) -> Result<Self> {
+        if data.len() < 4 {
+            anyhow::bail!("NetBIOS header too short: {} bytes (expected 4)", data.len());
+        }
+        let msg_type = data[0];
+        let length = u32::from_be_bytes([0, data[1], data[2], data[3]]);
+        Ok(Self { msg_type, length })
     }
 }
 
@@ -1283,5 +1350,90 @@ mod tests {
         assert_eq!(&pkt[0..4], b"\xfeSMB");
         // Opcode 0x01 is Session Setup
         assert_eq!(&pkt[12..14], &[0x01, 0x00]);
+    }
+
+    #[test]
+    fn test_smb2_header_roundtrip() {
+        let mut original = Smb2Header::new(0x03); // TREE_CONNECT
+        original.credit_charge = 1;
+        original.status = 0x00000000;
+        original.credits_requested = 32;
+        original.flags = 0x00000001;
+        original.message_id = 42;
+        original.tree_id = 7;
+        original.session_id = 0x1234567890ABCDEF;
+        original.signature = [0xAA; 16];
+
+        let bytes = original.to_bytes();
+        assert_eq!(bytes.len(), 64);
+
+        let parsed = Smb2Header::parse(&bytes).expect("Failed to parse valid SMB2 header");
+        assert_eq!(original, parsed);
+    }
+
+    #[test]
+    fn test_netbios_framing_roundtrip() {
+        let original = NetbiosSessionHeader::new(1024);
+        let bytes = original.to_bytes();
+        assert_eq!(bytes.len(), 4);
+
+        let parsed = NetbiosSessionHeader::parse(&bytes).expect("Failed to parse NetBIOS header");
+        assert_eq!(original, parsed);
+        assert_eq!(parsed.length, 1024);
+        assert_eq!(parsed.msg_type, NETBIOS_SESSION_MSG);
+    }
+
+    #[test]
+    fn test_smb2_header_rejects_truncated() {
+        assert!(Smb2Header::parse(&[]).is_err());
+        assert!(Smb2Header::parse(&[0u8; 63]).is_err());
+        assert!(Smb2Header::parse(&[0u8; 64]).is_err()); // Invalid magic
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn dont_crash_smb2_header_parse(data in proptest::collection::vec(any::<u8>(), 0..256)) {
+            let _ = Smb2Header::parse(&data);
+        }
+
+        #[test]
+        fn dont_crash_netbios_header_parse(data in proptest::collection::vec(any::<u8>(), 0..32)) {
+            let _ = NetbiosSessionHeader::parse(&data);
+        }
+
+        #[test]
+        fn smb2_header_roundtrip_property(
+            command in any::<u16>(),
+            credit_charge in any::<u16>(),
+            status in any::<u32>(),
+            credits_requested in any::<u16>(),
+            flags in any::<u32>(),
+            next_command in any::<u32>(),
+            message_id in any::<u64>(),
+            tree_id in any::<u32>(),
+            session_id in any::<u64>(),
+            sig in proptest::array::uniform16(any::<u8>())
+        ) {
+            let mut header = Smb2Header::new(command);
+            header.credit_charge = credit_charge;
+            header.status = status;
+            header.credits_requested = credits_requested;
+            header.flags = flags;
+            header.next_command = next_command;
+            header.message_id = message_id;
+            header.tree_id = tree_id;
+            header.session_id = session_id;
+            header.signature = sig;
+
+            let bytes = header.to_bytes();
+            let parsed = Smb2Header::parse(&bytes).expect("Serialized SMB2 header must parse");
+            prop_assert_eq!(header, parsed);
+        }
     }
 }
