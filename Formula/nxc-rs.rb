@@ -1,22 +1,22 @@
 class NxcRs < Formula
   desc "NetExec-RS - High-performance offensive network orchestration framework"
   homepage "https://github.com/thrive-spectrexq/nxc-rs"
-  version "0.4.7"
+  version "0.4.8"
   
   if OS.mac?
     if Hardware::CPU.arm?
-      url "https://github.com/thrive-spectrexq/nxc-rs/releases/download/v0.4.7/nxc-macos-arm64"
+      url "https://github.com/thrive-spectrexq/nxc-rs/releases/download/v0.4.8/nxc-macos-arm64"
       sha256 "REPLACE_WITH_SHA256"
     else
-      url "https://github.com/thrive-spectrexq/nxc-rs/releases/download/v0.4.7/nxc-macos-amd64"
+      url "https://github.com/thrive-spectrexq/nxc-rs/releases/download/v0.4.8/nxc-macos-amd64"
       sha256 "REPLACE_WITH_SHA256"
     end
   elsif OS.linux?
     if Hardware::CPU.arm?
-      url "https://github.com/thrive-spectrexq/nxc-rs/releases/download/v0.4.7/nxc-linux-arm64"
+      url "https://github.com/thrive-spectrexq/nxc-rs/releases/download/v0.4.8/nxc-linux-arm64"
       sha256 "REPLACE_WITH_SHA256"
     else
-      url "https://github.com/thrive-spectrexq/nxc-rs/releases/download/v0.4.7/nxc-linux-amd64"
+      url "https://github.com/thrive-spectrexq/nxc-rs/releases/download/v0.4.8/nxc-linux-amd64"
       sha256 "REPLACE_WITH_SHA256"
     end
   end
