@@ -48,7 +48,7 @@ x509-parser = { workspace = true }
 # Registry parsing
 nt-hive = { workspace = true }
 aes-kw = { workspace = true }
-getrandom = "0.2.15"
+getrandom = "0.4.3"
 
 [dev-dependencies]
 proptest.workspace = true

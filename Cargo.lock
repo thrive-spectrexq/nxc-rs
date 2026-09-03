@@ -2859,7 +2859,7 @@ dependencies = [
  "cipher 0.5.2",
  "des 0.9.0",
  "digest 0.11.3",
- "getrandom 0.2.17",
+ "getrandom 0.4.3",
  "hex",
  "hmac 0.13.0",
  "hostname",
