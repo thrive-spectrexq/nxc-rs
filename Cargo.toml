@@ -45,7 +45,7 @@ ssh2 = "0.9"
 hostname = "0.4"
 async-trait = "0.1"
 ldap3 = "0.12"
-suppaftp = { version = "10.0", features = ["tokio", "tokio-rustls-ring"] }
+suppaftp = { version = "11.0", features = ["tokio", "tokio-rustls-ring"] }
 opcua = { version = "0.12", default-features = false, features = ["client"] }
 
 
