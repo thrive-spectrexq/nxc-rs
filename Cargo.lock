@@ -4639,9 +4639,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "suppaftp"
-version = "11.0.0"
+version = "12.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46c5095831abc0d7944a2d50d6ec6abcd75b9d165d9377deb3e45798cae2343a"
+checksum = "9c6978f1b04fc86f122f767b88a9d1d89e80cfe3dc97d670598507d713c4ce48"
 dependencies = [
  "async-trait",
  "chrono",
