@@ -5,6 +5,12 @@ All notable changes to the NetExec-RS (`nxc-rs`) project will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.9] - 2026-11-08
+
+### Changed
+- Updated the pinned Rust toolchain to 1.89.0 to match the locked dependency requirements.
+- Removed an unused integration-test mock that caused CI warnings to fail the test job.
+
 ## [0.4.6] - 2026-08-16
 
 ### Added
