@@ -49,7 +49,7 @@ chrono = { workspace = true }
 dotenvy = { workspace = true }
 hostname = { workspace = true }
 reqwest = { workspace = true }
-html-escape = "0.2"
+html-escape = "0.3"
 hex.workspace = true
 serde = { workspace = true, features = ["derive"] }
 csv.workspace = true
