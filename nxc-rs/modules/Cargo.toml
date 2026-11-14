@@ -25,7 +25,7 @@ chrono = { workspace = true }
 hex = { workspace = true }
 bytes = { workspace = true }
 reqwest = { workspace = true, features = ["multipart"] }
-zip = "8.5"
+zip = "9.0"
 base64 = { workspace = true }
 uuid = { workspace = true }
 rhai = { version = "1.25", features = ["sync"] }
